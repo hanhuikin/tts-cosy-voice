@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>播客工坊 · UI 与交互设计方案</title>
+<style>
+:root {
+  --bg: #0f1420; --bg-soft: #131a2a; --card: #1a2232; --edge: #263248;
+  --text: #e6ecf7; --muted: #8b96ad;
+  --primary: #4f8cff; --primary2: #22d3ee;
+  --grad: linear-gradient(135deg, #4f8cff, #22d3ee);
+  --ok: #34d399; --warn: #fbbf24; --danger: #f6626f; --purple: #a78bfa;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px; line-height: 1.7; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 32px 28px 80px; }
+h1 { font-size: 26px; margin: 0 0 6px; }
+h1 .accent { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.sub { color: var(--muted); margin-bottom: 30px; }
+h2 { font-size: 20px; margin: 44px 0 14px; padding-left: 12px; border-left: 4px solid var(--primary); }
+h3 { font-size: 15px; margin: 26px 0 10px; color: #cfe2ff; }
+p, li { color: #c9d4e8; }
+.card { background: var(--card); border: 1px solid var(--edge); border-radius: 12px; padding: 18px 20px; margin: 12px 0; }
+.muted { color: var(--muted); }
+code, .tag { background: var(--bg-soft); border: 1px solid var(--edge); border-radius: 6px;
+  padding: 1px 7px; font-family: Consolas, monospace; font-size: 12.5px; color: #9ec2ff; }
+table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #202a3e; font-size: 13px; }
+th { color: var(--muted); font-weight: 600; }
+.flow { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; margin: 14px 0; }
+.flow .step { background: var(--bg-soft); border: 1px solid var(--edge); border-radius: 10px;
+  padding: 10px 14px; flex: 1; min-width: 130px; text-align: center; }
+.flow .step b { display: block; color: #cfe2ff; margin-bottom: 2px; }
+.flow .arrow { align-self: center; color: var(--primary2); font-size: 18px; }
+/* mockup 区 */
+.mock { background: var(--bg); border: 1px solid var(--edge); border-radius: 14px;
+  padding: 16px; margin: 14px 0; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.mock-title { font-size: 12px; color: var(--muted); margin-bottom: 12px; letter-spacing: 1px; }
+.mock .chip { display: inline-block; background: var(--bg-soft); border: 1px solid var(--edge);
+  border-radius: 999px; padding: 3px 14px; font-size: 12.5px; color: var(--text); margin: 0 6px 6px 0; cursor: default; }
+.mock .chip.on { background: linear-gradient(135deg, rgba(79,140,255,.25), rgba(34,211,238,.18)); border-color: var(--primary); }
+.mock .input { background: var(--bg-soft); border: 1px solid var(--edge); border-radius: 8px;
+  padding: 9px 12px; color: var(--text); font-size: 13px; }
+.mock .btn { display: inline-block; border-radius: 9px; padding: 7px 18px; font-size: 13px; font-weight: 600;
+  background: var(--bg-soft); border: 1px solid var(--edge); color: var(--text); margin-right: 8px; }
+.mock .btn.primary { background: var(--grad); border: none; color: #fff; }
+.mock .label { font-size: 12px; color: var(--muted); margin: 10px 0 5px; }
+.dlg { display: flex; gap: 10px; margin: 7px 0; align-items: flex-start; }
+.dlg .avatar { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; font-size: 14px; }
+.dlg .bubble { background: var(--bg-soft); border: 1px solid var(--edge); border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+.dlg .who { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.dlg.host .avatar { background: linear-gradient(135deg,#4f8cff,#22d3ee); }
+.dlg.guest .avatar { background: linear-gradient(135deg,#a78bfa,#f472b6); }
+.dlg.guest { flex-direction: row-reverse; text-align: right; }
+.badge { font-size: 11px; padding: 2px 10px; border-radius: 999px; border: 1px solid; }
+.badge.ok { color: var(--ok); border-color: rgba(52,211,153,.4); background: rgba(52,211,153,.08); }
+.badge.warn { color: var(--warn); border-color: rgba(251,191,36,.4); background: rgba(251,191,36,.08); }
+.badge.live { color: var(--danger); border-color: rgba(246,98,111,.5); background: rgba(246,98,111,.1); }
+.badge.info { color: var(--primary2); border-color: rgba(34,211,238,.4); background: rgba(34,211,238,.08); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.kbd { background:#0a0e18; border:1px solid var(--edge); border-radius:6px; padding:1px 7px; font-family:Consolas,monospace; font-size:12px; color:#22d3ee; }
+.note { border-left: 3px solid var(--warn); background: rgba(251,191,36,.06); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 10px 0; font-size: 13px; }
+ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>🎙 播客工坊 <span class="accent">UI 与交互设计方案</span></h1>
+<div class="sub">CosyVoice FastAPI 服务 · 播客功能设计文档 v1.0 &nbsp;|&nbsp; 参考开源项目：<a href="https://github.com/souzatharsis/podcastfy" style="color:#4f8cff">Podcastfy</a>（开源 NotebookLM 替代）的内容源→对话稿→TTS 管线</div>
+
+<!-- ================= 概述 ================= -->
+<h2>一、功能概述</h2>
+<div class="card">
+<p>在现有控制台中新增「<b>播客工坊</b>」视图，把当前的单人 TTS 合成扩展为<b>多角色对话式播客生成</b>：</p>
+<ul>
+  <li><b>三种内容源</b>：① 上传文件（txt / md / pdf / docx）；② 直接粘贴文本；③ 提供网页 URL，由大模型抓取并总结归纳</li>
+  <li><b>大模型配置能力</b>：兼容 OpenAI 协议（base_url / api_key / model 可配，支持本地模型如 Ollama、DeepSeek、Qwen 等），可测试连通性</li>
+  <li><b>对话稿生成与编辑</b>：LLM 将内容改写为「主播 + 嘉宾」多轮对话稿，生成后可人工逐句编辑、指派音色</li>
+  <li><b>双输出模式</b>：非流式（整段合成 → 成品 WAV 下载）与流式（逐句合成实时播放 / 推流）</li>
+  <li><b>推流能力</b>：流式输出支持 RTMP / SRT / RTSP / HLS 四种主流协议，界面显示可复制的推流地址与拉流预览地址</li>
+</ul>
+</div>
+
+<div class="flow">
+  <div class="step"><b>① 内容源</b>文件 / 粘贴 / URL</div><div class="arrow">→</div>
+  <div class="step"><b>② LLM 归纳</b>生成对话稿</div><div class="arrow">→</div>
+  <div class="step"><b>③ 人工编辑</b>逐句校对音色</div><div class="arrow">→</div>
+  <div class="step"><b>④ 合成</b>流式 / 非流式</div><div class="arrow">→</div>
+  <div class="step"><b>⑤ 输出</b>下载 / 推流</div>
+</div>
+
+<!-- ================= UI 总布局 ================= -->
+<h2>二、UI 设计 — 播客工坊整体布局</h2>
+<p>沿用现有控制台框架（左侧导航新增「播客工坊」入口），主工作区为<b>三段式纵向布局</b>：内容源 → 对话稿 → 输出。</p>
+
+<div class="mock">
+<div class="mock-title">MOCKUP · 播客工坊主界面（非流式模式）</div>
+<div style="display:flex; gap:14px;">
+  <!-- 左: 内容源 -->
+  <div style="flex:1; min-width:260px;">
+    <div class="card" style="margin:0 0 12px;">
+      <b style="font-size:13px;">① 内容源</b>
+      <div style="margin:8px 0;">
+        <span class="chip on">📄 粘贴文本</span><span class="chip">📁 上传文件</span><span class="chip">🌐 网页链接</span>
+      </div>
+      <div class="input" style="height:150px; color:var(--muted);">在此粘贴文章、会议记录、学习笔记…<br><br>（支持 2 万字符，将改写为约 5~15 分钟对话）</div>
+      <div style="display:flex; justify-content:space-between; margin-top:8px;">
+        <span class="muted" style="font-size:12px;">1,842 字符</span>
+        <button class="btn" style="margin:0;">🤖 生成对话稿</button>
+      </div>
+    </div>
+    <div class="card" style="margin:0;">
+      <b style="font-size:13px;">⚙️ 大模型</b>
+      <div class="muted" style="font-size:12px; margin:6px 0;">DeepSeek-chat · 已连接 <span class="badge ok">✓ 连通</span></div>
+      <button class="btn" style="margin:0; padding:4px 12px; font-size:12px;">配置</button>
+    </div>
+  </div>
+  <!-- 中: 对话稿 -->
+  <div style="flex:1.4; min-width:300px;">
+    <div class="card" style="margin:0;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <b style="font-size:13px;">② 对话稿</b>
+        <span><span class="badge info">12 轮 · 预计 4 分 30 秒</span> <button class="btn" style="margin:0; padding:3px 10px; font-size:12px;">↻ 重新生成</button></span>
+      </div>
+      <div class="dlg host"><div class="avatar">🎙</div><div style="flex:1"><div class="who">主播 · 温柔学姐 <span style="float:right">⚡1.0</span></div><div class="bubble">欢迎收听本期播客！今天我们聊一个非常硬核的话题——语音合成的流式推流。</div></div></div>
+      <div class="dlg guest"><div class="avatar">🧑‍🔬</div><div style="flex:1"><div class="who">嘉宾 · 电台男主播 ⚡1.0</div><div class="bubble">对，传统合成是等全部生成完再给你文件，而流式是边生成边往外推，首包延迟可以压到秒级。</div></div></div>
+      <div class="dlg host"><div class="avatar">🎙</div><div style="flex:1"><div class="who">主播 · 温柔学姐</div><div class="bubble">那具体支持哪些推流协议呢？</div></div></div>
+      <div class="dlg guest"><div class="avatar">🧑‍🔬</div><div style="flex:1"><div class="who">嘉宾 · 电台男主播</div><div class="bubble">RTMP、SRT、RTSP，还有网页播放友好的 HLS，四条路都能走。</div></div></div>
+      <div style="text-align:center; color:var(--muted); font-size:12px; margin:8px 0;">▾ 滚动查看更多（每句可点击编辑 / 换音色 / 删除）</div>
+      <button class="btn primary" style="width:100%; margin:6px 0 0;">▶ 合成播客（非流式 · 约 2 分钟）</button>
+    </div>
+  </div>
+  <!-- 右: 输出 -->
+  <div style="flex:1; min-width:240px;">
+    <div class="card" style="margin:0;">
+      <b style="font-size:13px;">③ 输出设置</b>
+      <div class="label">主播音色</div>
+      <div class="input">温柔学姐（8.4s）▾</div>
+      <div class="label">嘉宾音色</div>
+      <div class="input">电台男主播（7.3s）▾</div>
+      <div class="label">语速 / 模式</div>
+      <div class="input">×1.00 · <span class="chip on">非流式</span><span class="chip">流式+推流</span></div>
+      <div style="margin-top:12px; border-top:1px solid var(--edge); padding-top:10px;">
+        <b style="font-size:13px;">④ 成品</b>
+        <div class="input" style="margin-top:8px;">▶▶▶ 04:32 ───────</div>
+        <div style="margin-top:8px;"><button class="btn" style="margin:0;">⬇ 下载 WAV</button><button class="btn" style="margin:0;">💾 存入播客列表</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ================= 内容源 ================= -->
+<h2>三、交互设计 — 内容源（三种方式）</h2>
+
+<h3>3.1 粘贴文本</h3>
+<ul>
+  <li>默认选中项；字符上限 20,000，超出禁止生成并提示「内容过长，请分段」</li>
+  <li>点击「🤖 生成对话稿」→ 按钮进入 loading → <b>对话稿区域流式渲染 LLM 输出</b>（打字机效果），完成后进入可编辑状态</li>
+</ul>
+
+<h3>3.2 上传文件</h3>
+<ul>
+  <li>支持 <code>.txt .md .pdf .docx</code>（前端预检扩展名与大小 ≤20MB），拖拽上传</li>
+  <li>服务端解析出纯文本后回显<b>「文本预览（前 500 字）」</b>，用户确认无误再生成</li>
+  <li>PDF/DOCX 解析失败时给出明确原因（加密 / 扫描件无文本层），引导改用粘贴</li>
+</ul>
+
+<h3>3.3 网页链接（URL 总结）</h3>
+<ul>
+  <li>输入 URL → 点击「抓取并总结」→ 服务端抓取网页正文 → LLM 归纳要点 → 直接生成对话稿</li>
+  <li>抓取过程显示三态进度：<span class="badge info">抓取网页中…</span> → <span class="badge info">正文提取完成 (8,214 字)</span> → <span class="badge info">LLM 改写中…</span></li>
+  <li>失败处理：404/超时提示检查地址；反爬拦截（403）提示「该网站禁止抓取，可复制正文用粘贴文本」</li>
+</ul>
+
+<!-- ================= LLM 配置 ================= -->
+<h2>四、交互设计 — 大模型配置面板</h2>
+<p>入口：内容源卡片「⚙️ 配置」按钮，弹出模态框。配置全局生效并<b>持久化到本地配置文件</b>（api_key 仅存本机，文档中明示）。</p>
+
+<div class="mock">
+<div class="mock-title">MOCKUP · 大模型配置（模态框）</div>
+<div style="max-width:560px; margin:0 auto;">
+  <div class="label">API 地址（OpenAI 兼容 base_url）</div>
+  <div class="input">https://api.deepseek.com/v1</div>
+  <div class="label">API Key</div>
+  <div class="input">sk-••••••••••••••••••••（已保存，点击修改）</div>
+  <div class="label">模型名称</div>
+  <div class="input">deepseek-chat ▾</div>
+  <div class="grid2">
+    <div><div class="label">温度 creativity</div><div class="input">0.7</div></div>
+    <div><div class="label">对话轮数偏好</div><div class="input">10~16 轮 ▾</div></div>
+  </div>
+  <div class="label">对话稿风格指令（System Prompt 附加段，可编辑）</div>
+  <div class="input" style="height:64px;">生成中文播客对话：一问一答、口语化、有观点交锋；开头向听众问好并概括本期主题，结尾引导订阅…</div>
+  <div style="margin-top:12px;">
+    <button class="btn primary">保存配置</button>
+    <button class="btn">测试连通</button>
+    <span class="badge ok">✓ 200 OK · 328ms · deepseek-chat</span>
+  </div>
+</div>
+</div>
+
+<div class="note">⚠️ Key 安全：api_key 保存于服务端本地 <code>server/data/llm_config.json</code>（已列入 .gitignore），接口返回时脱敏为 <code>sk-****</code>；文档与 UI 均注明「请勿在公共服务上使用生产密钥」。</div>
+
+<!-- ================= 对话稿编辑 ================= -->
+<h2>五、交互设计 — 对话稿编辑器</h2>
+<div class="card">
+<ul>
+  <li><b>结构</b>：每轮对话 = {角色, 音色, 语速, 文本}；角色用彩色头像区分（主播蓝 / 嘉宾紫，支持第三人）</li>
+  <li><b>逐句编辑</b>：点击任意气泡 → 文本变为输入框（Enter 保存 / Esc 取消）；删除某句后自动顺延</li>
+  <li><b>音色快换</b>：气泡上的音色名是下拉框，直接切换（联动右侧输出设置的角色默认音色）</li>
+  <li><b>重新生成</b>：保留内容源，重新调用 LLM（覆盖前确认）；「↻ 重写本句」可只重生成单句</li>
+  <li><b>预估时长</b>：按字数实时估算（约 4.3 字/秒 × 各角色语速），随编辑即时更新</li>
+  <li><b>轮次控制</b>：LLM 配置中的轮数偏好 + 生成后可手动增删，超过 60 轮提示拆分为多期</li>
+</ul>
+</div>
+
+<!-- ================= 输出与推流 ================= -->
+<h2>六、UI 设计 — 输出模式与推流面板</h2>
+
+<h3>6.1 非流式（默认）</h3>
+<ul>
+  <li>整段队列合成（逐句依次调用现有 /api/tts，拼接为单文件）→ 播放器试听 → 下载 WAV / 存入播客列表</li>
+  <li>进度条按「已合成句数 / 总句数」推进，单句失败不中断整体（跳过并标记，完成后可单独重试该句）</li>
+</ul>
+
+<h3>6.2 流式 + 推流</h3>
+<p>流式模式 = 逐句流式合成（复用现有 stream 管线）→ 音频流一边进播放器、一边按所选协议经 ffmpeg 推往目标地址。推流面板交互：</p>
+
+<div class="mock">
+<div class="mock-title">MOCKUP · 推流面板（流式模式下的输出设置区）</div>
+<div class="label">推流协议</div>
+<div><span class="chip on">RTMP</span><span class="chip">SRT</span><span class="chip">RTSP</span><span class="chip">HLS</span></div>
+<div class="grid2" style="margin-top:8px;">
+  <div><div class="label">推流地址</div><div class="input" style="font-family:Consolas; font-size:12px;">rtmp://127.0.0.1:1935/live/podcast01</div></div>
+  <div><div class="label">拉流预览（观众侧）</div><div class="input" style="font-family:Consolas; font-size:12px;">http://127.0.0.1:8080/live/podcast01.flv</div></div>
+</div>
+<div class="label">音频参数</div>
+<div><span class="chip">AAC 128k</span><span class="chip">44100 Hz</span><span class="chip">单声道</span></div>
+<div style="margin-top:10px;">
+  <button class="btn primary">🔴 开始合成并推流</button>
+  <button class="btn">⏹ 停止推流</button>
+  <span class="badge live">● 推流中 · 00:42 · 码率 128kbps</span>
+</div>
+<div class="muted" style="font-size:12px; margin-top:8px;">🔗 地址已复制到剪贴板 · 播放器波形与远端推流同步</div>
+</div>
+
+<h3>6.3 推流协议对比（面板中选择协议时展示对应地址格式提示）</h3>
+<table>
+  <tr><th>协议</th><th>地址格式</th><th>典型场景</th><th>延迟</th><th>备注</th></tr>
+  <tr><td><b>RTMP</b></td><td><code>rtmp://host:1935/app/streamKey</code></td><td>推给 SRS / nginx-rtmp / 直播平台（B 站、抖音、视频号）</td><td>1~3s</td><td>最通用，首选默认</td></tr>
+  <tr><td><b>SRT</b></td><td><code>srt://host:9000?streamid=xxx</code></td><td>广域网低延迟传输、专业导播</td><td>0.5~1s</td><td>抗丢包，需对端支持</td></tr>
+  <tr><td><b>RTSP</b></td><td><code>rtsp://host:8554/podcast</code></td><td>局域网监控类播放器（VLC）</td><td>&lt;1s</td><td>适合内网调试</td></tr>
+  <tr><td><b>HLS</b></td><td>推流无需地址；生成 <code>http://host:8001/live/podcast.m3u8</code></td><td>网页/手机 H5 直接播放</td><td>6~15s</td><td>服务端 ffmpeg 切片，本服务直接托管播放列表</td></tr>
+</table>
+<p class="muted">实现要点：服务端以 ffmpeg 子进程为推流出口（<code>ffmpeg -i pipe:0 -c:a aac -f flv rtmp://…</code>），HLS 模式由 ffmpeg 写 m3u8/ts 分片到 <code>server/data/live/</code> 并经 FastAPI 静态托管；进程生命周期与面板「开始/停止」按钮绑定，异常退出自动标记并提示 ffmpeg stderr 摘要。</p>
+
+<!-- ================= 状态机 ================= -->
+<h2>七、播客任务状态机与列表</h2>
+<table>
+  <tr><th>状态</th><th>含义</th><th>可执行操作</th></tr>
+  <tr><td><span class="badge warn">草稿</span></td><td>内容源已就绪，对话稿未生成</td><td>生成对话稿、编辑内容源</td></tr>
+  <tr><td><span class="badge info">稿已生成</span></td><td>对话稿可编辑</td><td>编辑 / 重新生成 / 合成</td></tr>
+  <tr><td><span class="badge info">合成中</span></td><td>逐句合成推进中（进度 n/m）</td><td>取消（保留已完成句）</td></tr>
+  <tr><td><span class="badge ok">已完成</span></td><td>成品音频就绪</td><td>播放 / 下载 / 重新合成 / 推流重播</td></tr>
+  <tr><td><span class="badge live">推流中</span></td><td>流式推流进行中</td><td>停止推流</td></tr>
+  <tr><td><span class="badge warn">失败</span></td><td>LLM / 抓取 / 合成某句失败</td><td>查看原因 / 重试失败句</td></tr>
+</table>
+<p class="muted">播客列表（新增子视图）：封面占位 + 标题（默认取 URL/文件名，可改）+ 时长 + 状态 + 创建时间；支持删除、重命名、下载成品。数据存 <code>server/data/db.sqlite</code> 新表 podcasts / podcast_lines。</p>
+
+<!-- ================= 接口草案 ================= -->
+<h2>八、后端接口草案（供实施参考）</h2>
+<table>
+  <tr><th>方法</th><th>路径</th><th>说明</th></tr>
+  <tr><td>GET/PUT</td><td><code>/api/llm/config</code></td><td>读取 / 保存大模型配置（key 脱敏返回）</td></tr>
+  <tr><td>POST</td><td><code>/api/llm/test</code></td><td>连通性测试（返回延迟与模型名）</td></tr>
+  <tr><td>POST</td><td><code>/api/podcast/source/extract</code></td><td>上传文件 / URL → 提取纯文本（URL 走抓取）</td></tr>
+  <tr><td>POST</td><td><code>/api/podcast/script</code></td><td>文本 → LLM 生成对话稿（SSE 流式返回）</td></tr>
+  <tr><td>POST</td><td><code>/api/podcast/episodes</code></td><td>保存剧集（对话稿 JSON + 音色分配）</td></tr>
+  <tr><td>POST</td><td><code>/api/podcast/episodes/{id}/synthesize</code></td><td>合成：mode=final|stream；stream 时返回事件流（进度 + 首包）</td></tr>
+  <tr><td>POST</td><td><code>/api/podcast/episodes/{id}/push</code></td><td>开始推流 {protocol, url, audio_params}；DELETE 同路径停止</td></tr>
+  <tr><td>GET</td><td><code>/live/{name}.m3u8</code></td><td>HLS 播放列表（静态托管）</td></tr>
+</table>
+<div class="muted" style="font-size:12.5px;">对话稿 JSON 结构：<code>{role, voice_id, speed, text}[]</code>；LLM 输出以 JSON Lines 约束（system prompt 要求逐行输出 JSON，逐行解析容错）。</div>
+
+<!-- ================= 风险 ================= -->
+<h2>九、依赖与风险</h2>
+<div class="card">
+<ul>
+  <li><b>ffmpeg</b>：推流必需依赖，Windows 下随包分发静态版或 winget 安装；启动时自检并在推流面板提示缺失</li>
+  <li><b>LLM Key 安全</b>：仅本机存储；若服务暴露公网需增加访问控制（当前定位为本地工具）</li>
+  <li><b>网页抓取</b>：依赖目标站可访问性与反爬策略，明确失败提示与「复制正文」兜底路径</li>
+  <li><b>流式拼接</b>：逐句流式合成的句间由播放器按序调度（复用现有 2.5s 预缓冲机制），句间停顿由标点自然承担</li>
+  <li><b>分期建议</b>：一期做「粘贴文本 + LLM 对话稿 + 编辑 + 非流式成品」；二期加「文件/URL + 推流」；三期加多角色(3+人)与背景音</li>
+</ul>
+</div>
+
+<div class="muted" style="margin-top:36px; font-size:12px;">文档版本 v1.0 · 2026-11-11 · 对应仓库 github.com/hanhuikin/tts-cosy-voice</div>
+</div>
+</body>
+</html>
