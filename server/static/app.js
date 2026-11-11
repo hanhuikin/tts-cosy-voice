@@ -321,6 +321,7 @@ createApp({
       return '';
     };
     const stateClass = computed(() => health.state);
+    const port = computed(() => window.location.port || (window.location.protocol === 'https:' ? '443' : '80'));
     const stateText = computed(() => ({
       idle: '未加载模型', loading: '模型加载中…', ready: '就绪', error: '加载失败',
     }[health.state] || health.state));
@@ -716,7 +717,7 @@ createApp({
       view, views, health, form, busy, busyText, workbenchError, lastResult,
       voices, tasks, taskFilter, toasts, banner, upload, uploadDrag, player: playerState,
       modeDefs, langs, sampleTexts,
-      stateClass, stateText, gpuText, vramPct, availableModels, visibleModeDefs, currentDefaults,
+      stateClass, stateText, gpuText, vramPct, port, availableModels, visibleModeDefs, currentDefaults,
       canSynth, synthBlocker, canUpload, filteredTasks, currentVoice,
       fmt, modeName, modelLabel, voiceOrSpk, displayTaskText,
       toast, dismissBanner, switchView, applySample, pickLang, switchMode, toggleStream, goVoices,
