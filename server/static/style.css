@@ -264,6 +264,8 @@ code { background: var(--bg-soft); border: 1px solid var(--card-edge); padding: 
   display: flex; align-items: center; gap: 14px; padding: 10px 16px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, .5); z-index: 50;
 }
+/* 右侧栏可见时, 播放器横条让位 (类由 Vue 按视图绑定) */
+.playerbar.sidebar-on { right: 380px; }
 .pb-btn {
   width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--card-edge);
   background: var(--bg-soft); color: var(--text); font-size: 15px; cursor: pointer; flex-shrink: 0;
@@ -332,6 +334,7 @@ code { background: var(--bg-soft); border: 1px solid var(--card-edge); padding: 
 
 /* ---------- Toast ---------- */
 .toasts { position: fixed; top: 18px; right: 18px; display: flex; flex-direction: column; gap: 10px; z-index: 99; }
+.toasts.sidebar-on { right: 380px; }
 .toast {
   background: var(--card); border: 1px solid var(--card-edge); border-left: 4px solid var(--primary);
   border-radius: 10px; padding: 10px 16px; min-width: 220px; max-width: 380px;

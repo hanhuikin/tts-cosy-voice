@@ -702,7 +702,7 @@
   </div>
 
   <!-- 全局播放器 -->
-  <div class="playerbar" v-if="player.active">
+  <div class="playerbar" :class="{ 'sidebar-on': view==='workbench' || view==='podcast' || view==='voices' }" v-if="player.active">
     <button class="pb-btn" @click="togglePlay">{{ player.playing ? '⏸' : '▶' }}</button>
     <canvas ref="waveCanvas" class="pb-wave"></canvas>
     <div class="pb-info">
@@ -815,7 +815,7 @@
   </div>
 
   <!-- Toast -->
-  <div class="toasts">
+  <div class="toasts" :class="{ 'sidebar-on': view==='workbench' || view==='podcast' || view==='voices' }">
     <transition-group name="toast">
       <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type">{{ t.text }}</div>
     </transition-group>
