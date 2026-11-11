@@ -331,6 +331,17 @@ createApp({
     }[s] || { cls: '', text: s });
     const ttsQueue = computed(() => tasks.value.slice(0, 12));
     const ttsRunning = computed(() => tasks.value.filter(t => t.status === 'running').length);
+    // 相对时间 (右侧栏行内显示, 完整时间见 title 提示)
+    const timeAgo = (iso) => {
+      if (!iso) return '';
+      const t = new Date(iso).getTime();
+      if (isNaN(t)) return iso;
+      const s = Math.max(0, (Date.now() - t) / 1000);
+      if (s < 60) return '刚刚';
+      if (s < 3600) return Math.floor(s / 60) + ' 分钟前';
+      if (s < 86400) return Math.floor(s / 3600) + ' 小时前';
+      return Math.floor(s / 86400) + ' 天前';
+    };
     const editLine = ref(-1);
     const editLineText = ref('');
 
@@ -1195,7 +1206,7 @@ createApp({
       editVoice, startVoiceEdit, cancelVoiceEdit, saveVoiceEdit,
       pod, voiceIds, llmCfg, llmModal, llmForm, llmTestResult, episodes, podEpisode, pushStatus,
       queueModal, queueDetail, podQueue, queueActive, queueRunning, queueBadge, queueTaskText,
-      ttsBadge, ttsQueue, ttsRunning,
+      ttsBadge, ttsQueue, ttsRunning, timeAgo,
       editLine, editLineText,
       podCanGen, podFileNeedsLLM, estimateText, pushUrlPlaceholder, hlsUrl, pushStatusText, voiceName,
       openLLMConfig, saveLLMConfig, testLLM,

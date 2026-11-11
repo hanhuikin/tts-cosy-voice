@@ -291,37 +291,54 @@ code { background: var(--bg-soft); border: 1px solid var(--card-edge); padding: 
 .dlg.guest { flex-direction: row-reverse; text-align: right; }
 .tag.live { background: rgba(79, 140, 255, .12); color: var(--primary-2); border-color: rgba(79, 140, 255, .35); }
 
-/* ---------- 右侧栏 (与左侧导航平级): 各视图的队列/记录 ---------- */
+/* ---------- 右侧栏 (与左侧导航平级, 扁平化风格) ---------- */
 .right-side {
   width: 360px; flex-shrink: 0;
   background: var(--bg-soft);
   border-left: 1px solid var(--card-edge);
-  padding: 20px 16px 24px;
-  display: flex; flex-direction: column; gap: 14px;
+  padding: 20px 14px 24px;
+  display: flex; flex-direction: column; gap: 20px;
   position: sticky; top: 0; height: 100vh; overflow-y: auto;
 }
-.right-side .card { flex-shrink: 0; }
-/* 最后一张卡片撑满剩余高度, 与左侧栏内容上下对齐 */
-.right-side .card:last-child { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
-.right-side .card:last-child .ep-list { flex: 1; max-height: none; min-height: 0; }
 @media (max-width: 1500px) { .right-side { width: 320px; } }
 @media (max-width: 1180px) { .right-side { display: none; } }
-.right-side .queue-list { max-height: 38vh; overflow-y: auto; padding-right: 2px; }
-.right-side .ep-list { overflow-y: auto; padding-right: 2px; }
-.queue-list { display: flex; flex-direction: column; gap: 8px; }
-.queue-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
-  border: 1px solid var(--edge); border-radius: 10px; cursor: pointer; transition: background .15s, border-color .15s; }
-.queue-item:hover { background: var(--hover); border-color: var(--primary); }
-.queue-item .tag { flex: none; }
-.q-main { flex: 1; min-width: 0; }
-.q-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.q-meta { margin-top: 2px; }
-.q-time { margin-left: 6px; white-space: nowrap; }
-.q-go { flex: none; font-size: 18px; line-height: 1; }
-.ep-list { display: flex; flex-direction: column; gap: 8px; }
-.ep-actions { flex: none; display: flex; gap: 4px; }
-.ep-actions .btn { padding: 2px 8px; font-size: 12px; }
-.qbar { height: 5px; background: var(--edge); border-radius: 999px; overflow: hidden; margin-top: 6px; }
+.rs-group { display: flex; flex-direction: column; min-height: 0; }
+.rs-grow { flex: 1 1 auto; }
+.rs-head { display: flex; align-items: center; gap: 8px; padding: 2px 6px 8px; border-bottom: 1px solid var(--card-edge); }
+.rs-title { font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+.rs-live { font-size: 11px; font-weight: 600; color: var(--primary-2); }
+.rs-count { font-size: 11px; color: var(--muted); }
+.rs-refresh { margin-left: auto; border: none; background: none; color: var(--muted); cursor: pointer;
+  font-size: 14px; padding: 2px 7px; border-radius: 6px; }
+.rs-refresh:hover { color: var(--text); background: var(--hover); }
+.rs-list { overflow-y: auto; min-height: 0; padding-right: 2px; }
+.rs-item { display: flex; align-items: flex-start; gap: 9px; padding: 9px 8px; cursor: pointer; }
+.rs-item + .rs-item { border-top: 1px solid var(--edge); }
+.rs-item:hover { background: var(--hover); }
+.rs-item:first-child { border-radius: 8px 8px 0 0; }
+.rs-item:last-child { border-radius: 0 0 8px 8px; }
+/* 状态圆点 (取代药丸标签) */
+.st-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; margin-top: 5px; background: var(--muted); opacity: .8; }
+.st-dot.live { background: var(--primary-2); opacity: 1; animation: st-pulse 1.6s ease-out infinite; }
+.st-dot.ok { background: var(--ok); }
+.st-dot.warn { background: var(--warn); }
+@keyframes st-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, .45); }
+  70% { box-shadow: 0 0 0 6px rgba(34, 211, 238, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+}
+.rs-item .q-main { flex: 1; min-width: 0; }
+.q-title { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-meta { margin-top: 2px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 操作按钮悬停才显示 */
+.rs-act { flex: none; font-size: 13px; opacity: 0; transition: opacity .15s; }
+.rs-item:hover .rs-act { opacity: 1; }
+.ep-actions { flex: none; display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+.rs-item:hover .ep-actions { opacity: 1; }
+.rs-btn { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 2px 5px; border-radius: 6px; }
+.rs-btn:hover { color: var(--text); background: var(--hover); }
+.rs-empty { color: var(--muted); font-size: 12px; padding: 14px 8px; }
+.qbar { height: 4px; background: var(--edge); border-radius: 999px; overflow: hidden; margin-top: 5px; }
 .qbar-fill { height: 100%; background: var(--accent-grad); border-radius: 999px; transition: width .5s; }
 
 /* ---------- 模态框 ---------- */
