@@ -470,10 +470,10 @@
               <b style="font-size:13px;">④ 成品（非流式）</b>
               <div style="margin-top:8px;">
                 <button class="btn btn-primary" style="width:100%;" @click="synthPod"
-                        :disabled="!pod.lines.length || pod.busy"
+                        :disabled="!pod.lines.length || pod.busyFinal || pod.busyStream"
                         :title="pod.lines.length ? '' : '请先生成或载入对话稿'">
-                  <span v-if="pod.busy" class="spinner spinner-light"></span>
-                  {{ pod.busy ? `合成中 ${pod.progress}/${pod.lines.length}` : '▶ 合成播客成品' }}
+                  <span v-if="pod.busyFinal" class="spinner spinner-light"></span>
+                  {{ pod.busyFinal ? `合成中 ${pod.progress}/${pod.lines.length}` : '▶ 合成播客成品' }}
                 </button>
                 <p class="hint" v-if="!pod.lines.length">请先生成 / 载入对话稿（合成时自动保存剧集）。</p>
               </div>
@@ -526,9 +526,9 @@
               </template>
               <template v-else>
                 <button class="btn btn-primary" style="width:100%;" @click="synthPodStream"
-                        :disabled="!pod.lines.length || pod.busy">
-                  <span v-if="pod.busy" class="spinner spinner-light"></span>
-                  {{ pod.busy ? `流式合成中 ${pod.progress}/${pod.lines.length}` : '▶ 流式合成并播放' }}
+                        :disabled="!pod.lines.length || pod.busyFinal || pod.busyStream">
+                  <span v-if="pod.busyStream" class="spinner spinner-light"></span>
+                  {{ pod.busyStream ? `流式合成中 ${pod.progress}/${pod.lines.length}` : '▶ 流式合成并播放' }}
                 </button>
                 <p class="hint">逐句合成实时播放（2.5 秒预缓冲），完成后自动存为成品，可下载。</p>
               </template>

@@ -280,7 +280,7 @@ createApp({
       extractText: '', extractChars: 0, extracting: false, fileDrag: false, sourceError: '',
       genning: false, genRaw: '', lines: [], saving: false,
       speed: 1.0, protocol: 'rtmp', pushUrl: '', ffmpeg: true, pushEnabled: false,
-      busy: false, progress: 0, synthError: '', pushing: false,
+      busyFinal: false, busyStream: false, progress: 0, synthError: '', pushing: false,
     });
     const voiceIds = reactive({ host: '', guest: '' });
     const llmCfg = reactive({ base_url: '', model: '', api_key_masked: '' });
@@ -906,8 +906,8 @@ createApp({
       toast(`已载入「${e.title}」`);
     }
     async function synthPod() {
-      if (!pod.lines.length) return;
-      pod.busy = true; pod.progress = 0; pod.synthError = '';
+      if (!pod.lines.length || pod.busyFinal || pod.busyStream) return;
+      pod.busyFinal = true; pod.progress = 0; pod.synthError = '';
       try {
         await saveEpisode();  // 合成前自动保存 (无剧集则创建)
         await api(`/api/podcast/episodes/${podEpisode.value.id}/synthesize`, {
@@ -929,7 +929,7 @@ createApp({
       } catch (e) {
         pod.synthError = e.message;
         toast('合成失败: ' + e.message, 'error', 6000);
-      } finally { pod.busy = false; }
+      } finally { pod.busyFinal = false; }
     }
     function playPodcast() {
       player.playFile(`/api/podcast/episodes/${podEpisode.value.id}/audio`, '播客 · ' + (podEpisode.value.title || ''), null);
@@ -947,8 +947,8 @@ createApp({
       if (podEpisode.value && podEpisode.value.id === e.id) podEpisode.value = null;
     }
     async function synthPodStream() {
-      if (!pod.lines.length || pod.busy) return;
-      pod.busy = true; pod.progress = 0; pod.synthError = '';
+      if (!pod.lines.length || pod.busyFinal || pod.busyStream) return;
+      pod.busyStream = true; pod.progress = 0; pod.synthError = '';
       try {
         await saveEpisode();  // 自动保存剧集
         const resp = await fetch(`/api/podcast/episodes/${podEpisode.value.id}/synthesize`, {
@@ -967,7 +967,7 @@ createApp({
       } catch (e) {
         pod.synthError = e.message;
         toast('流式合成失败: ' + e.message, 'error', 6000);
-      } finally { pod.busy = false; }
+      } finally { pod.busyStream = false; }
     }
     async function startPush() {
       pod.pushing = true;
