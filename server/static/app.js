@@ -754,7 +754,8 @@ createApp({
     const hlsUrl = computed(() => podEpisode.value
       ? `${window.location.origin}/live/${podEpisode.value.id}.m3u8` : '');
     const pushStatusText = computed(() => ({
-      pushing: '● 推流中', completed: '✓ 推流完成', stopped: '已停止', failed: '推流失败',
+      preparing: '⟳ 预缓冲中…', pushing: '● 推流中', completed: '✓ 推流完成',
+      stopped: '已停止', failed: '推流失败',
     }[pushStatus.status] || pushStatus.status));
 
     async function refreshLLM() {

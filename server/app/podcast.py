@@ -242,11 +242,16 @@ def ffmpeg_available() -> bool:
     return find_ffmpeg() is not None
 
 
-def build_ffmpeg_cmd(protocol: str, url: str, ep_id: str) -> list[str]:
+def build_ffmpeg_cmd(protocol: str, url: str, ep_id: str, input_wav: Optional[str] = None) -> list[str]:
+    """构建推流命令。-re 使 ffmpeg 按实时节拍读取: 产出不及时时输出流保持连续
+    (延迟增长) 而非断续。input_wav 为空时从 stdin 读 PCM。"""
     ffmpeg = find_ffmpeg() or "ffmpeg"
-    base = [ffmpeg, "-hide_banner", "-loglevel", "warning",
-            "-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "1", "-i", "pipe:0",
-            "-c:a", "aac", "-b:a", "128k"]
+    base = [ffmpeg, "-hide_banner", "-loglevel", "warning", "-re"]
+    if input_wav:
+        base += ["-i", input_wav]
+    else:
+        base += ["-f", "s16le", "-ar", str(SAMPLE_RATE), "-ac", "1", "-i", "pipe:0"]
+    base += ["-c:a", "aac", "-b:a", "128k"]
     if protocol == "rtmp":
         return base + ["-f", "flv", url]
     if protocol == "srt":
@@ -262,19 +267,34 @@ def build_ffmpeg_cmd(protocol: str, url: str, ep_id: str) -> list[str]:
     raise ValueError(f"不支持的推流协议: {protocol}")
 
 
+
+
 class PushManager:
-    """全局单推流会话 (本地工具定位): 管理 ffmpeg 子进程与喂流任务。"""
+    """全局单推流会话。
+
+    三阶段 (防断续):
+    1. preparing  — 开播前预缓冲: 先合成 ~20s 音频填满观众端播放缓冲
+    2. pushing    — ffmpeg 以 -re 实时节拍消费, 逐句边合成边补货;
+                    产出不及时时输出流保持连续 (延迟增长), 不产生静音缝隙
+    3. completed  — 全部句合成完, 关闭管道收尾, 完整 WAV 落盘为成品
+
+    若剧集已有成品 WAV (final 已合成过), 直接推成品文件 (零延迟增长)。
+    """
+
+    PREBUFFER_SECONDS = 20
 
     def __init__(self) -> None:
         self.proc: Optional[subprocess.Popen] = None
         self.info: dict = {}
         self._task: Optional[asyncio.Task] = None
         self._stderr_tail = ""
+        self._stop_flag = False
         self._lock = asyncio.Lock()
 
     @property
     def active(self) -> bool:
-        return self.proc is not None and self.proc.poll() is None
+        return (self._task is not None and not self._task.done()) or \
+               (self.proc is not None and self.proc.poll() is None)
 
     def status(self) -> dict:
         info = dict(self.info)
@@ -291,19 +311,19 @@ class PushManager:
             ep = storage.get_episode(ep_id)
             if not ep or not ep["script_json"]:
                 raise ValueError("episode 不存在或对话稿为空")
-            cmd = build_ffmpeg_cmd(protocol, url, ep_id)
-            LIVE_DIR.mkdir(parents=True, exist_ok=True)
-            self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                         stdout=subprocess.DEVNULL,
-                                         stderr=subprocess.PIPE)
+            self._stop_flag = False
             self._stderr_tail = ""
-            threading.Thread(target=self._drain_stderr, args=(self.proc,), daemon=True).start()
             self.info = {"episode_id": ep_id, "protocol": protocol, "url": url,
-                         "status": "pushing", "started_at": time.strftime("%H:%M:%S"),
-                         "lines_done": 0, "lines_total": len(json.loads(ep["script_json"]))}
+                         "status": "preparing", "lines_done": 0,
+                         "lines_total": len(json.loads(ep["script_json"])),
+                         "mode": "file" if self._ep_has_final(ep) else "live"}
             storage.update_episode(ep_id, status="pushing", error=None)
-            self._task = asyncio.create_task(self._feed(ep_id, protocol, url))
+            self._task = asyncio.create_task(self._run(ep_id, protocol, url))
             return self.status()
+
+    @staticmethod
+    def _ep_has_final(ep: dict) -> bool:
+        return bool(ep.get("file") and Path(ep["file"]).exists())
 
     def _drain_stderr(self, proc: subprocess.Popen) -> None:
         try:
@@ -312,47 +332,95 @@ class PushManager:
         except Exception:
             pass
 
-    async def _feed(self, ep_id: str, protocol: str, url: str) -> None:
-        """逐句合成并写入 ffmpeg stdin; 结束后关闭管道并落盘完整 WAV。"""
-        proc = self.proc
+    def _spawn(self, cmd: list[str]) -> subprocess.Popen:
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.PIPE)
+        self.proc = proc
+        threading.Thread(target=self._drain_stderr, args=(proc,), daemon=True).start()
+        return proc
+
+    async def _run(self, ep_id: str, protocol: str, url: str) -> None:
         loop = asyncio.get_running_loop()
         ep = storage.get_episode(ep_id)
         lines = json.loads(ep["script_json"])
         voice_ids = {"host": ep["voice_host"], "guest": ep["voice_guest"]}
+        status, error = "completed", None
+        proc: Optional[subprocess.Popen] = None
         all_parts: list[bytes] = []
         done = 0
-        status, error = "completed", None
         try:
-            for line in lines:
-                if proc.poll() is not None:  # ffmpeg 提前退出
-                    raise RuntimeError(f"ffmpeg 提前退出: {self._stderr_tail[-200:]}")
-                req = resolve_line_request(line, voice_ids)
-                pcm = await synth_line_pcm(req)
-                all_parts.append(pcm)
-                await loop.run_in_executor(None, self._write_stdin, proc, pcm)
-                done += 1
-                self.info["lines_done"] = done
-                storage.update_episode(ep_id, progress=done)
+            if self.info["mode"] == "file":
+                # 成品直推: 完整文件 + -re, 平滑无缺口
+                self.info["status"] = "pushing"
+                cmd = build_ffmpeg_cmd(protocol, url, ep_id, input_wav=ep["file"])
+                proc = self._spawn(cmd)
+                self.proc = proc
+                await loop.run_in_executor(None, proc.wait)
+                if proc.returncode not in (0, None):
+                    raise RuntimeError(f"ffmpeg 退出码 {proc.returncode}: {self._stderr_tail[-200:]}")
+            else:
+                # 阶段 1: 预缓冲
+                reservoir: list[bytes] = []
+                rsamples = 0
+                need = self.PREBUFFER_SECONDS * SAMPLE_RATE
+                idx = 0
+                while idx < len(lines) and rsamples < need and not self._stop_flag:
+                    pcm = await synth_line_pcm(resolve_line_request(lines[idx], voice_ids))
+                    reservoir.append(pcm)
+                    rsamples += len(pcm) // 2
+                    idx += 1
+                    done += 1
+                    self.info["lines_done"] = done
+                    storage.update_episode(ep_id, progress=done)
+                # 阶段 2: 起播 + 边合成边补货
+                self.info["status"] = "pushing"
+                cmd = build_ffmpeg_cmd(protocol, url, ep_id)
+                proc = self._spawn(cmd)
+                self.proc = proc
+                await loop.run_in_executor(None, self._write_stdin, proc, b"".join(reservoir))
+                while idx < len(lines):
+                    if self._stop_flag:
+                        status, error = "stopped", "手动停止"
+                        break
+                    pcm = await synth_line_pcm(resolve_line_request(lines[idx], voice_ids))
+                    all_parts.append(pcm)
+                    await loop.run_in_executor(None, self._write_stdin, proc, pcm)
+                    idx += 1
+                    done += 1
+                    self.info["lines_done"] = done
+                    storage.update_episode(ep_id, progress=done)
+                if status != "stopped":
+                    if proc.stdin and not proc.stdin.closed:
+                        proc.stdin.close()
+                    await loop.run_in_executor(None, proc.wait)
+                    if proc.returncode != 0:
+                        raise RuntimeError(f"ffmpeg 退出码 {proc.returncode}: {self._stderr_tail[-200:]}")
+                # 预缓冲部分计入成品
+                all_parts = reservoir + all_parts
         except Exception as e:
             logger.exception("推流中断")
             status, error = "failed", f"{type(e).__name__}: {e}"
             storage.update_episode(ep_id, status="failed", error=error)
         finally:
-            try:
-                if proc.stdin and not proc.stdin.closed:
-                    proc.stdin.close()
-                proc.wait(timeout=10)
-            except Exception:
-                proc.kill()
+            if proc is not None:
+                try:
+                    if proc.stdin and not proc.stdin.closed:
+                        proc.stdin.close()
+                    proc.wait(timeout=5)
+                except Exception:
+                    proc.kill()
+                self.proc = None
             if all_parts:
                 wav = pcm_to_wav(all_parts, SAMPLE_RATE)
                 out = DATA_DIR / "podcasts" / f"{ep_id}.wav"
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_bytes(wav)
-                storage.update_episode(ep_id, status=status if status == "completed" else "failed",
-                                       file=str(out), error=error,
+                storage.update_episode(ep_id, file=str(out),
                                        duration=sum(len(p) for p in all_parts) / 2 / SAMPLE_RATE,
                                        progress=done)
+            if status != "stopped":
+                storage.update_episode(ep_id, status=status, error=error)
             self.info["status"] = status
             self.info["error"] = error
             self.proc = None
@@ -362,9 +430,10 @@ class PushManager:
         proc.stdin.flush()
 
     def stop(self) -> dict:
+        self._stop_flag = True
         if self.proc:
             try:
-                self.proc.stdin.close()  # 优雅收尾: ffmpeg 写完 trailer 退出
+                self.proc.stdin.close()
                 self.proc.wait(timeout=5)
             except Exception:
                 self.proc.kill()
