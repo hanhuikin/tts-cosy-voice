@@ -75,6 +75,11 @@ async def startup() -> None:
     engine._loop = loop
     engine.task_queue = asyncio.Queue(maxsize=QUEUE_MAX)
     asyncio.create_task(engine.worker_loop())
+    # 复位上次进程中断遗留的中间状态
+    for ep in storage.list_episodes(500):
+        if ep["status"] in ("synthesizing", "pushing"):
+            storage.update_episode(ep["id"], status="failed",
+                                   error="服务重启中断, 请重新合成")
     # 默认加载 cosyvoice3; 若未下载则尝试 cosyvoice2, 都没有则保持 idle 等待 /api/admin/model
     target = None
     for key in (_default_model, "cosyvoice2"):
