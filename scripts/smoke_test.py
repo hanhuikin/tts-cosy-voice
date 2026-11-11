@@ -11,7 +11,7 @@ import wave
 
 import requests
 
-BASE = "http://127.0.0.1:8000"
+BASE = "http://127.0.0.1:8001"
 PROMPT_WAV = "CosyVoice/asset/zero_shot_prompt.wav"
 PROMPT_TEXT = "希望你以后能够做的比我还好呦。"
 

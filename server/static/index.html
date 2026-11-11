@@ -318,6 +318,212 @@
         </div>
       </section>
 
+      <!-- ========== 播客工坊 ========== -->
+      <section v-else-if="view==='podcast'" class="view">
+        <h2 class="view-title">播客工坊</h2>
+
+        <div class="podcast-grid">
+          <!-- ① 内容源 -->
+          <div class="card pod-col">
+            <div class="card-head">
+              <span class="card-title">① 内容源</span>
+              <button class="btn btn-ghost" style="padding:3px 10px; font-size:12px;" @click="openLLMConfig">⚙ 大模型</button>
+            </div>
+            <div class="mode-tabs" style="grid-template-columns: repeat(3, 1fr); margin-bottom:10px;">
+              <button class="mode-tab" :class="{active: pod.source==='text'}" @click="pod.source='text'">📄 粘贴</button>
+              <button class="mode-tab" :class="{active: pod.source==='file'}" @click="pod.source='file'">📁 文件</button>
+              <button class="mode-tab" :class="{active: pod.source==='url'}" @click="pod.source='url'">🌐 链接</button>
+            </div>
+
+            <div v-if="pod.source==='text'">
+              <textarea v-model="pod.sourceText" class="textarea" rows="8" style="font-size:13px;"
+                        placeholder="在此粘贴文章、会议记录、学习笔记…（将改写为 10~16 轮对话，约 4~10 分钟节目）"></textarea>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                <span class="muted small" :class="{accent: pod.sourceText.length>20000}">{{ pod.sourceText.length }} / 20000 字符</span>
+              </div>
+            </div>
+
+            <div v-else-if="pod.source==='file'">
+              <div class="dropzone" :class="{drag: pod.fileDrag}" @click="$refs.podFile.click()"
+                   @dragover.prevent="pod.fileDrag=true" @dragleave="pod.fileDrag=false" @drop.prevent="onPodFileDrop">
+                <input type="file" ref="podFile" accept=".txt,.md,.pdf,.docx" hidden @change="onPodFilePick">
+                <div v-if="!pod.fileName" class="dz-hint">
+                  <div class="dz-icon">📄</div>
+                  点击或拖拽文件<br><span class="muted small">txt / md / pdf / docx · ≤20MB</span>
+                </div>
+                <div v-else class="dz-file">
+                  <b>{{ pod.fileName }}</b>
+                  <span class="muted small">{{ pod.extractText ? '已提取 ' + pod.extractChars + ' 字' : '解析中…' }}</span>
+                </div>
+              </div>
+              <p class="hint" v-if="pod.sourceError">{{ pod.sourceError }}</p>
+            </div>
+
+            <div v-else>
+              <div style="display:flex; gap:8px;">
+                <input v-model="pod.url" class="input" placeholder="https:// 文章页面地址" style="flex:1;">
+                <button class="btn" @click="extractUrl" :disabled="!pod.url || pod.extracting">
+                  {{ pod.extracting ? '抓取中…' : '抓取' }}
+                </button>
+              </div>
+              <p class="hint" v-if="pod.extractText">✓ 已提取 {{ pod.extractChars }} 字正文，可直接生成对话稿</p>
+              <p class="hint" v-if="pod.sourceError">{{ pod.sourceError }}</p>
+            </div>
+
+            <div style="margin-top:12px; border-top:1px solid var(--edge); padding-top:10px;">
+              <b style="font-size:13px;">⚙️ 大模型</b>
+              <div class="muted" style="font-size:12px; margin:4px 0;">
+                {{ llmCfg.model || '未配置' }} <span v-if="llmCfg.base_url" class="muted">· {{ llmCfg.base_url }}</span>
+              </div>
+              <button class="btn btn-ghost" style="padding:4px 12px; font-size:12px;" @click="openLLMConfig">配置 / 测试连通</button>
+            </div>
+
+            <button class="btn btn-primary" style="width:100%; margin-top:12px;" @click="genScript"
+                    :disabled="!podCanGen || pod.genning">
+              <span v-if="pod.genning" class="spinner spinner-light"></span>
+              {{ pod.genning ? '生成中…' : '🤖 生成对话稿' }}
+            </button>
+          </div>
+
+          <!-- ② 对话稿 -->
+          <div class="card pod-col pod-script">
+            <div class="card-head">
+              <span class="card-title">② 对话稿</span>
+              <span>
+                <span class="badge info" v-if="pod.lines.length">{{ pod.lines.length }} 轮 · 预计 {{ estimateText }}</span>
+                <button class="btn btn-ghost" style="padding:3px 10px; font-size:12px;" @click="genScript"
+                        :disabled="!podCanGen || pod.genning">↻ 重新生成</button>
+              </span>
+            </div>
+
+            <div class="pod-script-body" v-if="pod.lines.length">
+              <div v-for="(line, i) in pod.lines" :key="i" class="dlg" :class="line.role==='host' ? 'host' : 'guest'">
+                <div class="avatar">{{ line.role==='host' ? '🎙' : '🧑‍🔬' }}</div>
+                <div style="flex:1; min-width:0;">
+                  <div class="who">
+                    {{ line.role==='host' ? '主播' : '嘉宾' }} ·
+                    <select v-model="voiceIds[line.role]" class="input" style="display:inline-block; width:auto; padding:2px 8px; font-size:12px;">
+                      <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
+                    </select>
+                    <button class="btn btn-ghost" style="padding:1px 8px; font-size:11px; float:right" @click="delLine(i)">✕</button>
+                  </div>
+                  <div v-if="editLine===i">
+                    <textarea v-model="editLineText" class="textarea" rows="3" style="font-size:13px;"></textarea>
+                    <button class="btn btn-primary" style="padding:3px 12px; font-size:12px;" @click="saveLine(i)">保存</button>
+                    <button class="btn btn-ghost" style="padding:3px 12px; font-size:12px;" @click="editLine=-1">取消</button>
+                  </div>
+                  <div v-else class="bubble" style="cursor:text;" @click="startEditLine(i)">{{ line.text }}</div>
+                </div>
+              </div>
+              <div v-if="pod.genRaw && !pod.lines.length" class="input" style="white-space:pre-wrap; font-size:12.5px; color:var(--muted);">{{ pod.genRaw }}</div>
+              <button class="btn btn-ghost" style="width:100%; margin-top:6px;" @click="addLine">
+                ＋ 插入一轮对话
+              </button>
+            </div>
+            <div v-else class="empty">还没有对话稿。完成左侧内容源后点击「生成对话稿」。</div>
+
+            <button class="btn btn-primary" style="width:100%; margin-top:10px;" @click="saveEpisode"
+                    :disabled="!pod.lines.length || pod.saving">
+              {{ pod.saving ? '保存中…' : '💾 保存剧集' }}
+            </button>
+          </div>
+
+          <!-- ③ 输出 -->
+          <div class="card pod-col">
+            <div class="card-head"><span class="card-title">③ 输出设置</span></div>
+            <div class="field-col">
+              <label>主播音色 (host)</label>
+              <select v-model="voiceIds.host" class="input">
+                <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
+              </select>
+            </div>
+            <div class="field-col">
+              <label>嘉宾音色 (guest)</label>
+              <select v-model="voiceIds.guest" class="input">
+                <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
+              </select>
+            </div>
+            <div class="field-col">
+              <label>语速 ×{{ pod.speed.toFixed(2) }}</label>
+              <input type="range" min="0.5" max="2" step="0.05" v-model.number="pod.speed">
+            </div>
+
+            <div style="margin-top:10px; border-top:1px solid var(--edge); padding-top:10px;">
+              <b style="font-size:13px;">④ 成品（非流式）</b>
+              <div style="margin-top:8px;">
+                <button class="btn btn-primary" style="width:100%;" @click="synthPod('final')"
+                        :disabled="!currentEpisode || pod.busy">
+                  <span v-if="pod.busy" class="spinner spinner-light"></span>
+                  {{ pod.busy ? `合成中 ${pod.progress}/${pod.lines.length}` : '▶ 合成播客成品' }}
+                </button>
+              </div>
+              <div v-if="podEpisode && podEpisode.status==='completed' && podEpisode.duration" style="margin-top:8px;">
+                <div class="muted small">时长 {{ podEpisode.duration.toFixed(1) }}s</div>
+                <div style="display:flex; gap:8px; margin-top:6px;">
+                  <button class="btn btn-ghost" @click="playPodcast">▶ 试听</button>
+                  <a class="btn btn-ghost" :href="`/api/podcast/episodes/${podEpisode.id}/audio`" download>⬇ 下载</a>
+                </div>
+              </div>
+              <p class="hint" v-if="pod.synthError">{{ pod.synthError }}</p>
+            </div>
+
+            <div style="margin-top:10px; border-top:1px solid var(--edge); padding-top:10px;">
+              <b style="font-size:13px;">📡 流式推流</b>
+              <div style="margin:6px 0;">
+                <span v-for="p in ['rtmp','srt','rtsp','hls']" :key="p" class="chip"
+                      :class="{active: pod.protocol===p}" @click="pod.protocol=p">{{ p.toUpperCase() }}</span>
+              </div>
+              <input v-if="pod.protocol!=='hls'" v-model="pod.pushUrl" class="input"
+                     :placeholder="pushUrlPlaceholder" style="font-family:Consolas; font-size:12px;">
+              <div class="muted small" v-if="pod.protocol==='hls'" style="margin-top:6px;">
+                拉流地址（推流开始后）：<span class="kbd">{{ hlsUrl }}</span>
+              </div>
+              <div style="margin-top:8px;">
+                <button class="btn btn-primary" style="width:100%;" @click="startPush"
+                        :disabled="!currentEpisode || pod.pushing">
+                  🔴 开始合成并推流
+                </button>
+                <button class="btn btn-danger" style="width:100%; margin-top:6px;" @click="stopPush"
+                        v-if="pushStatus.status==='pushing'">⏹ 停止推流</button>
+              </div>
+              <div class="muted small" style="margin-top:6px;" v-if="pushStatus.status">
+                <span class="badge" :class="pushStatus.status==='pushing' ? 'live' : (pushStatus.status==='completed' ? 'ok' : 'warn')">
+                  {{ pushStatusText }}
+                </span>
+                <span v-if="pushStatus.status==='pushing'"> {{ pushStatus.lines_done }}/{{ pushStatus.lines_total }} 句</span>
+                <div v-if="pushStatus.error" style="color:var(--danger)">{{ pushStatus.error }}</div>
+              </div>
+              <p class="hint" v-if="!pod.ffmpeg">⚠️ 未检测到 ffmpeg，推流不可用（winget install Gyan.FFmpeg）</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 播客列表 -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">📚 播客列表</span>
+            <button class="btn btn-ghost" style="padding:3px 10px; font-size:12px;" @click="loadEpisodes">刷新</button>
+          </div>
+          <table class="table" v-if="episodes.length">
+            <thead><tr><th>标题</th><th>轮数</th><th>时长</th><th>状态</th><th>创建</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="e in episodes" :key="e.id" @click="loadEpisode(e)" style="cursor:pointer;">
+                <td>{{ e.title }}</td>
+                <td>{{ e.lines_count }}</td>
+                <td>{{ e.duration ? e.duration.toFixed(1)+'s' : '—' }}</td>
+                <td><span class="tag" :class="{ok: e.status==='completed', warn: e.status==='failed'}">{{ e.status }}</span></td>
+                <td class="nowrap muted small">{{ e.created_at }}</td>
+                <td class="nowrap actions">
+                  <button class="btn btn-ghost" v-if="e.status==='completed'" @click.stop="downloadEpisode(e)">⬇</button>
+                  <button class="btn btn-ghost btn-danger" @click.stop="removeEpisode(e)">🗑</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty">暂无播客剧集。生成对话稿并保存后，会出现在这里。</div>
+        </div>
+      </section>
+
       <!-- ========== 系统状态 ========== -->
       <section v-else class="view">
         <h2 class="view-title">系统状态</h2>
@@ -369,6 +575,49 @@
     </div>
     <button class="pb-btn" @click="downloadTask(player.taskId)" title="下载 WAV">⬇</button>
     <button class="pb-btn" @click="stopPlayer" title="关闭">✕</button>
+  </div>
+
+  <!-- LLM 配置模态框 -->
+  <div class="modal-mask" v-if="llmModal" @click.self="llmModal=false">
+    <div class="modal">
+      <div class="card-head">
+        <span class="card-title">⚙️ 大模型配置（OpenAI 兼容）</span>
+        <button class="btn btn-ghost" style="padding:2px 10px" @click="llmModal=false">✕</button>
+      </div>
+      <div class="field-col">
+        <label>API 地址（base_url）</label>
+        <input v-model="llmForm.base_url" class="input" placeholder="https://api.deepseek.com/v1">
+      </div>
+      <div class="field-col">
+        <label>API Key <span class="muted small" v-if="llmForm.api_key_masked">（已保存: {{ llmForm.api_key_masked }}，留空则不修改）</span></label>
+        <input v-model="llmForm.api_key" class="input" type="password" placeholder="sk-...">
+      </div>
+      <div class="field-col">
+        <label>模型名称</label>
+        <input v-model="llmForm.model" class="input" placeholder="deepseek-chat / qwen-plus / gpt-4o-mini …">
+      </div>
+      <div class="grid2" style="gap:10px;">
+        <div class="field-col">
+          <label>温度</label>
+          <input v-model.number="llmForm.temperature" class="input" type="number" min="0" max="2" step="0.1">
+        </div>
+        <div class="field-col">
+          <label>对话轮数偏好</label>
+          <select v-model="llmForm.rounds_hint" class="input">
+            <option>6~10</option><option selected>10~16</option><option>16~24</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-col">
+        <label>对话稿风格指令</label>
+        <textarea v-model="llmForm.style_prompt" class="textarea" rows="3"></textarea>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button class="btn btn-primary" @click="saveLLMConfig">保存配置</button>
+        <button class="btn" @click="testLLM">测试连通</button>
+        <span class="muted small">{{ llmTestResult }}</span>
+      </div>
+    </div>
   </div>
 
   <!-- Toast -->

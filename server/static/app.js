@@ -241,6 +241,7 @@ createApp({
     const view = ref('workbench');
     const views = [
       { key: 'workbench', icon: '🎬', name: '合成工作台' },
+      { key: 'podcast', icon: '🎙', name: '播客工坊' },
       { key: 'voices', icon: '🧬', name: '音色库' },
       { key: 'history', icon: '🕘', name: '历史记录' },
       { key: 'system', icon: '⚙️', name: '系统状态' },
@@ -272,6 +273,25 @@ createApp({
       active: false, playing: false, streaming: false, title: '', taskId: null,
       duration: 0, position: 0, firstMs: null, sampleRate: null, buffered: 0,
     });
+
+    // ---------- 播客工坊状态 ----------
+    const pod = reactive({
+      source: 'text', sourceText: '', url: '', fileName: '', fileRaw: null,
+      extractText: '', extractChars: 0, extracting: false, fileDrag: false, sourceError: '',
+      genning: false, genRaw: '', lines: [], saving: false,
+      speed: 1.0, protocol: 'rtmp', pushUrl: '', ffmpeg: true,
+      busy: false, progress: 0, synthError: '', pushing: false,
+    });
+    const voiceIds = reactive({ host: '', guest: '' });
+    const llmCfg = reactive({ base_url: '', model: '', api_key_masked: '' });
+    const llmModal = ref(false);
+    const llmForm = reactive({ base_url: '', api_key: '', model: '', temperature: 0.7, rounds_hint: '10~16', style_prompt: '' });
+    const llmTestResult = ref('');
+    const episodes = ref([]);
+    const podEpisode = ref(null);
+    const pushStatus = reactive({ status: '', lines_done: 0, lines_total: 0, error: '', protocol: '', url: '' });
+    const editLine = ref(-1);
+    const editLineText = ref('');
 
     const modeDefs = [
       { key: 'sft', icon: '🎙', name: '预置音色' },
@@ -412,6 +432,9 @@ createApp({
     }
     async function loadVoices() {
       voices.value = await (await api('/api/voices')).json();
+      // 播客角色默认音色: 首个/第二个可用音色
+      if (!voiceIds.host && voices.value.length) voiceIds.host = voices.value[0].id;
+      if (!voiceIds.guest && voices.value.length > 1) voiceIds.guest = voices.value[1].id;
     }
     async function loadTasks() {
       const j = await (await api('/api/tasks?limit=200')).json();
@@ -451,6 +474,10 @@ createApp({
       view.value = key;
       if (key === 'voices') loadVoices();
       if (key === 'history') loadTasks();
+      if (key === 'podcast') {
+        loadVoices(); loadEpisodes(); refreshLLM();
+        api('/api/podcast/ffmpeg').then(r => r.json()).then(j => { pod.ffmpeg = j.available; }).catch(() => {});
+      }
     }
 
     async function synthesize() {
@@ -677,6 +704,244 @@ createApp({
       await fetchHealth();
     }
 
+    // ---------- 播客工坊 ----------
+    const podCanGen = computed(() => {
+      const src = pod.source === 'text' ? pod.sourceText : pod.extractText;
+      return src.trim().length >= 10 && !pod.genning && !pod.extracting;
+    });
+    const estimateText = computed(() => {
+      const chars = pod.lines.reduce((n, l) => n + l.text.length, 0);
+      const sec = Math.round(chars / 4.3 / Math.max(0.5, pod.speed));
+      return `${Math.floor(sec / 60)} 分 ${sec % 60} 秒`;
+    });
+    const pushUrlPlaceholder = computed(() => ({
+      rtmp: 'rtmp://127.0.0.1:1935/live/podcast01',
+      srt: 'srt://127.0.0.1:9000?streamid=podcast',
+      rtsp: 'rtsp://127.0.0.1:8554/podcast',
+      hls: '无需地址（本服务托管分片）',
+    }[pod.protocol] || ''));
+    const hlsUrl = computed(() => podEpisode.value
+      ? `${window.location.origin}/live/${podEpisode.value.id}.m3u8` : '');
+    const pushStatusText = computed(() => ({
+      pushing: '● 推流中', completed: '✓ 推流完成', stopped: '已停止', failed: '推流失败',
+    }[pushStatus.status] || pushStatus.status));
+
+    async function refreshLLM() {
+      Object.assign(llmCfg, await (await api('/api/llm/config')).json());
+      Object.assign(llmForm, { base_url: llmCfg.base_url, api_key: '', model: llmCfg.model,
+        temperature: llmCfg.temperature, rounds_hint: llmCfg.rounds_hint || '10~16',
+        style_prompt: llmCfg.style_prompt || '' });
+    }
+    function openLLMConfig() { refreshLLM(); llmModal.value = true; llmTestResult.value = ''; }
+    async function saveLLMConfig() {
+      try {
+        const body = { ...llmForm };
+        if (!body.api_key) delete body.api_key;  // 留空不覆盖已存 key
+        Object.assign(llmCfg, await (await api('/api/llm/config', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        })).json());
+        llmModal.value = false;
+        toast('大模型配置已保存', 'ok');
+      } catch (e) { toast('保存失败: ' + e.message, 'error'); }
+    }
+    async function testLLM() {
+      llmTestResult.value = '测试中…';
+      try {
+        const r = await (await api('/api/llm/test', { method: 'POST' })).json();
+        llmTestResult.value = `✓ ${r.latency_ms}ms · ${r.model}`;
+      } catch (e) { llmTestResult.value = '✗ ' + e.message; }
+    }
+
+    function onPodFilePick(e) {
+      const f = e.target.files[0];
+      if (f) pickPodFile(f);
+      e.target.value = '';
+    }
+    function onPodFileDrop(e) {
+      pod.fileDrag = false;
+      const f = e.dataTransfer.files[0];
+      if (f) pickPodFile(f);
+    }
+    async function pickPodFile(f) {
+      pod.fileName = f.name; pod.fileRaw = f; pod.extractText = ''; pod.extractChars = 0; pod.sourceError = '';
+      await extractPodContent();
+    }
+    async function extractUrl() {
+      pod.extracting = true; pod.sourceError = ''; pod.extractText = '';
+      try {
+        const j = await (await api('/api/podcast/source/extract', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: pod.url }),
+        })).json();
+        pod.extractText = j.text; pod.extractChars = j.chars;
+        toast(`已提取 ${j.chars} 字正文`, 'ok');
+      } catch (e) { pod.sourceError = e.message; }
+      finally { pod.extracting = false; }
+    }
+    async function extractPodContent() {
+      pod.extracting = true; pod.sourceError = '';
+      try {
+        const fd = new FormData();
+        fd.append('file', pod.fileRaw);
+        const j = await (await api('/api/podcast/source/extract', { method: 'POST', body: fd })).json();
+        pod.extractText = j.text; pod.extractChars = j.chars;
+        toast(`已提取 ${j.chars} 字`, 'ok');
+      } catch (e) { pod.sourceError = e.message; }
+      finally { pod.extracting = false; }
+    }
+
+    async function genScript() {
+      const source = pod.source === 'text' ? pod.sourceText : pod.extractText;
+      if (source.trim().length < 10) return toast('内容源太短', 'error');
+      pod.genning = true; pod.genRaw = ''; pod.lines = [];
+      try {
+        const resp = await fetch('/api/podcast/script', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: source }),
+        });
+        if (!resp.ok) {
+          let msg = `HTTP ${resp.status}`;
+          try { msg = (await resp.json()).detail || msg; } catch (e) {}
+          throw new Error(msg);
+        }
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder();
+        let raw = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          raw += dec.decode(value, { stream: true });
+          pod.genRaw = raw;
+        }
+        if (raw.includes('__LLM_ERROR__')) {
+          throw new Error(raw.split('__LLM_ERROR__')[1].trim());
+        }
+        const j = await (await api('/api/podcast/parse-script', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raw }),
+        })).json();
+        pod.lines = j.lines;
+        pod.genRaw = '';
+        toast(`对话稿已生成: ${j.lines.length} 轮`, 'ok');
+      } catch (e) {
+        pod.genRaw = '';
+        toast('对话稿生成失败: ' + e.message, 'error', 6000);
+      } finally { pod.genning = false; }
+    }
+
+    function startEditLine(i) { editLine.value = i; editLineText.value = pod.lines[i].text; }
+    function saveLine(i) { pod.lines[i].text = editLineText.value.trim() || pod.lines[i].text; editLine.value = -1; }
+    function delLine(i) { pod.lines.splice(i, 1); }
+    function addLine() {
+      const lastRole = pod.lines.length ? pod.lines[pod.lines.length - 1].role : 'guest';
+      pod.lines.push({ role: lastRole === 'host' ? 'guest' : 'host', text: '' });
+      startEditLine(pod.lines.length - 1);
+    }
+
+    function autoTitle() {
+      const src = pod.source === 'url' ? pod.url : (pod.source === 'file' ? pod.fileName : pod.sourceText);
+      return `播客 ${new Date().toLocaleDateString('zh-CN')} · ${(src || '').replace(/^https?:\/\//, '').slice(0, 24)}`;
+    }
+    async function saveEpisode() {
+      pod.saving = true;
+      try {
+        const body = {
+          title: autoTitle(), source_type: pod.source, source_ref: pod.source === 'url' ? pod.url : pod.fileName,
+          lines: pod.lines.map(l => ({ role: l.role, text: l.text })),
+          voice_host: voiceIds.host, voice_guest: voiceIds.guest, speed: pod.speed,
+        };
+        if (podEpisode.value && podEpisode.value.id) {
+          await api(`/api/podcast/episodes/${podEpisode.value.id}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+          });
+          podEpisode.value = { ...podEpisode.value };
+        } else {
+          podEpisode.value = await (await api('/api/podcast/episodes', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+          })).json();
+        }
+        toast('剧集已保存', 'ok');
+        loadEpisodes();
+      } catch (e) { toast('保存失败: ' + e.message, 'error'); }
+      finally { pod.saving = false; }
+    }
+    async function loadEpisodes() {
+      const j = await (await api('/api/podcast/episodes')).json();
+      episodes.value = j.episodes;
+    }
+    async function loadEpisode(e) {
+      podEpisode.value = await (await api(`/api/podcast/episodes/${e.id}`)).json();
+      pod.lines = JSON.parse(JSON.stringify(podEpisode.value.script || []));
+      voiceIds.host = podEpisode.value.voice_host || voiceIds.host;
+      voiceIds.guest = podEpisode.value.voice_guest || voiceIds.guest;
+      view.value = 'podcast';
+      toast(`已载入「${e.title}」`);
+    }
+    async function synthPod() {
+      if (!podEpisode.value) return;
+      pod.busy = true; pod.progress = 0; pod.synthError = '';
+      try {
+        await api(`/api/podcast/episodes/${podEpisode.value.id}/synthesize`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'final' }),
+        });
+        // 轮询进度
+        while (true) {
+          await new Promise(r => setTimeout(r, 1500));
+          const st = await (await api(`/api/podcast/episodes/${podEpisode.value.id}/status`)).json();
+          pod.progress = st.progress;
+          if (st.status === 'completed') {
+            podEpisode.value = await (await api(`/api/podcast/episodes/${podEpisode.value.id}`)).json();
+            toast('播客成品已生成', 'ok');
+            break;
+          }
+          if (st.status === 'failed') throw new Error(st.error || '合成失败');
+        }
+        loadEpisodes();
+      } catch (e) {
+        pod.synthError = e.message;
+        toast('合成失败: ' + e.message, 'error', 6000);
+      } finally { pod.busy = false; }
+    }
+    function playPodcast() {
+      player.playFile(`/api/podcast/episodes/${podEpisode.value.id}/audio`, '播客 · ' + (podEpisode.value.title || ''), null);
+    }
+    function downloadEpisode(e) {
+      const a = document.createElement('a');
+      a.href = `/api/podcast/episodes/${e.id}/audio`;
+      a.download = `${e.title}.wav`;
+      a.click();
+    }
+    async function removeEpisode(e) {
+      if (!confirm(`删除剧集「${e.title}」？成品音频将一并删除。`)) return;
+      await api(`/api/podcast/episodes/${e.id}`, { method: 'DELETE' });
+      loadEpisodes();
+      if (podEpisode.value && podEpisode.value.id === e.id) podEpisode.value = null;
+    }
+    async function startPush() {
+      pod.pushing = true;
+      try {
+        pushStatus.status = 'pushing';
+        Object.assign(pushStatus, await (await api(`/api/podcast/episodes/${podEpisode.value.id}/push`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ protocol: pod.protocol, url: pod.pushUrl.trim() }),
+        })).json());
+        toast('推流已开始', 'ok');
+      } catch (e) { pod.pushing = false; toast('推流启动失败: ' + e.message, 'error', 6000); }
+    }
+    async function stopPush() {
+      try {
+        Object.assign(pushStatus, await (await api(`/api/podcast/episodes/${podEpisode.value.id}/push`, { method: 'DELETE' })).json());
+        toast('已停止推流');
+        loadEpisodes();
+      } catch (e) { toast(e.message, 'error'); }
+      finally { pod.pushing = false; }
+    }
+    async function pollPush() {
+      if (view.value !== 'podcast' || pushStatus.status === 'completed' || pushStatus.status === 'stopped') return;
+      try {
+        const st = await (await api('/api/podcast/push/status')).json();
+        if (st.status) Object.assign(pushStatus, st);
+        if (st.status === 'completed' || st.status === 'failed') { pod.pushing = false; loadEpisodes(); }
+      } catch (e) {}
+    }
+
     // ---------- 系统 ----------
     async function switchModel(key) {
       try {
@@ -709,6 +974,7 @@ createApp({
       loadVoices();
       connectSSE();
       setInterval(fetchHealth, 8000);
+      setInterval(pollPush, 4000);
       window.addEventListener('keydown', onKeydown);
       window.addEventListener('resize', () => { if (playerState.active) player.draw(); });
     });
@@ -724,6 +990,13 @@ createApp({
       synthesize, previewSpeaker, previewVoice, reloadParams, downloadTask, deleteTask, stopPlayer, playTask,
       onFilePick, onDrop, uploadVoice, useVoice, deleteVoice,
       editVoice, startVoiceEdit, cancelVoiceEdit, saveVoiceEdit,
+      pod, voiceIds, llmCfg, llmModal, llmForm, llmTestResult, episodes, podEpisode, pushStatus,
+      editLine, editLineText,
+      podCanGen, estimateText, pushUrlPlaceholder, hlsUrl, pushStatusText,
+      openLLMConfig, saveLLMConfig, testLLM,
+      onPodFilePick, onPodFileDrop, extractUrl, genScript,
+      startEditLine, saveLine, delLine, addLine, saveEpisode, loadEpisode,
+      synthPod, playPodcast, downloadEpisode, removeEpisode, startPush, stopPush,
       switchModel, modelTagClass, modelTagText,
     };
     return appVm;

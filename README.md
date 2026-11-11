@@ -7,6 +7,7 @@
 - **四种合成模式**：预置音色（sft）、声音克隆（zero_shot）、跨语言（cross_lingual）、指令控制（instruct，方言/语速/情绪）
 - **流式合成**：边合成边播放（WebAudio，2.5s 预缓冲），显示首包延迟；**流式/非流式均支持语速**（v3）
 - **音色管理**：上传 3~30s 参考音频克隆音色（Whisper 自动转写辅助）、重命名与参考文本编辑
+- **🎙 播客工坊**：三种内容源（粘贴/上传文件/网页 URL 总结）→ 大模型生成双人对对话稿 → 逐句编辑 → 整段合成或推流（RTMP/SRT/RTSP/HLS，见 `播客设计文档.html`）
 - **双模型可切换**：Fun-CosyVoice3-0.5B 与 CosyVoice2-0.5B 互斥加载，界面一键切换
 - **任务历史**：每次合成落盘 WAV，可回放/下载/重载参数
 - **OpenAI 兼容端点**：`POST /v1/audio/speech`
@@ -37,7 +38,11 @@ uv pip install --python .venv --no-build-isolation openai-whisper==20231117
 # 3. 模型权重（ModelScope, ~15GB；默认下到 models/，可用环境变量 COSYVOICE_MODELS_DIR 覆盖）
 .venv\Scripts\python.exe scripts\download_models.py
 
-# 4. 启动（默认 8000，可 -Port 指定）
+# 4. 附加依赖（播客工坊: 文档解析 + 推流）
+uv pip install --python .venv pypdf python-docx beautifulsoup4
+winget install --id Gyan.FFmpeg --accept-package-agreements   # 推流需要 ffmpeg
+
+# 5. 启动（默认 8000，可 -Port 指定）
 powershell -ExecutionPolicy Bypass -File scripts\start.ps1 -Port 8001
 # 打开 http://127.0.0.1:8001
 ```
@@ -56,6 +61,11 @@ powershell -ExecutionPolicy Bypass -File scripts\start.ps1 -Port 8001
 | GET | `/api/health` | 模型状态 / GPU 显存 / 队列 |
 | POST | `/api/admin/model` | 切换模型 `{model: "cosyvoice3"|"cosyvoice2"}` |
 | GET | `/api/events` | SSE：引擎状态 / 队列事件 |
+| GET/PUT | `/api/llm/config` · `POST /api/llm/test` | 播客大模型配置（OpenAI 兼容）与连通测试 |
+| POST | `/api/podcast/source/extract` | 文件/URL → 纯文本 |
+| POST | `/api/podcast/script` · `/api/podcast/parse-script` | LLM 生成对话稿（流式）与解析 |
+| GET/POST/PUT/DELETE | `/api/podcast/episodes…` | 剧集 CRUD / 合成 `{mode:"final"}` / 推流 `{protocol,url}` / 状态轮询 |
+| GET | `/live/{id}.m3u8` | HLS 拉流播放列表 |
 | GET | `/docs` | Swagger UI |
 
 ## 测试

@@ -42,6 +42,22 @@ CREATE TABLE IF NOT EXISTS tasks (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_created ON tasks(created_at DESC);
+CREATE TABLE IF NOT EXISTS podcasts (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    source_type TEXT NOT NULL DEFAULT 'text',
+    source_ref TEXT NOT NULL DEFAULT '',
+    script_json TEXT NOT NULL DEFAULT '[]',
+    voice_host TEXT NOT NULL DEFAULT '',
+    voice_guest TEXT NOT NULL DEFAULT '',
+    speed REAL NOT NULL DEFAULT 1.0,
+    status TEXT NOT NULL DEFAULT 'draft',
+    progress INTEGER NOT NULL DEFAULT 0,
+    file TEXT,
+    duration REAL,
+    error TEXT,
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -162,6 +178,48 @@ class Storage:
         self._exec("DELETE FROM tasks WHERE id=?", (tid,))
         if t.get("file"):
             Path(t["file"]).unlink(missing_ok=True)
+        return True
+
+    # ---------- podcasts ----------
+    def add_episode(self, title: str, source_type: str, source_ref: str,
+                    script_json: str, voice_host: str, voice_guest: str) -> dict:
+        pid = new_id()
+        self._exec(
+            "INSERT INTO podcasts(id,title,source_type,source_ref,script_json,voice_host,voice_guest,created_at)"
+            " VALUES(?,?,?,?,?,?,?,?)",
+            (pid, title, source_type, source_ref, script_json, voice_host, voice_guest, now_iso()),
+        )
+        return self.get_episode(pid)  # type: ignore[return-value]
+
+    def get_episode(self, pid: str) -> Optional[dict]:
+        rows = self._query("SELECT * FROM podcasts WHERE id=?", (pid,))
+        return dict(rows[0]) if rows else None
+
+    def list_episodes(self, limit: int = 100) -> list[dict]:
+        return [dict(r) for r in self._query(
+            "SELECT * FROM podcasts ORDER BY created_at DESC, id DESC LIMIT ?", (limit,))]
+
+    def update_episode(self, pid: str, **fields) -> None:
+        if not fields:
+            return
+        allowed = {"title", "script_json", "voice_host", "voice_guest", "speed",
+                   "status", "progress", "file", "duration", "error"}
+        sets, params = [], []
+        for k, v in fields.items():
+            if k in allowed:
+                sets.append(f"{k}=?")
+                params.append(v)
+        if sets:
+            params.append(pid)
+            self._exec(f"UPDATE podcasts SET {', '.join(sets)} WHERE id=?", tuple(params))
+
+    def delete_episode(self, pid: str) -> bool:
+        ep = self.get_episode(pid)
+        if not ep:
+            return False
+        self._exec("DELETE FROM podcasts WHERE id=?", (pid,))
+        if ep.get("file"):
+            Path(ep["file"]).unlink(missing_ok=True)
         return True
 
 

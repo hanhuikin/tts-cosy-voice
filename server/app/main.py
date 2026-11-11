@@ -19,8 +19,8 @@ from .engine import setup_sys_path
 setup_sys_path()
 
 from .engine import MODEL_REGISTRY, QUEUE_MAX, engine
-from .routes import system, tasks, tts, voices
-from .storage import storage
+from .routes import podcast, system, tasks, tts, voices
+from .storage import DATA_DIR, storage
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("cosyvoice-server")
@@ -49,6 +49,7 @@ app.include_router(tts.router)
 app.include_router(voices.router)
 app.include_router(tasks.router)
 app.include_router(system.router)
+app.include_router(podcast.router)
 
 
 @app.get("/", include_in_schema=False)
@@ -57,6 +58,10 @@ def index():
 
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+# HLS 推流分片托管
+_LIVE_DIR = DATA_DIR / "live"
+_LIVE_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/live", StaticFiles(directory=str(_LIVE_DIR)), name="live")
 
 # 模块级导入: 供 uvicorn 字符串引用
 import os

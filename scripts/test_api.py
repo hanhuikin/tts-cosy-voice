@@ -20,7 +20,7 @@ REPO = Path(__file__).resolve().parents[1]
 PROMPT_WAV = REPO / "CosyVoice" / "asset" / "zero_shot_prompt.wav"
 PROMPT_TEXT = "希望你以后能够做的比我还好呦。"
 
-BASE = "http://127.0.0.1:8000"
+BASE = "http://127.0.0.1:8001"
 SKIP_SLOW = False
 
 RESULTS = []  # (用例编号, 名称, 状态, 备注)
@@ -525,6 +525,127 @@ def _():
     assert results == [200, 200, 200], f"status codes: {results}"
     assert saw_queue[0] >= 1, "未观察到排队 (串行队列设计预期 queue_len>=1)"
     return f"3/3 ok, max queue_len={saw_queue[0]}"
+
+
+# ============================================================
+# 9. 播客工坊
+# ============================================================
+@case("POD-01", "ffmpeg 检测可用")
+def _():
+    r = requests.get(f"{BASE}/api/podcast/ffmpeg").json()
+    assert r["available"] is True, "ffmpeg 未就绪, 推流用例将跳过"
+    globals()["FFMPEG_OK"] = True
+    return "available"
+
+
+@case("POD-02", "LLM 配置保存/读取脱敏")
+def _():
+    r = requests.put(f"{BASE}/api/llm/config", json={
+        "base_url": "https://api.deepseek.com/v1", "api_key": "sk-test-1234567890abcdef",
+        "model": "deepseek-chat"})
+    assert r.ok, r.text
+    cfg = r.json()
+    assert "api_key" not in cfg, "响应不得包含原始 key"
+    assert cfg["api_key_masked"].startswith("sk-t"), cfg["api_key_masked"]
+    got = requests.get(f"{BASE}/api/llm/config").json()
+    assert got["base_url"] == "https://api.deepseek.com/v1"
+    globals()["LLM_CFG_OK"] = True
+    return f"masked={cfg['api_key_masked']}"
+
+
+@case("POD-03", "URL 内容提取")
+def _():
+    r = requests.post(f"{BASE}/api/podcast/source/extract", json={
+        "url": "https://raw.githubusercontent.com/hanhuikin/tts-cosy-voice/main/README.md"})
+    assert r.ok, r.text
+    j = r.json()
+    assert j["chars"] > 50, f"提取过短: {j['chars']}"
+    return f"{j['chars']} chars"
+
+
+@case("POD-04", "剧集创建/查询/更新")
+def _():
+    vid = globals()["TEST_VOICE_ID"]
+    lines = [
+        {"role": "host", "text": "欢迎收听本期播客，我们来聊聊接口测试。"},
+        {"role": "guest", "text": "没错，测试是工程质量的基石。"},
+        {"role": "host", "text": "那我们就从这里说起。"},
+    ]
+    r = requests.post(f"{BASE}/api/podcast/episodes", json={
+        "title": "测试剧集", "source_type": "text", "source_ref": "",
+        "lines": lines, "voice_host": vid, "voice_guest": vid})
+    assert r.ok, r.text
+    ep = r.json()
+    assert ep["status"] == "draft"
+    r = requests.put(f"{BASE}/api/podcast/episodes/{ep['id']}", json={
+        "title": "测试剧集(改)", "source_type": "text", "source_ref": "",
+        "lines": lines, "voice_host": vid, "voice_guest": vid})
+    assert r.ok and requests.get(f"{BASE}/api/podcast/episodes/{ep['id']}").json()["title"] == "测试剧集(改)"
+    globals()["POD_EP_ID"] = ep["id"]
+    globals()["POD_LINES"] = lines
+    return f"id={ep['id']}"
+
+
+@case("POD-05", "非流式合成整段成品 (逐句+拼接)")
+def _():
+    if SKIP_SLOW:
+        return "skip (--skip-slow)"
+    pid = globals()["POD_EP_ID"]
+    r = requests.post(f"{BASE}/api/podcast/episodes/{pid}/synthesize", json={"mode": "final"})
+    assert r.ok, r.text
+    for _ in range(120):
+        time.sleep(2)
+        st = requests.get(f"{BASE}/api/podcast/episodes/{pid}/status").json()
+        if st["status"] in ("completed", "failed"):
+            break
+    assert st["status"] == "completed", f"final status={st}"
+    assert st["progress"] == 3, st
+    r = requests.get(f"{BASE}/api/podcast/episodes/{pid}/audio")
+    assert r.ok
+    sr, ch, dur, _ = parse_wav(r.content)
+    assert dur > 4, f"成品过短 {dur}s"
+    return f"{st['progress']} 句, {dur:.1f}s @ {sr}Hz"
+
+
+@case("POD-06", "HLS 流式推流 (逐句合成→ffmpeg 分片)")
+def _():
+    if SKIP_SLOW or not globals().get("FFMPEG_OK"):
+        return "skip (--skip-slow / 无 ffmpeg)"
+    pid = globals()["POD_EP_ID"]
+    r = requests.post(f"{BASE}/api/podcast/episodes/{pid}/push", json={"protocol": "hls"})
+    assert r.ok, r.text
+    st = {}
+    for _ in range(90):
+        time.sleep(2)
+        st = requests.get(f"{BASE}/api/podcast/push/status").json()
+        if st["status"] in ("completed", "failed"):
+            break
+    assert st["status"] == "completed", f"push status={st}"
+    m3u8 = requests.get(f"{BASE}/live/{pid}.m3u8")
+    assert m3u8.ok and "#EXTM3U" in m3u8.text, "HLS 播放列表未生成"
+    assert "#EXTINF" in m3u8.text and m3u8.text.count("#EXTINF") >= 2, "分片数量异常"
+    globals()["POD_M3U8"] = f"{pid}.m3u8"
+    return f"lines_done={st['lines_done']}, m3u8 ok"
+
+
+@case("POD-07", "推流冲突与停止接口")
+def _():
+    pid = globals()["POD_EP_ID"]
+    r = requests.post(f"{BASE}/api/podcast/episodes/{pid}/push", json={"protocol": "brotli"})
+    assert r.status_code == 422, f"非法协议 expect 422, got {r.status_code}"
+    r = requests.delete(f"{BASE}/api/podcast/episodes/nowhere/push")
+    assert r.status_code == 404
+    return "协议校验与停止 404 正确"
+
+
+@case("POD-08", "剧集删除")
+def _():
+    pid = globals()["POD_EP_ID"]
+    assert requests.delete(f"{BASE}/api/podcast/episodes/{pid}").status_code == 200
+    assert requests.delete(f"{BASE}/api/podcast/episodes/{pid}").status_code == 404
+    if globals().get("POD_M3U8"):
+        requests.get(f"{BASE}/live/{globals()['POD_M3U8']}")
+    return f"deleted {pid}"
 
 
 # ============================================================
