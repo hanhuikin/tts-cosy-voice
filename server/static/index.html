@@ -521,6 +521,7 @@
                 <p class="hint" v-if="pod.protocol!=='hls'">RTMP / SRT / RTSP 需要一个接收端（如本机 docker 起一个 SRS，或直播平台的推流地址）；只在本机试听推荐用 HLS。</p>
                 <div class="muted small" v-if="pod.protocol==='hls'" style="margin-top:6px;">
                   拉流地址（推流开始后）：<span class="kbd">{{ hlsUrl }}</span>
+                  <br>用 VLC / IINA 等支持 HLS 的播放器打开观看；浏览器地址栏直接打开只会显示文本。
                 </div>
                 <div style="margin-top:8px;">
                   <button class="btn btn-primary" style="width:100%;" @click="startPush"
@@ -534,8 +535,8 @@
                   <span class="badge" :class="pushStatus.status==='pushing' ? 'live' : (pushStatus.status==='completed' ? 'ok' : 'warn')">
                     {{ pushStatusText }}
                   </span>
-                  <span v-if="pushStatus.status==='pushing'"> {{ pushStatus.lines_done }}/{{ pushStatus.lines_total }} 句</span>
-                  <div v-if="pushStatus.error" style="color:var(--danger)">{{ pushStatus.error }}</div>
+                  <span v-if="pushStatus.status==='pushing' && pushStatus.mode==='live'"> {{ pushStatus.lines_done }}/{{ pushStatus.lines_total }} 句</span>
+                  <span v-if="pushStatus.status==='pushing' && pushStatus.duration_s"> {{ fmt(pushStatus.elapsed_s) }} / {{ fmt(pushStatus.duration_s) }}（实时速率，预计 {{ fmt(pushStatus.duration_s - pushStatus.elapsed_s) }} 后推完）</span>
                 </div>
                 <p class="hint" v-if="!pod.ffmpeg">⚠️ 未检测到 ffmpeg，推流不可用（winget install Gyan.FFmpeg）</p>
               </template>

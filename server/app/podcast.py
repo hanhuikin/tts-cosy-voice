@@ -300,6 +300,14 @@ class PushManager:
         info = dict(self.info)
         info["ffmpeg_available"] = ffmpeg_available()
         info["stderr_tail"] = self._stderr_tail[-300:]
+        # 时间进度 (file 模式按实时速率, elapsed 即已推送秒数)
+        if self.info.get("started_epoch") and self.info.get("duration"):
+            if self.info.get("status") in ("preparing", "pushing"):
+                info["elapsed_s"] = round(max(0, time.time() - self.info["started_epoch"]), 1)
+            else:
+                info["elapsed_s"] = round(min(self.info["duration"],
+                                              self.info.get("elapsed_s") or self.info["duration"]), 1)
+            info["duration_s"] = self.info["duration"]
         return info
 
     async def start(self, ep_id: str, protocol: str, url: str) -> dict:
@@ -316,6 +324,8 @@ class PushManager:
             self.info = {"episode_id": ep_id, "protocol": protocol, "url": url,
                          "status": "preparing", "lines_done": 0,
                          "lines_total": len(json.loads(ep["script_json"])),
+                         "duration": ep.get("duration") or 0,
+                         "started_epoch": time.time(),
                          "mode": "file" if self._ep_has_final(ep) else "live"}
             storage.update_episode(ep_id, status="pushing", error=None)
             self._task = asyncio.create_task(self._run(ep_id, protocol, url))
