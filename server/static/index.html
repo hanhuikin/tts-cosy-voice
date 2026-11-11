@@ -68,8 +68,8 @@
             <button class="chip chip-ghost" @click="form.text=''" v-if="form.text">清空</button>
           </div>
           <div class="lang-tags" v-if="form.mode==='cross_lingual'">
-            <span class="chip-label">语言（点击在文本开头添加标签）：</span>
-            <button v-for="l in langs" :key="l.code" class="chip" :class="{active: form.text.startsWith('<|'+l.code+'|>')}"
+            <span class="chip-label">语言（选中后合成时自动应用）：</span>
+            <button v-for="l in langs" :key="l.code" class="chip" :class="{active: form.lang===l.code}"
                     @click="pickLang(l.code)">{{ l.name }}</button>
           </div>
         </div>
@@ -131,7 +131,7 @@
               </select>
               <button class="btn btn-ghost" @click="previewVoice" :disabled="!form.voice_id || busy">试听参考</button>
             </div>
-            <p class="hint" v-if="form.model==='cosyvoice3'">用参考音色说任意语言；文本可用 &lt;|en|&gt; 等语言标签标注语种，服务端自动添加指令前缀。</p>
+            <p class="hint" v-if="form.model==='cosyvoice3'">用参考音色说任意语言；在上方「语言」中选中后合成时自动应用语种标签（再次点击可取消），服务端自动添加指令前缀。</p>
             <p class="hint" v-else>用参考音色说任意语言，支持 [laughter] [breath] 等细粒度控制标记。</p>
           </div>
 
@@ -299,7 +299,7 @@
             <tbody>
               <tr v-for="t in filteredTasks" :key="t.id" :class="{failed: t.status!=='ok'}">
                 <td class="nowrap">{{ t.created_at.slice(5,16) }}</td>
-                <td class="clip" :title="t.text">{{ t.text }}</td>
+                <td class="clip" :title="t.text">{{ displayTaskText(t.text) }}</td>
                 <td class="nowrap">{{ modeName(t.mode) }}<div class="muted small">{{ modelLabel(t.model) }}</div></td>
                 <td class="nowrap">{{ voiceOrSpk(t) || '—' }}</td>
                 <td class="nowrap">{{ t.duration ? t.duration.toFixed(1)+'s' : '—' }}</td>

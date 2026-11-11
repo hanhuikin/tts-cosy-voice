@@ -252,7 +252,7 @@ createApp({
     });
     const form = reactive({
       text: '', model: 'cosyvoice3', mode: 'sft', spk_id: '', voice_id: '',
-      prompt_text: '', instruct_text: '', speed: 1.0, stream: false,
+      prompt_text: '', instruct_text: '', speed: 1.0, stream: false, lang: '',
     });
     const busy = ref(false);
     const busyText = ref('合成中…');
@@ -292,7 +292,7 @@ createApp({
     ];
     const sampleTexts = [
       { label: '中文问候', text: '你好，我是通义生成式语音大模型，请问有什么可以帮您的吗？' },
-      { label: '英文', text: '<|en|>The quick brown fox jumps over the lazy dog. Speech synthesis has come a long way!' },
+      { label: '英文', text: 'The quick brown fox jumps over the lazy dog. Speech synthesis has come a long way!' },
       { label: '情感', text: '收到好友从远方寄来的生日礼物，那份意外的惊喜与深深的祝福让我心中充满了甜蜜的快乐，笑容如花儿般绽放。' },
       { label: '绕口令', text: '八百标兵奔北坡，北坡炮兵并排跑，炮兵怕把标兵碰，标兵怕碰炮兵炮。' },
     ];
@@ -313,6 +313,8 @@ createApp({
     };
     const modeName = (k) => (modeDefs.find(m => m.key === k) || {}).name || k;
     const modelLabel = (k) => k === 'cosyvoice3' ? 'CosyVoice 3.0' : 'CosyVoice 2.0';
+    // 历史显示: 剥离开头语言标签 (它是控制标记, 不属于朗读内容)
+    const displayTaskText = (t) => (t || '').replace(/^(?:<\|[a-z]{2}\|>\s*)+/, '');
     const voiceOrSpk = (t) => {
       if (t.spk_id) return t.spk_id;
       if (t.voice_id) { const v = voices.value.find(v => v.id === t.voice_id); return v ? v.name : '音色 ' + t.voice_id; }
@@ -437,11 +439,9 @@ createApp({
 
     // ---------- 工作台 ----------
     function applySample(s) { form.text = s.text; }
-    // 跨语言: 选择语言 -> 在文本开头放置对应标签 (已有开头标签则替换, 不堆叠)
+    // 跨语言: 选择语言仅记录状态, 合成请求时自动在文本前拼接标签; 再次点击同一语言取消
     function pickLang(code) {
-      const tag = `<|${code}|>`;
-      const stripped = form.text.replace(/^(?:<\|[a-z]{2}\|>\s*)+/, '');
-      form.text = tag + stripped;
+      form.lang = form.lang === code ? '' : code;
     }
     function switchMode(key) { form.mode = key; }
     function toggleStream() { form.stream = !form.stream; }
@@ -454,8 +454,11 @@ createApp({
 
     async function synthesize() {
       if (!canSynth.value) return;
+      // 跨语言选中了语言: 请求时自动前置语言标签 (不进入文本框, 模型也不会读出它)
+      const text = (form.mode === 'cross_lingual' && form.lang)
+        ? `<|${form.lang}|>` + form.text : form.text;
       const payload = {
-        text: form.text, model: form.model, mode: form.mode, speed: form.speed, stream: form.stream,
+        text, model: form.model, mode: form.mode, speed: form.speed, stream: form.stream,
       };
       if (form.mode === 'sft') payload.spk_id = form.spk_id;
       else payload.voice_id = form.voice_id;
@@ -528,7 +531,10 @@ createApp({
     }
 
     function reloadParams(t) {
-      form.text = t.text; form.model = t.model; form.mode = t.mode;
+      // 回填时剥离开头语言标签, 恢复为语言选择状态
+      const m = (t.text || '').match(/^(?:<\|([a-z]{2})\|>\s*)/);
+      form.text = displayTaskText(t.text); form.model = t.model; form.mode = t.mode;
+      form.lang = (t.mode === 'cross_lingual' && m && m[1]) ? m[1] : '';
       form.spk_id = t.spk_id || ''; form.voice_id = t.voice_id || '';
       form.prompt_text = t.voice_id ? (currentVoice.value ? currentVoice.value.prompt_text : '') : '';
       form.instruct_text = t.instruct_text || ''; form.speed = t.speed || 1.0;
@@ -712,7 +718,7 @@ createApp({
       modeDefs, langs, sampleTexts,
       stateClass, stateText, gpuText, vramPct, availableModels, visibleModeDefs, currentDefaults,
       canSynth, synthBlocker, canUpload, filteredTasks, currentVoice,
-      fmt, modeName, modelLabel, voiceOrSpk,
+      fmt, modeName, modelLabel, voiceOrSpk, displayTaskText,
       toast, dismissBanner, switchView, applySample, pickLang, switchMode, toggleStream, goVoices,
       synthesize, previewSpeaker, previewVoice, reloadParams, downloadTask, deleteTask, stopPlayer, playTask,
       onFilePick, onDrop, uploadVoice, useVoice, deleteVoice,
