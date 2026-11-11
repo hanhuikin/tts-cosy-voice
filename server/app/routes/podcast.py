@@ -196,9 +196,11 @@ async def synthesize_episode(pid: str, body: SynthesizeBody):
         raise HTTPException(409, "合成进行中")
     if podcast.push_manager.active:
         raise HTTPException(409, "已有推流进行中")
+    lines = json.loads(ep["script_json"])
+    if not lines:
+        raise HTTPException(400, "对话稿为空")
     try:
         # 预校验全部行可解析音色与参数 (提前暴露问题)
-        lines = json.loads(ep["script_json"])
         for ln in lines:
             podcast.resolve_line_request(ln, {"host": ep["voice_host"], "guest": ep["voice_guest"]})
     except ValueError as e:
@@ -210,8 +212,14 @@ async def synthesize_episode(pid: str, body: SynthesizeBody):
         loop.create_task(podcast.synth_episode_final(pid))
         return {"ok": True, "mode": "final", "status": "synthesizing"}
     if body.mode == "stream":
-        # stream 模式直接由 push 管线承担 (逐句合成 -> ffmpeg)
-        raise HTTPException(400, "流式模式请使用 /push 接口指定协议与地址")
+        # 本地流式: 与合成工作台一致, WAV 头 + 逐句 PCM 分块, 结束后落盘成品
+        storage.update_episode(pid, status="synthesizing", progress=0)
+        return StreamingResponse(
+            podcast.stream_episode_gen(pid),
+            media_type="audio/wav",
+            headers={"X-Episode-Id": pid, "X-Sample-Rate": "24000",
+                     "Content-Disposition": f'inline; filename="podcast_{pid}.wav"'},
+        )
     raise HTTPException(400, f"未知 mode: {body.mode}")
 
 

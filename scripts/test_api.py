@@ -638,7 +638,34 @@ def _():
     return "协议校验与停止 404 正确"
 
 
-@case("POD-08", "剧集删除")
+@case("POD-08", "本地流式合成 (mode=stream, 与工作台一致)")
+def _():
+    pid = globals()["POD_EP_ID"]
+    r = requests.post(f"{BASE}/api/podcast/episodes/{pid}/synthesize",
+                      json={"mode": "stream"}, stream=True)
+    assert r.ok, r.text
+    assert "audio/wav" in r.headers["content-type"]
+    total = 0
+    first = None
+    t0 = time.time()
+    for chunk in r.iter_content(8192):
+        if first is None:
+            first = time.time() - t0
+        total += len(chunk)
+    assert total > 44 * 20, f"流式音频过短: {total}"
+    # 结束后剧集应完成并落盘成品
+    st = {}
+    for _ in range(15):
+        st = requests.get(f"{BASE}/api/podcast/episodes/{pid}/status").json()
+        if st["status"] in ("completed", "failed"):
+            break
+        time.sleep(1)
+    assert st["status"] == "completed", st
+    assert requests.get(f"{BASE}/api/podcast/episodes/{pid}/audio").ok, "成品未落盘"
+    return f"first-byte={first*1000:.0f}ms, {total//1024}KB, 成品已保存"
+
+
+@case("POD-09", "剧集删除")
 def _():
     pid = globals()["POD_EP_ID"]
     assert requests.delete(f"{BASE}/api/podcast/episodes/{pid}").status_code == 200

@@ -488,33 +488,50 @@
             </div>
 
             <div style="margin-top:10px; border-top:1px solid var(--edge); padding-top:10px;">
-              <b style="font-size:13px;">📡 流式推流</b>
-              <div style="margin:6px 0;">
-                <span v-for="p in ['rtmp','srt','rtsp','hls']" :key="p" class="chip"
-                      :class="{active: pod.protocol===p}" @click="pod.protocol=p">{{ p.toUpperCase() }}</span>
-              </div>
-              <input v-if="pod.protocol!=='hls'" v-model="pod.pushUrl" class="input"
-                     :placeholder="pushUrlPlaceholder" style="font-family:Consolas; font-size:12px;">
-              <p class="hint" v-if="pod.protocol!=='hls'">RTMP / SRT / RTSP 需要一个接收端（如本机 docker 起一个 SRS，或直播平台的推流地址）；只在本机试听推荐用 HLS。</p>
-              <div class="muted small" v-if="pod.protocol==='hls'" style="margin-top:6px;">
-                拉流地址（推流开始后）：<span class="kbd">{{ hlsUrl }}</span>
-              </div>
-              <div style="margin-top:8px;">
-                <button class="btn btn-primary" style="width:100%;" @click="startPush"
-                        :disabled="!pod.lines.length || pod.pushing">
-                  🔴 开始合成并推流
+              <b style="font-size:13px;">📡 流式合成</b>
+              <div style="margin:6px 0; display:flex; align-items:center; gap:10px;">
+                <button class="toggle" :class="{on: pod.pushEnabled}" @click="pod.pushEnabled=!pod.pushEnabled">
+                  <span class="knob"></span>
                 </button>
-                <button class="btn btn-danger" style="width:100%; margin-top:6px;" @click="stopPush"
-                        v-if="pushStatus.status==='pushing'">⏹ 停止推流</button>
+                <span class="muted small">{{ pod.pushEnabled ? '推流到流媒体服务器' : '不推流 · 本地播放（与合成工作台一致）' }}</span>
               </div>
-              <div class="muted small" style="margin-top:6px;" v-if="pushStatus.status && (!podEpisode || pushStatus.episode_id===podEpisode.id)">
-                <span class="badge" :class="pushStatus.status==='pushing' ? 'live' : (pushStatus.status==='completed' ? 'ok' : 'warn')">
-                  {{ pushStatusText }}
-                </span>
-                <span v-if="pushStatus.status==='pushing'"> {{ pushStatus.lines_done }}/{{ pushStatus.lines_total }} 句</span>
-                <div v-if="pushStatus.error" style="color:var(--danger)">{{ pushStatus.error }}</div>
-              </div>
-              <p class="hint" v-if="!pod.ffmpeg">⚠️ 未检测到 ffmpeg，推流不可用（winget install Gyan.FFmpeg）</p>
+
+              <template v-if="pod.pushEnabled">
+                <div style="margin:6px 0;">
+                  <span v-for="p in ['rtmp','srt','rtsp','hls']" :key="p" class="chip"
+                        :class="{active: pod.protocol===p}" @click="pod.protocol=p">{{ p.toUpperCase() }}</span>
+                </div>
+                <input v-if="pod.protocol!=='hls'" v-model="pod.pushUrl" class="input"
+                       :placeholder="pushUrlPlaceholder" style="font-family:Consolas; font-size:12px;">
+                <p class="hint" v-if="pod.protocol!=='hls'">RTMP / SRT / RTSP 需要一个接收端（如本机 docker 起一个 SRS，或直播平台的推流地址）；只在本机试听推荐用 HLS。</p>
+                <div class="muted small" v-if="pod.protocol==='hls'" style="margin-top:6px;">
+                  拉流地址（推流开始后）：<span class="kbd">{{ hlsUrl }}</span>
+                </div>
+                <div style="margin-top:8px;">
+                  <button class="btn btn-primary" style="width:100%;" @click="startPush"
+                          :disabled="!pod.lines.length || pod.pushing">
+                    🔴 开始合成并推流
+                  </button>
+                  <button class="btn btn-danger" style="width:100%; margin-top:6px;" @click="stopPush"
+                          v-if="pushStatus.status==='pushing'">⏹ 停止推流</button>
+                </div>
+                <div class="muted small" style="margin-top:6px;" v-if="pushStatus.status && (!podEpisode || pushStatus.episode_id===podEpisode.id)">
+                  <span class="badge" :class="pushStatus.status==='pushing' ? 'live' : (pushStatus.status==='completed' ? 'ok' : 'warn')">
+                    {{ pushStatusText }}
+                  </span>
+                  <span v-if="pushStatus.status==='pushing'"> {{ pushStatus.lines_done }}/{{ pushStatus.lines_total }} 句</span>
+                  <div v-if="pushStatus.error" style="color:var(--danger)">{{ pushStatus.error }}</div>
+                </div>
+                <p class="hint" v-if="!pod.ffmpeg">⚠️ 未检测到 ffmpeg，推流不可用（winget install Gyan.FFmpeg）</p>
+              </template>
+              <template v-else>
+                <button class="btn btn-primary" style="width:100%;" @click="synthPodStream"
+                        :disabled="!pod.lines.length || pod.busy">
+                  <span v-if="pod.busy" class="spinner spinner-light"></span>
+                  {{ pod.busy ? `流式合成中 ${pod.progress}/${pod.lines.length}` : '▶ 流式合成并播放' }}
+                </button>
+                <p class="hint">逐句合成实时播放（2.5 秒预缓冲），完成后自动存为成品，可下载。</p>
+              </template>
             </div>
           </div>
         </div>

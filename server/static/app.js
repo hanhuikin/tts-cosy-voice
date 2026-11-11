@@ -279,7 +279,7 @@ createApp({
       source: 'text', sourceText: '', url: '', fileName: '', fileRaw: null,
       extractText: '', extractChars: 0, extracting: false, fileDrag: false, sourceError: '',
       genning: false, genRaw: '', lines: [], saving: false,
-      speed: 1.0, protocol: 'rtmp', pushUrl: '', ffmpeg: true,
+      speed: 1.0, protocol: 'rtmp', pushUrl: '', ffmpeg: true, pushEnabled: false,
       busy: false, progress: 0, synthError: '', pushing: false,
     });
     const voiceIds = reactive({ host: '', guest: '' });
@@ -946,6 +946,29 @@ createApp({
       loadEpisodes();
       if (podEpisode.value && podEpisode.value.id === e.id) podEpisode.value = null;
     }
+    async function synthPodStream() {
+      if (!pod.lines.length || pod.busy) return;
+      pod.busy = true; pod.progress = 0; pod.synthError = '';
+      try {
+        await saveEpisode();  // 自动保存剧集
+        const resp = await fetch(`/api/podcast/episodes/${podEpisode.value.id}/synthesize`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'stream' }),
+        });
+        if (!resp.ok) {
+          let msg = `HTTP ${resp.status}`;
+          try { msg = (await resp.json()).detail || msg; } catch (e) {}
+          throw new Error(msg);
+        }
+        // 与合成工作台一致: 全局播放器流式播放 (2.5s 预缓冲)
+        await player.startStream(resp, '播客流式 · ' + (podEpisode.value.title || ''), null);
+        podEpisode.value = await (await api(`/api/podcast/episodes/${podEpisode.value.id}`)).json();
+        loadEpisodes();
+        toast('流式合成完成, 成品已保存', 'ok');
+      } catch (e) {
+        pod.synthError = e.message;
+        toast('流式合成失败: ' + e.message, 'error', 6000);
+      } finally { pod.busy = false; }
+    }
     async function startPush() {
       pod.pushing = true;
       try {
@@ -1028,7 +1051,7 @@ createApp({
       openLLMConfig, saveLLMConfig, testLLM,
       onPodFilePick, onPodFileDrop, extractUrl, genScript,
       startEditLine, saveLine, delLine, addLine, saveEpisode, loadEpisode,
-      synthPod, playPodcast, downloadEpisode, removeEpisode, startPush, stopPush,
+      synthPod, synthPodStream, playPodcast, downloadEpisode, removeEpisode, startPush, stopPush,
       switchModel, modelTagClass, modelTagText,
     };
     return appVm;

@@ -19,7 +19,7 @@ from typing import Callable, Optional
 
 import requests
 
-from .audio import pcm_to_wav
+from .audio import pcm_to_wav, wav_header
 from .engine import TTSRequest, engine
 from .llm import SCRIPT_SYSTEM_PROMPT, chat_stream
 from .storage import storage
@@ -150,6 +150,50 @@ async def synth_line_pcm(req: TTSRequest) -> bytes:
         elif kind == "error":
             raise RuntimeError(payload)
     return b"".join(parts)
+
+
+async def stream_episode_gen(ep_id: str):
+    """本地流式合成 (与工作台一致的输出形态): WAV 头 + 逐句 PCM 分块;
+    播放器边播边收; 结束后完整 WAV 落盘为成品。"""
+    ep = storage.get_episode(ep_id)
+    lines = json.loads(ep["script_json"])
+    voice_ids = {"host": ep["voice_host"], "guest": ep["voice_guest"]}
+    yield wav_header(SAMPLE_RATE, 600 * SAMPLE_RATE)
+    parts: list[bytes] = []
+    done = 0
+    status, error = "ok", None
+    t0 = time.time()
+    first_ms = None
+    try:
+        for line in lines:
+            req = resolve_line_request(line, voice_ids)
+            job = await engine.submit(req)
+            async for kind, payload in engine.drain(job):
+                if kind == "chunk":
+                    parts.append(payload)
+                    if first_ms is None:
+                        first_ms = int((time.time() - t0) * 1000)
+                    yield payload
+                elif kind == "error":
+                    raise RuntimeError(payload)
+            done += 1
+            storage.update_episode(ep_id, progress=done)
+        status = "completed"
+    except asyncio.CancelledError:
+        status, error = "failed", "client disconnected"
+        raise
+    except Exception as e:
+        logger.exception("episode %s 本地流式失败", ep_id)
+        status, error = "failed", f"{type(e).__name__}: {e}"
+    finally:
+        out = DATA_DIR / "podcasts" / f"{ep_id}.wav" if parts else None
+        if parts:
+            out.write_bytes(pcm_to_wav(parts, SAMPLE_RATE))
+        storage.update_episode(ep_id, status=status, error=error,
+                               file=str(out) if parts else None,
+                               duration=sum(len(p) for p in parts) / 2 / SAMPLE_RATE if parts else None,
+                               progress=done)
+        logger.info("episode %s 本地流式结束: %s, %d 句, %d bytes", ep_id, status, done, sum(len(p) for p in parts))
 
 
 async def synth_episode_final(ep_id: str) -> None:
