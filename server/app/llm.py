@@ -123,3 +123,29 @@ SCRIPT_SYSTEM_PROMPT = (
     "不要输出 JSON 数组符号, 不要输出任何解释文字或 markdown 代码块标记。\n"
     "风格: 口语化、自然、有来有回、有观点交锋; 开头向听众问好并概括主题, 结尾总结并引导订阅。\n"
 )
+
+
+def script_system_prompt(speakers: list[dict], style_prompt: str = "") -> str:
+    """多人对话稿 system 提示: 内嵌说话人名单(姓名/角色/人设描述), 供大模型关联生成。
+    speakers 为空时退回默认双人模板。每项: {role: host|guest, name, desc}。"""
+    if not speakers:
+        return SCRIPT_SYSTEM_PROMPT
+    roster = []
+    for s in speakers:
+        tag = "主播" if s.get("role") == "host" else "嘉宾"
+        name = (s.get("name") or "").strip() or tag
+        desc = (s.get("desc") or "").strip()
+        roster.append(f"- {name}（{tag}）{('：' + desc) if desc else ''}")
+    example_guest = next((((s.get("name") or "").strip() or "嘉宾")
+                          for s in speakers if s.get("role") != "host"), "嘉宾")
+    example = json.dumps({"role": "guest", "name": example_guest, "text": "台词"}, ensure_ascii=False)
+    return (
+        "你是一名中文播客策划与编剧。把用户给到的内容改写为多人播客对话稿。\n"
+        f"本期说话人阵容（共 {len(speakers)} 位）:\n" + "\n".join(roster) + "\n"
+        "严格要求: 逐行输出 JSON, 每行一个对象, 形如 " + example + ", "
+        "其中 role 只能取 \"host\" 或 \"guest\", name 必须从上方名单中选取且与身份一致, "
+        "台词开头不要带姓名或冒号前缀; 不要输出 JSON 数组符号, 不要输出任何解释文字或 markdown 代码块标记。\n"
+        "对话要求: 每位说话人都要有发言; 主播负责开场、串场与追问, 嘉宾围绕自己的人设定位输出专业观点; "
+        "风格: 口语化、自然、有来有回、有观点交锋; 开头向听众问好并概括主题, 结尾总结并引导订阅。\n"
+        + (f"额外风格要求: {style_prompt.strip()}\n" if style_prompt.strip() else "")
+    )

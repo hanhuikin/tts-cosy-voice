@@ -15,13 +15,12 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 import requests
 
 from .audio import pcm_to_wav, wav_header
 from .engine import TTSRequest, engine
-from .llm import SCRIPT_SYSTEM_PROMPT, chat_stream
 from .storage import storage
 
 logger = logging.getLogger("cosyvoice-server.podcast")
@@ -77,29 +76,10 @@ def extract_from_file(filename: str, raw: bytes) -> str:
     raise ValueError(f"不支持的文件类型 {ext}")
 
 
-# ---------- 对话稿生成 ----------
-
-def generate_script(source_text: str, on_delta: Callable[[str], None]) -> list[dict]:
-    """调用 LLM 将内容改写为对话稿; on_delta 接收增量输出 (供前端流式渲染)。
-    返回解析后的行列表 [{role, text}]; 解析失败的行跳过。"""
-    cfg_rounds = "10~16"
-    user_prompt = (
-        f"请把以下内容改写为 {cfg_rounds} 轮左右的双人播客对话稿。\n\n"
-        f"【内容开始】\n{source_text[:12000]}\n【内容结束】"
-    )
-    messages = [
-        {"role": "system", "content": SCRIPT_SYSTEM_PROMPT},
-        {"role": "user", "content": user_prompt},
-    ]
-    raw = ""
-    for delta in chat_stream(messages):
-        raw += delta
-        on_delta(delta)
-    return parse_script(raw)
-
+# ---------- 对话稿解析 ----------
 
 def parse_script(raw: str) -> list[dict]:
-    """宽松解析 JSON Lines 对话稿。"""
+    """宽松解析 JSON Lines 对话稿; 行可携带说话人姓名 (多嘉宾场景)。"""
     lines = []
     for ln in raw.splitlines():
         ln = ln.strip().strip("`")
@@ -109,7 +89,11 @@ def parse_script(raw: str) -> list[dict]:
             obj = json.loads(ln)
             role, text = obj.get("role"), (obj.get("text") or "").strip()
             if role in ("host", "guest") and text:
-                lines.append({"role": role, "text": text})
+                entry = {"role": role, "text": text}
+                name = (obj.get("name") or "").strip()
+                if name:
+                    entry["name"] = name
+                lines.append(entry)
         except json.JSONDecodeError:
             continue
     if not lines:
@@ -119,13 +103,38 @@ def parse_script(raw: str) -> list[dict]:
 
 # ---------- 逐句合成 ----------
 
-def resolve_line_request(line: dict, voice_ids: dict) -> TTSRequest:
-    """把对话稿一行转为引擎请求 (解析音色参考并校验)。"""
-    role = line.get("role", "host")
-    voice_id = voice_ids.get(role) or voice_ids.get("host")
+def episode_speakers(ep: dict) -> list[dict]:
+    """剧集的说话人阵容: 优先 speakers_json; 旧数据从 voice_host/voice_guest 兼容构造。
+    每项: {role: host|guest, name, desc, voice_id}。"""
+    raw = ep.get("speakers_json")
+    if raw:
+        try:
+            spks = json.loads(raw)
+            if isinstance(spks, list) and spks:
+                return spks
+        except json.JSONDecodeError:
+            pass
+    out = []
+    if ep.get("voice_host"):
+        out.append({"role": "host", "name": "主播", "desc": "", "voice_id": ep["voice_host"]})
+    if ep.get("voice_guest"):
+        out.append({"role": "guest", "name": "嘉宾", "desc": "", "voice_id": ep["voice_guest"]})
+    return out or [{"role": "host", "name": "主播", "desc": "", "voice_id": ""}]
+
+
+def resolve_line_request(line: dict, speakers: list[dict]) -> TTSRequest:
+    """把对话稿一行转为引擎请求: 说话人姓名精确匹配音色, 未命中回退同角色第一位, 再回退首位。"""
+    name = (line.get("name") or "").strip()
+    spk = None
+    if name:
+        spk = next((s for s in speakers if (s.get("name") or "").strip() == name), None)
+    if spk is None:
+        role = line.get("role", "host")
+        spk = next((s for s in speakers if s.get("role") == role), None) or speakers[0]
+    voice_id = (spk.get("voice_id") or "").strip()
     voice = storage.get_voice(voice_id) if voice_id else None
     if not voice:
-        raise ValueError(f"角色 {role} 未配置有效音色")
+        raise ValueError(f"说话人「{spk.get('name') or line.get('role', 'host')}」未配置有效音色")
     req = TTSRequest(
         text=line["text"], model="cosyvoice3", mode="zero_shot",
         voice_id=voice_id, speed=float(line.get("speed", 1.0)), stream=False,
@@ -157,7 +166,7 @@ async def stream_episode_gen(ep_id: str):
     播放器边播边收; 结束后完整 WAV 落盘为成品。"""
     ep = storage.get_episode(ep_id)
     lines = json.loads(ep["script_json"])
-    voice_ids = {"host": ep["voice_host"], "guest": ep["voice_guest"]}
+    speakers = episode_speakers(ep)
     yield wav_header(SAMPLE_RATE, 600 * SAMPLE_RATE)
     parts: list[bytes] = []
     done = 0
@@ -166,7 +175,7 @@ async def stream_episode_gen(ep_id: str):
     first_ms = None
     try:
         for line in lines:
-            req = resolve_line_request(line, voice_ids)
+            req = resolve_line_request(line, speakers)
             job = await engine.submit(req)
             async for kind, payload in engine.drain(job):
                 if kind == "chunk":
@@ -202,13 +211,13 @@ async def synth_episode_final(ep_id: str) -> None:
     if not ep:
         return
     lines = json.loads(ep["script_json"])
-    voice_ids = {"host": ep["voice_host"], "guest": ep["voice_guest"]}
+    speakers = episode_speakers(ep)
     storage.update_episode(ep_id, status="synthesizing", progress=0, error=None)
     all_parts: list[bytes] = []
     done = 0
     try:
         for line in lines:
-            req = resolve_line_request(line, voice_ids)
+            req = resolve_line_request(line, speakers)
             pcm = await synth_line_pcm(req)
             all_parts.append(pcm)
             done += 1
@@ -354,7 +363,7 @@ class PushManager:
         loop = asyncio.get_running_loop()
         ep = storage.get_episode(ep_id)
         lines = json.loads(ep["script_json"])
-        voice_ids = {"host": ep["voice_host"], "guest": ep["voice_guest"]}
+        speakers = episode_speakers(ep)
         status, error = "completed", None
         proc: Optional[subprocess.Popen] = None
         all_parts: list[bytes] = []
@@ -376,7 +385,7 @@ class PushManager:
                 need = self.PREBUFFER_SECONDS * SAMPLE_RATE
                 idx = 0
                 while idx < len(lines) and rsamples < need and not self._stop_flag:
-                    pcm = await synth_line_pcm(resolve_line_request(lines[idx], voice_ids))
+                    pcm = await synth_line_pcm(resolve_line_request(lines[idx], speakers))
                     reservoir.append(pcm)
                     rsamples += len(pcm) // 2
                     idx += 1
@@ -393,7 +402,7 @@ class PushManager:
                     if self._stop_flag:
                         status, error = "stopped", "手动停止"
                         break
-                    pcm = await synth_line_pcm(resolve_line_request(lines[idx], voice_ids))
+                    pcm = await synth_line_pcm(resolve_line_request(lines[idx], speakers))
                     all_parts.append(pcm)
                     await loop.run_in_executor(None, self._write_stdin, proc, pcm)
                     idx += 1

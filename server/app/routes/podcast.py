@@ -75,16 +75,23 @@ async def podcast_extract(request: Request, file: UploadFile | None = File(None)
 # ---------- 对话稿生成 (流式返回增量) ----------
 class ScriptBody(BaseModel):
     text: str = Field(min_length=10, max_length=20000)
+    speakers: list[dict] = []   # 主持阵容: {role, name, desc}, 注入 prompt 供大模型关联
 
 
 @router.post("/podcast/script")
 async def podcast_script(body: ScriptBody):
+    speakers = [s for s in body.speakers if isinstance(s, dict)]
+    cfg = llm.load_config()
+    rounds = (cfg.get("rounds_hint") or "10~16").strip() or "10~16"
+    system = llm.script_system_prompt(speakers, cfg.get("style_prompt") or "")
+    kind = f"{len(speakers)} 人" if len(speakers) > 2 else "双人"
+
     async def gen():
         buf = []
         try:
             for delta in llm.chat_stream([
-                {"role": "system", "content": llm.SCRIPT_SYSTEM_PROMPT},
-                {"role": "user", "content": f"请把以下内容改写为 10~16 轮左右的双人播客对话稿。\n\n"
+                {"role": "system", "content": system},
+                {"role": "user", "content": f"请把以下内容改写为 {rounds} 轮左右的{kind}播客对话稿。\n\n"
                                             f"【内容开始】\n{body.text[:12000]}\n【内容结束】"},
             ]):
                 buf.append(delta)
@@ -96,33 +103,78 @@ async def podcast_script(body: ScriptBody):
 
 @router.post("/podcast/parse-script")
 async def podcast_parse(request: Request):
-    """解析前端累积的原始 LLM 输出 -> 结构化对话稿行。"""
+    """解析前端累积的原始 LLM 输出 -> 结构化对话稿行。
+    传入阵容时做说话人归一化: 姓名对不上名单的行纠正为名单内说话人。"""
     body = await request.json()
     raw = body.get("raw") or ""
+    speakers = [s for s in (body.get("speakers") or []) if isinstance(s, dict)]
     try:
-        return {"lines": podcast.parse_script(raw)}
+        lines = podcast.parse_script(raw)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    if speakers:
+        known = {}
+        for s in speakers:
+            nm = (s.get("name") or "").strip()
+            if nm:
+                known[nm] = s
+        for ln in lines:
+            nm = (ln.get("name") or "").strip()
+            spk = known.get(nm)
+            if spk is None and nm:
+                key = next((k for k in known if k in nm or nm in k), None)   # 宽容: 互相包含
+                spk = known.get(key) if key else None
+            if spk is None:
+                role = ln.get("role", "host")
+                spk = next((s for s in speakers if s.get("role") == role), speakers[0])
+            ln["name"] = (spk.get("name") or "").strip() or ("主播" if spk.get("role") == "host" else "嘉宾")
+            ln["role"] = spk.get("role") or ln.get("role", "host")
+    return {"lines": lines}
 
 
 # ---------- 剧集管理 ----------
+def _clean_speakers(speakers: list[dict]) -> list[dict]:
+    out = []
+    for s in speakers:
+        if not isinstance(s, dict):
+            continue
+        role = "host" if s.get("role") == "host" else "guest"
+        out.append({"role": role, "name": (s.get("name") or "").strip(),
+                    "desc": (s.get("desc") or "").strip(), "voice_id": (s.get("voice_id") or "").strip()})
+    return out
+
+
 class EpisodeBody(BaseModel):
     title: str = Field(min_length=1, max_length=100)
     source_type: str = "text"
     source_ref: str = ""
     lines: list[dict]
-    voice_host: str
-    voice_guest: str
+    speakers: list[dict] = []   # 主持阵容; 为空时按 voice_host/voice_guest 兼容构造
+    voice_host: str = ""
+    voice_guest: str = ""
     speed: float = 1.0
+
+
+def _episode_speakers_json(body: EpisodeBody) -> tuple[str, str, str]:
+    """序列化阵容; 返回 (speakers_json, voice_host, voice_guest), 双字段保持旧数据兼容。"""
+    spks = _clean_speakers(body.speakers)
+    if not spks:
+        spks = [{"role": "host", "name": "主播", "desc": "", "voice_id": body.voice_host},
+                {"role": "guest", "name": "嘉宾", "desc": "", "voice_id": body.voice_guest}]
+    host = next((s["voice_id"] for s in spks if s["role"] == "host" and s["voice_id"]), body.voice_host)
+    guest = next((s["voice_id"] for s in spks if s["role"] != "host" and s["voice_id"]), body.voice_guest)
+    return json.dumps(spks, ensure_ascii=False), host, guest
 
 
 @router.post("/podcast/episodes")
 def create_episode(body: EpisodeBody):
     if not body.lines:
         raise HTTPException(400, "对话稿为空")
+    spk_json, host, guest = _episode_speakers_json(body)
     ep = storage.add_episode(body.title, body.source_type, body.source_ref,
                              json.dumps(body.lines, ensure_ascii=False),
-                             body.voice_host, body.voice_guest)
+                             spk_json, host, guest)
+    ep["speakers"] = json.loads(ep.pop("speakers_json", "[]") or "[]")
     return ep
 
 
@@ -136,6 +188,8 @@ def list_episodes(limit: int = 50):
         e["has_audio"] = bool(e.get("file"))
         e.pop("file", None)
         e["lines_count"] = len(json.loads(e.pop("script_json") or "[]"))
+        e["speakers"] = podcast.episode_speakers(e)
+        e.pop("speakers_json", None)
         if e["id"] == pushing_id:
             e["push"] = podcast.push_manager.status()
     return {"episodes": eps}
@@ -149,6 +203,8 @@ def get_episode(pid: str):
     ep["script"] = json.loads(ep.pop("script_json") or "[]")
     ep["has_audio"] = bool(ep.get("file"))
     ep.pop("file", None)
+    ep["speakers"] = podcast.episode_speakers(ep)
+    ep.pop("speakers_json", None)
     ep["push"] = podcast.push_manager.status() if ep["id"] == podcast.push_manager.info.get("episode_id") else None
     return ep
 
@@ -157,9 +213,12 @@ def get_episode(pid: str):
 def update_episode(pid: str, body: EpisodeBody):
     if not storage.get_episode(pid):
         raise HTTPException(404, "episode not found")
+    spk_json, host, guest = _episode_speakers_json(body)
     storage.update_episode(pid, title=body.title, script_json=json.dumps(body.lines, ensure_ascii=False),
-                           voice_host=body.voice_host, voice_guest=body.voice_guest, speed=body.speed)
-    return storage.get_episode(pid)
+                           speakers_json=spk_json, voice_host=host, voice_guest=guest, speed=body.speed)
+    ep = storage.get_episode(pid)
+    ep["speakers"] = json.loads(ep.pop("speakers_json", "[]") or "[]")
+    return ep
 
 
 @router.delete("/podcast/episodes/{pid}")
@@ -208,8 +267,9 @@ async def synthesize_episode(pid: str, body: SynthesizeBody):
         raise HTTPException(400, "对话稿为空")
     try:
         # 预校验全部行可解析音色与参数 (提前暴露问题)
+        spks = podcast.episode_speakers(ep)
         for ln in lines:
-            podcast.resolve_line_request(ln, {"host": ep["voice_host"], "guest": ep["voice_guest"]})
+            podcast.resolve_line_request(ln, spks)
     except ValueError as e:
         raise HTTPException(400, str(e))
 

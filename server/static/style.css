@@ -426,3 +426,17 @@ html[data-theme="light"] {
   --nav-active-fg: #1d4ed8;
   --chip-hover-fg: #1d4ed8;
 }
+
+/* ---------- 播客工坊: 主持阵容 ---------- */
+.tag.info { background: rgba(79, 140, 255, .15); color: var(--primary-2); border-color: rgba(79, 140, 255, .35); }
+html[data-theme="light"] .tag.info { color: #1d4ed8; }
+.spk-block {
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+.spk-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.spk-row { display: flex; gap: 6px; }
+.spk-row .input:first-child { flex: 1; min-width: 0; }
+.spk-row select.input { flex: 1.2; min-width: 0; }

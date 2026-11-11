@@ -353,7 +353,7 @@
 
             <div v-if="pod.source==='text'">
               <textarea v-model="pod.sourceText" class="textarea" rows="8" style="font-size:13px;"
-                        placeholder="在此粘贴文章、会议记录、学习笔记…（将改写为 10~16 轮对话，约 4~10 分钟节目）"></textarea>
+                        placeholder="在此粘贴文章、会议记录、学习笔记…（将按③的主持阵容改写为多轮多人对话，约 4~10 分钟节目）"></textarea>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                 <span class="muted small" :class="{accent: pod.sourceText.length>20000}">{{ pod.sourceText.length }} / 20000 字符</span>
               </div>
@@ -401,8 +401,8 @@
                   <span v-if="pod.genning" class="spinner spinner-light"></span>
                   {{ pod.genning ? '生成中…' : '🤖 由大模型生成对话稿' }}
                 </button>
-                <p class="hint" v-if="pod.source==='url'">网页内容由大模型归纳改写为双人对话稿（需先配置大模型）。</p>
-                <p class="hint" v-else>该文档格式将由大模型归纳改写为双人对话稿（需先配置大模型）。</p>
+                <p class="hint" v-if="pod.source==='url'">网页内容由大模型按③的主持阵容改写为多人对话稿（需先配置大模型）。</p>
+                <p class="hint" v-else>该文档格式将由大模型按③的主持阵容改写为多人对话稿（需先配置大模型）。</p>
               </template>
               <template v-else>
                 <button class="btn btn-primary" style="width:100%;" @click="directRead"
@@ -412,9 +412,9 @@
                 <button class="btn btn-ghost" style="width:100%; margin-top:6px;" @click="genScript"
                         :disabled="!podCanGen || pod.genning">
                   <span v-if="pod.genning" class="spinner spinner-light"></span>
-                  {{ pod.genning ? '生成中…' : '🤖 改写为双人对话稿（需大模型）' }}
+                  {{ pod.genning ? '生成中…' : '🤖 改写为多人对话稿（需大模型）' }}
                 </button>
-                <p class="hint">直接朗读：按语句切分为朗读稿，由主播音色通读；对话稿：交给大模型改写为双人对谈。</p>
+                <p class="hint">直接朗读：按语句切分为朗读稿，由主播音色通读；对话稿：交给大模型按③阵容改写为多人对谈。</p>
               </template>
             </div>
           </div>
@@ -435,9 +435,11 @@
                 <div class="avatar">{{ line.role==='host' ? '🎙' : '🧑‍🔬' }}</div>
                 <div style="flex:1; min-width:0;">
                   <div class="who">
-                    {{ line.role==='host' ? '主播' : '嘉宾' }} ·
-                    <select v-model="voiceIds[line.role]" class="input" style="display:inline-block; width:auto; padding:2px 8px; font-size:12px;">
-                      <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
+                    <span class="tag" :class="line.role==='host' ? 'info' : ''">{{ line.role==='host' ? '主播' : '嘉宾' }}</span>
+                    <select v-model="line.name" @change="syncLineRole(line)" class="input"
+                            style="display:inline-block; width:auto; padding:2px 8px; font-size:12px;"
+                            title="切换该行说话人 (连同音色)">
+                      <option v-for="s in speakers" :key="spkLabel(s)" :value="spkLabel(s)">{{ spkLabel(s) }} · {{ voiceName(s.voice_id) }}</option>
                     </select>
                     <button class="btn btn-ghost" style="padding:1px 8px; font-size:11px; float:right" @click="delLine(i)">✕</button>
                   </div>
@@ -464,19 +466,45 @@
 
           <!-- ③ 输出 -->
           <div class="card pod-col">
-            <div class="card-head"><span class="card-title">③ 输出设置</span></div>
-            <div class="field-col">
-              <label>主播音色 (host)</label>
-              <select v-model="voiceIds.host" class="input">
-                <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
-              </select>
+            <div class="card-head">
+              <span class="card-title">③ 主持阵容</span>
+              <span class="muted small">主播 ×1 · 嘉宾 ×{{ guestCount }}</span>
             </div>
-            <div class="field-col">
-              <label>嘉宾音色 (guest)</label>
-              <select v-model="voiceIds.guest" class="input">
-                <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
-              </select>
+
+            <!-- 主播 -->
+            <div class="spk-block">
+              <div class="spk-head"><span class="tag info">🎙 主播</span></div>
+              <div class="spk-row">
+                <input v-model="hostSpk.name" class="input" placeholder="姓名，如 阿远">
+                <select v-model="hostSpk.voice_id" class="input" title="主播音色">
+                  <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
+                </select>
+              </div>
+              <textarea v-model="hostSpk.desc" class="textarea" rows="2" style="margin-top:6px; font-size:12.5px;"
+                        placeholder="人设 / 简介（生成对话稿时供大模型参考）：如 资深科技主播，擅长用生活化的比喻讲清技术原理"></textarea>
             </div>
+
+            <!-- 嘉宾 (可多个) -->
+            <template v-for="(s, i) in speakers" :key="i">
+              <div v-if="s.role !== 'host'" class="spk-block">
+                <div class="spk-head">
+                  <span class="tag">🧑‍🔬 嘉宾 {{ guestSeq(s) + 1 }}</span>
+                  <button class="btn btn-ghost" style="padding:1px 8px; font-size:11px;"
+                          :disabled="guestCount <= 1" :title="guestCount <= 1 ? '至少保留一位嘉宾' : '移除该嘉宾'"
+                          @click="removeGuest(i)">✕</button>
+                </div>
+                <div class="spk-row">
+                  <input v-model="s.name" class="input" placeholder="姓名，如 张老师">
+                  <select v-model="s.voice_id" class="input" title="嘉宾音色">
+                    <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
+                  </select>
+                </div>
+                <textarea v-model="s.desc" class="textarea" rows="2" style="margin-top:6px; font-size:12.5px;"
+                          placeholder="人设 / 简介（生成对话稿时供大模型参考）：如 AI 研究员，专注语音合成，观点犀利、爱抬杠"></textarea>
+              </div>
+            </template>
+            <button class="btn btn-ghost" style="width:100%; margin-top:2px;" @click="addGuest">＋ 添加嘉宾</button>
+
             <div class="field-col">
               <label>语速 ×{{ pod.speed.toFixed(2) }}</label>
               <input type="range" min="0.5" max="2" step="0.05" v-model.number="pod.speed">
@@ -784,7 +812,7 @@
         <div class="status-meta">来源：{{ {text:'粘贴文本', file:'上传文件', url:'网页 URL'}[queueDetail.source_type] || queueDetail.source_type }}
           <span class="muted" v-if="queueDetail.source_ref">（{{ String(queueDetail.source_ref).slice(0, 60) }}）</span></div>
         <div class="status-meta">对话稿：{{ queueDetail.lines_count || (queueDetail.script ? queueDetail.script.length : 0) }} 轮 · 语速 ×{{ queueDetail.speed }}</div>
-        <div class="status-meta">音色：主播 {{ voiceName(queueDetail.voice_host) }} / 嘉宾 {{ voiceName(queueDetail.voice_guest) }}</div>
+        <div class="status-meta">主持阵容：{{ speakersSummary(queueDetail) }}</div>
         <div class="status-meta">创建时间：{{ queueDetail.created_at }}</div>
       </div>
 

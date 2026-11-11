@@ -283,7 +283,31 @@ createApp({
       busyFinal: false, busyStream: false, busySince: 0, progress: 0, synthError: '', pushing: false,
       stopRequested: '',
     });
-    const voiceIds = reactive({ host: '', guest: '' });
+    // 主持阵容: 主播 1 位 + 嘉宾若干; 姓名/人设描述供大模型生成对话稿时关联
+    const speakers = reactive([
+      { role: 'host', name: '', desc: '', voice_id: '' },
+      { role: 'guest', name: '', desc: '', voice_id: '' },
+    ]);
+    const guestCount = computed(() => speakers.filter(s => s.role !== 'host').length);
+    const hostSpk = computed(() => speakers.find(s => s.role === 'host') || speakers[0]);
+    // 显示名: 未命名时回退 主播/嘉宾N (与 ensureSpeakerNames 的补名规则一致)
+    const guestSeq = (s) => speakers.filter(x => x.role !== 'host').indexOf(s);
+    const spkLabel = (s) => s.name || (s.role === 'host' ? '主播' : `嘉宾${guestSeq(s) + 1}`);
+    function ensureSpeakerNames() {
+      for (const s of speakers) {
+        if (!(s.name || '').trim()) s.name = s.role === 'host' ? '主播' : `嘉宾${guestSeq(s) + 1}`;
+      }
+    }
+    function addGuest() {
+      // 自动分配一个未被其他说话人占用的音色
+      const used = new Set(speakers.map(s => s.voice_id));
+      const free = voices.value.find(v => !used.has(v.id));
+      speakers.push({ role: 'guest', name: '', desc: '', voice_id: (free || voices.value[0] || {}).id || '' });
+    }
+    function removeGuest(i) {
+      if (guestCount.value <= 1) { toast('至少保留一位嘉宾', 'error'); return; }
+      speakers.splice(i, 1);
+    }
     const llmCfg = reactive({ base_url: '', model: '', api_key_masked: '' });
     const llmModal = ref(false);
     const llmForm = reactive({ base_url: '', api_key: '', model: '', temperature: 0.7, rounds_hint: '10~16', style_prompt: '' });
@@ -321,6 +345,12 @@ createApp({
       if (t.status === 'completed') return t.duration ? `时长 ${t.duration.toFixed(1)}s` : '';
       if (t.status === 'failed') return (t.error || '').slice(0, 60) || '未知错误';
       return '';
+    };
+    // 剧集主持阵容摘要 (任务详情弹窗): 姓名(音色) · ...
+    const speakersSummary = (ep) => {
+      const spks = Array.isArray(ep && ep.speakers) && ep.speakers.length ? ep.speakers : null;
+      if (!spks) return `主播 ${voiceName(ep && ep.voice_host)} / 嘉宾 ${voiceName(ep && ep.voice_guest)}`;
+      return spks.map(s => `${s.name || (s.role === 'host' ? '主播' : '嘉宾')}（${voiceName(s.voice_id) || '未配置'}）`).join(' · ');
     };
     // ---------- TTS 任务队列 (工作台右边栏) ----------
     const ttsBadge = (s) => ({
@@ -485,8 +515,9 @@ createApp({
     async function loadVoices() {
       voices.value = await (await api('/api/voices')).json();
       // 播客角色默认音色: 首个/第二个可用音色
-      if (!voiceIds.host && voices.value.length) voiceIds.host = voices.value[0].id;
-      if (!voiceIds.guest && voices.value.length > 1) voiceIds.guest = voices.value[1].id;
+      if (hostSpk.value && !hostSpk.value.voice_id && voices.value.length) hostSpk.value.voice_id = voices.value[0].id;
+      const firstGuest = speakers.find(s => s.role !== 'host');
+      if (firstGuest && !firstGuest.voice_id && voices.value.length > 1) firstGuest.voice_id = voices.value[1].id;
     }
     async function loadTasks() {
       const j = await (await api('/api/tasks?limit=200')).json();
@@ -541,11 +572,13 @@ createApp({
       return lines.map(t => ({ role: 'host', text: t }));
     }
     function directRead() {
+      ensureSpeakerNames();
+      const host = hostSpk.value;
       const source = pod.source === 'text' ? pod.sourceText : pod.extractText;
       const lines = splitToLines(source);
       if (!lines.length) return toast('内容源为空', 'error');
-      pod.lines = lines;
-      toast(`已切分为 ${lines.length} 句朗读稿（单音色）`, 'ok');
+      pod.lines = lines.map(l => ({ role: 'host', name: host.name, text: l.text }));
+      toast(`已切分为 ${lines.length} 句朗读稿（${host.name} 单音色）`, 'ok');
     }
     function switchMode(key) { form.mode = key; }
     function toggleStream() { form.stream = !form.stream; }
@@ -876,10 +909,14 @@ createApp({
     async function genScript() {
       const source = pod.source === 'text' ? pod.sourceText : pod.extractText;
       if (source.trim().length < 10) return toast('内容源太短', 'error');
+      if (speakers.length < 2) return toast('至少需要 1 位主播 + 1 位嘉宾才能生成多人对话稿', 'error');
+      ensureSpeakerNames();
+      const speakersBrief = speakers.map(s => ({ role: s.role, name: (s.name || '').trim(), desc: (s.desc || '').trim() }));
       pod.genning = true; pod.genRaw = ''; pod.lines = [];
       try {
         const resp = await fetch('/api/podcast/script', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: source }),
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: source, speakers: speakersBrief }),
         });
         if (!resp.ok) {
           let msg = `HTTP ${resp.status}`;
@@ -899,7 +936,8 @@ createApp({
           throw new Error(raw.split('__LLM_ERROR__')[1].trim());
         }
         const j = await (await api('/api/podcast/parse-script', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ raw }),
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ raw, speakers: speakersBrief }),
         })).json();
         pod.lines = j.lines;
         pod.genRaw = '';
@@ -913,9 +951,17 @@ createApp({
     function startEditLine(i) { editLine.value = i; editLineText.value = pod.lines[i].text; }
     function saveLine(i) { pod.lines[i].text = editLineText.value.trim() || pod.lines[i].text; editLine.value = -1; }
     function delLine(i) { pod.lines.splice(i, 1); }
+    // 对话稿行切换说话人: 同步行的角色
+    function syncLineRole(ln) {
+      const spk = speakers.find(s => spkLabel(s) === ln.name);
+      if (spk) ln.role = spk.role;
+    }
     function addLine() {
-      const lastRole = pod.lines.length ? pod.lines[pod.lines.length - 1].role : 'guest';
-      pod.lines.push({ role: lastRole === 'host' ? 'guest' : 'host', text: '' });
+      // 轮换: 接在上一位说话人之后, 沿阵容顺序取下一位
+      const last = pod.lines[pod.lines.length - 1];
+      const idx = last ? speakers.findIndex(s => spkLabel(s) === last.name) : speakers.length - 1;
+      const next = speakers[(idx + 1) % speakers.length] || speakers[0];
+      pod.lines.push({ role: next.role, name: spkLabel(next), text: '' });
       startEditLine(pod.lines.length - 1);
     }
 
@@ -926,12 +972,16 @@ createApp({
     async function saveEpisode() {
       pod.saving = true;
       try {
+        ensureSpeakerNames();
         // 更新已有剧集时保留原标题 (autoTitle 仅用于新建, 否则载入后再次保存/合成会被改名)
         const keepTitle = podEpisode.value && podEpisode.value.title ? podEpisode.value.title : autoTitle();
         const body = {
           title: keepTitle, source_type: pod.source, source_ref: pod.source === 'url' ? pod.url : pod.fileName,
-          lines: pod.lines.map(l => ({ role: l.role, text: l.text })),
-          voice_host: voiceIds.host, voice_guest: voiceIds.guest, speed: pod.speed,
+          lines: pod.lines.map(l => ({ role: l.role, name: l.name || '', text: l.text })),
+          speakers: speakers.map(s => ({ role: s.role, name: (s.name || '').trim(), desc: (s.desc || '').trim(), voice_id: s.voice_id })),
+          voice_host: hostSpk.value.voice_id || '',
+          voice_guest: (speakers.find(s => s.role !== 'host') || {}).voice_id || '',
+          speed: pod.speed,
         };
         if (podEpisode.value && podEpisode.value.id) {
           await api(`/api/podcast/episodes/${podEpisode.value.id}`, {
@@ -955,9 +1005,20 @@ createApp({
     }
     async function loadEpisode(e) {
       podEpisode.value = await (await api(`/api/podcast/episodes/${e.id}`)).json();
-      pod.lines = JSON.parse(JSON.stringify(podEpisode.value.script || []));
-      voiceIds.host = podEpisode.value.voice_host || voiceIds.host;
-      voiceIds.guest = podEpisode.value.voice_guest || voiceIds.guest;
+      // 主持阵容: 优先 speakers; 旧数据从 voice_host/voice_guest 兼容构造
+      const raw = Array.isArray(podEpisode.value.speakers) && podEpisode.value.speakers.length
+        ? podEpisode.value.speakers
+        : [{ role: 'host', name: '', desc: '', voice_id: podEpisode.value.voice_host || '' },
+           { role: 'guest', name: '', desc: '', voice_id: podEpisode.value.voice_guest || '' }];
+      speakers.splice(0, speakers.length, ...raw.map(s => ({
+        role: s.role === 'host' ? 'host' : 'guest', name: s.name || '', desc: s.desc || '', voice_id: s.voice_id || '',
+      })));
+      ensureSpeakerNames();
+      // 旧行无 name: 按角色回填阵容姓名
+      pod.lines = JSON.parse(JSON.stringify(podEpisode.value.script || [])).map(l => {
+        const spk = speakers.find(s => s.role === (l.role || 'host')) || speakers[0];
+        return { role: spk.role, name: l.name || spk.name, text: l.text };
+      });
       view.value = 'podcast';
       toast(`已载入「${e.title}」`);
     }
@@ -1204,14 +1265,15 @@ createApp({
       synthesize, previewSpeaker, previewVoice, reloadParams, downloadTask, deleteTask, stopPlayer, playTask,
       onFilePick, onDrop, uploadVoice, useVoice, deleteVoice,
       editVoice, startVoiceEdit, cancelVoiceEdit, saveVoiceEdit,
-      pod, voiceIds, llmCfg, llmModal, llmForm, llmTestResult, episodes, podEpisode, pushStatus,
+      pod, speakers, hostSpk, guestCount, guestSeq, spkLabel, addGuest, removeGuest, speakersSummary,
+      llmCfg, llmModal, llmForm, llmTestResult, episodes, podEpisode, pushStatus,
       queueModal, queueDetail, podQueue, queueActive, queueRunning, queueBadge, queueTaskText,
       ttsBadge, ttsQueue, ttsRunning, timeAgo,
       editLine, editLineText,
       podCanGen, podFileNeedsLLM, estimateText, pushUrlPlaceholder, hlsUrl, pushStatusText, voiceName,
       openLLMConfig, saveLLMConfig, testLLM,
       onPodFilePick, onPodFileDrop, extractUrl, genScript,
-      startEditLine, saveLine, delLine, addLine, saveEpisode, loadEpisode,
+      startEditLine, saveLine, delLine, addLine, syncLineRole, saveEpisode, loadEpisode,
       synthPod, synthPodStream, playPodcast, downloadEpisode, removeEpisode, startPush, stopPush,
       openQueueDetail, pollPod, playEpisode, loadFromQueue, removeFromQueue,
       switchModel, modelTagClass, modelTagText,

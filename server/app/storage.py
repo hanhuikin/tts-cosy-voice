@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS podcasts (
     script_json TEXT NOT NULL DEFAULT '[]',
     voice_host TEXT NOT NULL DEFAULT '',
     voice_guest TEXT NOT NULL DEFAULT '',
+    speakers_json TEXT NOT NULL DEFAULT '[]',
     speed REAL NOT NULL DEFAULT 1.0,
     status TEXT NOT NULL DEFAULT 'draft',
     progress INTEGER NOT NULL DEFAULT 0,
@@ -79,6 +80,10 @@ class Storage:
         self._lock = threading.Lock()
         with self._lock:
             self._db.executescript(_SCHEMA)
+            # 老库迁移: 补 speakers_json 列 (多说话人阵容)
+            cols = {r[1] for r in self._db.execute("PRAGMA table_info(podcasts)")}
+            if "speakers_json" not in cols:
+                self._db.execute("ALTER TABLE podcasts ADD COLUMN speakers_json TEXT NOT NULL DEFAULT '[]'")
             self._db.commit()
 
     def _exec(self, sql: str, params: tuple = ()) -> None:
@@ -182,12 +187,14 @@ class Storage:
 
     # ---------- podcasts ----------
     def add_episode(self, title: str, source_type: str, source_ref: str,
-                    script_json: str, voice_host: str, voice_guest: str) -> dict:
+                    script_json: str, speakers_json: str = "[]",
+                    voice_host: str = "", voice_guest: str = "") -> dict:
         pid = new_id()
         self._exec(
-            "INSERT INTO podcasts(id,title,source_type,source_ref,script_json,voice_host,voice_guest,created_at)"
-            " VALUES(?,?,?,?,?,?,?,?)",
-            (pid, title, source_type, source_ref, script_json, voice_host, voice_guest, now_iso()),
+            "INSERT INTO podcasts(id,title,source_type,source_ref,script_json,speakers_json,voice_host,voice_guest,created_at)"
+            " VALUES(?,?,?,?,?,?,?,?,?)",
+            (pid, title, source_type, source_ref, script_json, speakers_json,
+             voice_host, voice_guest, now_iso()),
         )
         return self.get_episode(pid)  # type: ignore[return-value]
 
@@ -202,7 +209,7 @@ class Storage:
     def update_episode(self, pid: str, **fields) -> None:
         if not fields:
             return
-        allowed = {"title", "script_json", "voice_host", "voice_guest", "speed",
+        allowed = {"title", "script_json", "voice_host", "voice_guest", "speakers_json", "speed",
                    "status", "progress", "file", "duration", "error"}
         sets, params = [], []
         for k, v in fields.items():
