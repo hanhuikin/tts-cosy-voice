@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CosyVoice 控制台</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙</text></svg>">
+</head>
+<body>
+<div id="app" v-cloak>
+
+  <!-- 顶部横幅: 模型加载 / 错误 -->
+  <div v-if="banner" class="banner" :class="banner.type">
+    <span class="banner-icon">{{ banner.icon }}</span>
+    <span>{{ banner.text }}</span>
+    <span v-if="banner.busy" class="spinner"></span>
+    <button class="banner-close" v-if="banner.closable" @click="dismissBanner">✕</button>
+  </div>
+
+  <div class="layout">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-mark">🎙</div>
+        <div>
+          <div class="logo-title">CosyVoice</div>
+          <div class="logo-sub">语音合成控制台</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a v-for="v in views" :key="v.key" :class="{active: view===v.key}" @click="switchView(v.key)">
+          <span class="nav-icon">{{ v.icon }}</span>{{ v.name }}
+        </a>
+      </nav>
+      <div class="side-status">
+        <div class="status-row">
+          <span class="dot" :class="stateClass"></span>
+          <span>{{ stateText }}</span>
+        </div>
+        <div class="status-meta">{{ health.gpu ? health.gpu.name : '…' }}</div>
+        <div class="status-meta" v-if="health.gpu && health.gpu.vram_total_gb">
+          显存 {{ health.gpu.vram_used_gb }} / {{ health.gpu.vram_total_gb }} GB
+        </div>
+        <div class="status-meta">排队 {{ health.queue_len }} / {{ health.queue_max }}</div>
+        <div class="status-meta" v-if="health.sample_rate">输出 {{ health.sample_rate }} Hz</div>
+      </div>
+    </aside>
+
+    <!-- 主区域 -->
+    <main class="main">
+
+      <!-- ========== 合成工作台 ========== -->
+      <section v-if="view==='workbench'" class="view">
+        <h2 class="view-title">合成工作台</h2>
+
+        <!-- 文本输入卡 -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">合成文本</span>
+            <span class="muted">{{ form.text.length }} / 2000 字符</span>
+          </div>
+          <textarea v-model="form.text" ref="ta" class="textarea" rows="5"
+                    placeholder="输入要合成的文本，支持中 / 英 / 日 / 韩 / 德 / 法 / 西 / 意 / 俄 及 18 种中文方言…（Ctrl+Enter 合成）"></textarea>
+          <div class="chips">
+            <span class="chip-label">示例：</span>
+            <button v-for="s in sampleTexts" :key="s.text" class="chip" @click="applySample(s)">{{ s.label }}</button>
+            <button class="chip chip-ghost" @click="form.text=''" v-if="form.text">清空</button>
+          </div>
+          <div class="lang-tags" v-if="form.mode==='cross_lingual'">
+            <span class="chip-label">语言标签插入：</span>
+            <button v-for="t in langTags" :key="t" class="chip chip-tag" @click="insertTag(t)">{{ t }}</button>
+          </div>
+        </div>
+
+        <!-- 模式 + 参考区 -->
+        <div class="card">
+          <div class="mode-tabs" :style="visibleModeDefs.length===4 ? '' : 'grid-template-columns: repeat(3, 1fr)'">
+            <button v-for="m in visibleModeDefs" :key="m.key" class="mode-tab" :class="{active: form.mode===m.key}"
+                    @click="switchMode(m.key)">
+              <span class="mode-icon">{{ m.icon }}</span>
+              <span>{{ m.name }}</span>
+            </button>
+          </div>
+
+          <!-- 预置音色 -->
+          <div v-if="form.mode==='sft'" class="mode-panel">
+            <template v-if="health.speakers.length">
+              <div class="field-row">
+                <label>内置说话人</label>
+                <select v-model="form.spk_id" class="input">
+                  <option disabled value="">请选择说话人</option>
+                  <option v-for="s in health.speakers" :key="s" :value="s">{{ s }}</option>
+                </select>
+                <button class="btn btn-ghost" @click="previewSpeaker" :disabled="!form.spk_id || busy">试听</button>
+              </div>
+              <p class="hint">使用模型内置音色直接合成，无需参考音频。</p>
+            </template>
+            <div v-else class="empty" style="padding: 18px;">
+              当前模型（{{ modelLabel(form.model) }}）没有内置说话人<br>
+              <button class="btn" @click="switchMode('zero_shot')" style="margin-top: 8px;">改用 🧬 声音克隆</button>
+            </div>
+          </div>
+
+          <!-- 声音克隆 -->
+          <div v-else-if="form.mode==='zero_shot'" class="mode-panel">
+            <div class="field-row">
+              <label>克隆音色</label>
+              <select v-model="form.voice_id" class="input">
+                <option disabled value="">请选择音色</option>
+                <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}（{{ v.duration.toFixed(1) }}s）</option>
+              </select>
+              <button class="btn btn-ghost" @click="previewVoice" :disabled="!form.voice_id || busy">试听参考</button>
+              <button class="btn btn-ghost" @click="goVoices">＋ 新建音色</button>
+            </div>
+            <div class="field-col" v-if="form.voice_id">
+              <label>参考音频文字内容 <span class="muted">（与参考音频一致，服务端自动添加指令前缀）</span></label>
+              <input v-model="form.prompt_text" class="input" placeholder="参考音频里说的那句话…">
+            </div>
+            <p class="hint">3~30 秒干净的单人语音即可克隆音色，建议先在「音色库」完成上传与校验。</p>
+          </div>
+
+          <!-- 跨语言 -->
+          <div v-else-if="form.mode==='cross_lingual'" class="mode-panel">
+            <div class="field-row">
+              <label>克隆音色</label>
+              <select v-model="form.voice_id" class="input">
+                <option disabled value="">请选择音色</option>
+                <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}（{{ v.duration.toFixed(1) }}s）</option>
+              </select>
+              <button class="btn btn-ghost" @click="previewVoice" :disabled="!form.voice_id || busy">试听参考</button>
+            </div>
+            <p class="hint" v-if="form.model==='cosyvoice3'">用参考音色说任意语言；文本可用 &lt;|en|&gt; 等语言标签标注语种，服务端自动添加指令前缀。</p>
+            <p class="hint" v-else>用参考音色说任意语言，支持 [laughter] [breath] 等细粒度控制标记。</p>
+          </div>
+
+          <!-- 指令控制 -->
+          <div v-else class="mode-panel">
+            <div class="field-row">
+              <label>克隆音色</label>
+              <select v-model="form.voice_id" class="input">
+                <option disabled value="">请选择音色</option>
+                <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}（{{ v.duration.toFixed(1) }}s）</option>
+              </select>
+              <button class="btn btn-ghost" @click="previewVoice" :disabled="!form.voice_id || busy">试听参考</button>
+            </div>
+            <div class="field-col">
+              <label>自然语言指令 <span class="muted">（方言 / 语速 / 情绪等，服务端自动补全 &lt;|endofprompt|&gt;）</span></label>
+              <input v-model="form.instruct_text" class="input" placeholder="例如：请用四川话说这句话。">
+              <div class="chips">
+                <button v-for="i in currentDefaults" :key="i" class="chip" @click="form.instruct_text=i">{{ i }}</button>
+              </div>
+            </div>
+            <p class="hint">通过自然语言控制方言、语速、情绪等表达方式。</p>
+          </div>
+        </div>
+
+        <!-- 参数条 -->
+        <div class="card param-bar">
+          <div class="param">
+            <label>模型</label>
+            <select v-model="form.model" class="input" :disabled="busy || health.state==='loading'">
+              <option v-for="m in availableModels" :key="m.key" :value="m.key">{{ m.label }}</option>
+            </select>
+          </div>
+          <div class="param">
+            <label>语速 ×{{ form.speed.toFixed(2) }}<span class="muted small" v-if="form.stream && form.model==='cosyvoice2'">（v2 流式不支持）</span></label>
+            <input type="range" min="0.5" max="2" step="0.05" v-model.number="form.speed" :disabled="form.stream && form.model==='cosyvoice2'">
+          </div>
+          <div class="param param-stream">
+            <label>流式合成</label>
+            <button class="toggle" :class="{on: form.stream}" @click="toggleStream">
+              <span class="knob"></span>
+            </button>
+            <span class="muted small">{{ form.stream ? '边合成边播放（生成跟不上会有停顿）' : '整段合成，音质更稳' }}</span>
+          </div>
+          <div class="param-grow"></div>
+          <span class="muted small" v-if="synthBlocker && !busy">{{ synthBlocker }}</span>
+          <button class="btn btn-primary btn-lg" @click="synthesize" :disabled="!canSynth" :title="synthBlocker">
+            <span v-if="busy" class="spinner spinner-light"></span>
+            <span v-else>▶</span>
+            {{ busy ? busyText : '开始合成' }}
+          </button>
+        </div>
+
+        <!-- 错误卡 -->
+        <div class="card error-card" v-if="workbenchError">
+          <b>合成失败</b>
+          <p>{{ workbenchError }}</p>
+          <button class="btn btn-ghost" @click="workbenchError=''">知道了</button>
+        </div>
+
+        <!-- 结果元信息卡 -->
+        <div class="card result-meta" v-if="lastResult">
+          <div class="result-row"><span class="muted">任务</span><code>{{ lastResult.id }}</code></div>
+          <div class="result-row"><span class="muted">模式</span>{{ modeName(lastResult.mode) }} · {{ modelLabel(lastResult.model) }}</div>
+          <div class="result-row" v-if="lastResult.firstMs"><span class="muted">首包延迟</span><b class="accent">{{ lastResult.firstMs }} ms</b></div>
+          <div class="result-row" v-if="lastResult.duration"><span class="muted">音频时长</span>{{ lastResult.duration.toFixed(2) }} s</div>
+          <div class="result-row" v-if="lastResult.inferMs"><span class="muted">合成耗时</span>{{ lastResult.inferMs }} ms</div>
+          <div class="result-actions">
+            <button class="btn btn-ghost" @click="downloadTask(lastResult.id)">下载 WAV</button>
+            <button class="btn btn-ghost" @click="reloadParams(lastResult)">重载参数</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== 音色库 ========== -->
+      <section v-else-if="view==='voices'" class="view">
+        <h2 class="view-title">音色库</h2>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">上传新音色（3~30 秒参考音频）</span></div>
+          <div class="upload-grid">
+            <div class="dropzone" :class="{drag:uploadDrag, invalid:upload.checkError}" @click="$refs.file.click()"
+                 @dragover.prevent="uploadDrag=true" @dragleave="uploadDrag=false"
+                 @drop.prevent="onDrop">
+              <input type="file" ref="file" accept=".wav,.mp3,.flac,.m4a,.ogg,.opus" hidden @change="onFilePick">
+              <div v-if="!upload.file" class="dz-hint">
+                <div class="dz-icon">📁</div>
+                点击或拖拽音频到此处<br>
+                <span class="muted small">wav / mp3 / flac / m4a，建议 5~15s 干净单人语音</span>
+              </div>
+              <div v-else class="dz-file">
+                <b>{{ upload.file.name }}</b>
+                <span class="muted">{{ upload.duration ? upload.duration.toFixed(1)+'s · '+upload.sr+' Hz' : '解析中…' }}</span>
+                <span class="dz-ok" v-if="upload.duration && upload.duration>=1 && upload.duration<=30">✓ 可用</span>
+                <span class="dz-bad" v-else-if="upload.duration">✗ 时长需在 1~30 秒</span>
+              </div>
+              <canvas ref="dzWave" class="dz-wave"></canvas>
+            </div>
+            <div class="upload-form">
+              <div class="field-col">
+                <label>音色名称 *</label>
+                <input v-model="upload.name" class="input" placeholder="例如：小雅（温柔女声）">
+              </div>
+              <div class="field-col">
+                <label>参考音频文字内容 *</label>
+                <textarea v-model="upload.prompt_text" class="textarea" rows="3" placeholder="逐字填写音频里说的内容，克隆质量的关键"></textarea>
+              </div>
+              <button class="btn btn-primary" @click="uploadVoice" :disabled="!canUpload">
+                {{ upload.busy ? '保存中…' : '保存音色' }}
+              </button>
+              <p class="hint" v-if="upload.checkError">{{ upload.checkError }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="voice-grid" v-if="voices.length">
+          <div class="card voice-card" v-for="v in voices" :key="v.id">
+            <!-- 编辑态 -->
+            <template v-if="editVoice && editVoice.id === v.id">
+              <div class="field-col">
+                <label>音色名称</label>
+                <input v-model="editVoice.name" class="input" maxlength="50" placeholder="音色名称">
+              </div>
+              <div class="field-col">
+                <label>参考音频文字内容</label>
+                <textarea v-model="editVoice.prompt_text" class="textarea" rows="3" maxlength="500"></textarea>
+              </div>
+              <div class="voice-actions">
+                <button class="btn btn-primary" @click="saveVoiceEdit">保存</button>
+                <button class="btn btn-ghost" @click="cancelVoiceEdit">取消</button>
+              </div>
+            </template>
+            <!-- 展示态 -->
+            <template v-else>
+              <div class="voice-head">
+                <b>{{ v.name }}</b>
+                <span class="tag">{{ v.duration.toFixed(1) }}s</span>
+              </div>
+              <p class="voice-prompt">{{ v.prompt_text }}</p>
+              <div class="voice-actions">
+                <button class="btn btn-ghost" @click="previewVoice(v.id)">▶ 试听参考</button>
+                <button class="btn btn-ghost" @click="useVoice(v)">用于合成</button>
+                <button class="btn btn-ghost" @click="startVoiceEdit(v)">✏ 编辑</button>
+                <button class="btn btn-ghost btn-danger" @click="deleteVoice(v)">删除</button>
+              </div>
+              <div class="voice-date muted small">{{ v.created_at }}</div>
+            </template>
+          </div>
+        </div>
+        <div v-else class="card empty">还没有克隆音色。上传一段 3~30 秒的参考音频开始克隆。</div>
+      </section>
+
+      <!-- ========== 历史记录 ========== -->
+      <section v-else-if="view==='history'" class="view">
+        <h2 class="view-title">历史记录</h2>
+        <div class="card">
+          <div class="chips filter-chips">
+            <button class="chip" :class="{active: taskFilter.mode===null}" @click="taskFilter.mode=null">全部</button>
+            <button v-for="m in modeDefs" :key="m.key" class="chip" :class="{active: taskFilter.mode===m.key}"
+                    @click="taskFilter.mode=m.key">{{ m.name }}</button>
+            <span class="param-grow"></span>
+            <button class="btn btn-ghost" @click="loadTasks">刷新</button>
+          </div>
+          <table class="table" v-if="filteredTasks.length">
+            <thead><tr><th>时间</th><th>文本</th><th>模式</th><th>音色</th><th>时长</th><th>首包</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="t in filteredTasks" :key="t.id" :class="{failed: t.status!=='ok'}">
+                <td class="nowrap">{{ t.created_at.slice(5,16) }}</td>
+                <td class="clip" :title="t.text">{{ t.text }}</td>
+                <td class="nowrap">{{ modeName(t.mode) }}<div class="muted small">{{ modelLabel(t.model) }}</div></td>
+                <td class="nowrap">{{ voiceOrSpk(t) || '—' }}</td>
+                <td class="nowrap">{{ t.duration ? t.duration.toFixed(1)+'s' : '—' }}</td>
+                <td class="nowrap">{{ t.first_chunk_ms!=null ? t.first_chunk_ms+'ms' : '—' }}</td>
+                <td class="nowrap actions">
+                  <button v-if="t.status==='ok'" class="btn btn-ghost" @click="playTask(t)">▶</button>
+                  <button v-if="t.status==='ok'" class="btn btn-ghost" @click="downloadTask(t.id)">⬇</button>
+                  <button class="btn btn-ghost" @click="reloadParams(t)" title="回填到工作台">↺</button>
+                  <button class="btn btn-ghost btn-danger" @click="deleteTask(t)">🗑</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty">暂无合成记录。去工作台合成第一条语音吧。</div>
+        </div>
+      </section>
+
+      <!-- ========== 系统状态 ========== -->
+      <section v-else class="view">
+        <h2 class="view-title">系统状态</h2>
+        <div class="grid-2">
+          <div class="card" v-for="m in health.models" :key="m.key">
+            <div class="card-head">
+              <span class="card-title">{{ m.label }}</span>
+              <span class="tag" :class="modelTagClass(m)">{{ modelTagText(m) }}</span>
+            </div>
+            <div class="status-meta">推理模式：{{ m.modes.map(modeName).join(' / ') }}</div>
+            <div class="status-meta">权重目录：{{ m.available ? '已下载' : '未下载（切换时将自动从 ModelScope 拉取）' }}</div>
+            <button class="btn" :class="m.loaded ? 'btn-ghost' : 'btn-primary'"
+                    :disabled="m.loaded || health.state==='loading'" @click="switchModel(m.key)">
+              {{ m.loaded ? '当前已加载' : '加载此模型' }}
+            </button>
+          </div>
+          <div class="card" v-if="health.gpu">
+            <div class="card-head"><span class="card-title">GPU</span></div>
+            <div class="status-meta">{{ health.gpu.name }}</div>
+            <div class="meter" v-if="health.gpu.vram_total_gb">
+              <div class="meter-fill" :style="{width: vramPct+'%'}"></div>
+            </div>
+            <div class="status-meta" v-if="health.gpu.vram_total_gb">
+              {{ health.gpu.vram_used_gb }} / {{ health.gpu.vram_total_gb }} GB（{{ vramPct }}%）
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">服务</span></div>
+            <div class="status-meta">推理队列：{{ health.queue_len }} / {{ health.queue_max }}</div>
+            <div class="status-meta">最近一次合成耗时：{{ health.last_infer_ms ? health.last_infer_ms+' ms' : '—' }}</div>
+            <div class="status-meta">克隆音色：{{ health.voices_count }} 个</div>
+            <div class="status-meta">输出采样率：{{ health.sample_rate || '—' }} Hz</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 全局播放器 -->
+  <div class="playerbar" v-if="player.active">
+    <button class="pb-btn" @click="togglePlay">{{ player.playing ? '⏸' : '▶' }}</button>
+    <canvas ref="waveCanvas" class="pb-wave"></canvas>
+    <div class="pb-info">
+      <div class="pb-title">{{ player.title }}</div>
+      <div class="pb-sub muted small">
+        <template v-if="player.streaming">流式播放中 · 已缓冲 {{ player.buffered.toFixed(1) }}s · 首包 {{ player.firstMs }}ms</template>
+        <template v-else>{{ fmt(player.position) }} / {{ fmt(player.duration) }}<span v-if="player.sampleRate"> · {{ player.sampleRate }} Hz</span></template>
+      </div>
+    </div>
+    <button class="pb-btn" @click="downloadTask(player.taskId)" title="下载 WAV">⬇</button>
+    <button class="pb-btn" @click="stopPlayer" title="关闭">✕</button>
+  </div>
+
+  <!-- Toast -->
+  <div class="toasts">
+    <transition-group name="toast">
+      <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type">{{ t.text }}</div>
+    </transition-group>
+  </div>
+</div>
+<script src="vendor/vue.global.prod.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

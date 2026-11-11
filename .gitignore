@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# 上游仓库 (部署时 git clone --recursive, 见 README)
+CosyVoice/
+
+# 模型权重 (部署时 scripts/download_models.py 下载, ~15GB)
+models/
+
+# 运行时数据 (用户音频 + 数据库)
+server/data/
+
+# IDE / 系统
+.idea/
+.vscode/
+.zcode/
+Thumbs.db
+.DS_Store
