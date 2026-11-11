@@ -279,7 +279,17 @@ createApp({
       { key: 'cross_lingual', icon: '🌐', name: '跨语言' },
       { key: 'instruct', icon: '💬', name: '指令控制' },
     ];
-    const langTags = ['<|zh|>', '<|en|>', '<|ja|>', '<|ko|>', '<|yue|>', '<|de|>', '<|fr|>', '<|es|>', '<|ru|>'];
+    const langs = [
+      { code: 'zh', name: '中文' },
+      { code: 'en', name: '英语' },
+      { code: 'ja', name: '日语' },
+      { code: 'ko', name: '韩语' },
+      { code: 'yue', name: '粤语' },
+      { code: 'de', name: '德语' },
+      { code: 'fr', name: '法语' },
+      { code: 'es', name: '西班牙语' },
+      { code: 'ru', name: '俄语' },
+    ];
     const sampleTexts = [
       { label: '中文问候', text: '你好，我是通义生成式语音大模型，请问有什么可以帮您的吗？' },
       { label: '英文', text: '<|en|>The quick brown fox jumps over the lazy dog. Speech synthesis has come a long way!' },
@@ -427,11 +437,11 @@ createApp({
 
     // ---------- 工作台 ----------
     function applySample(s) { form.text = s.text; }
-    function insertTag(tag) {
-      const ta = document.querySelector('.textarea');
-      const pos = ta ? ta.selectionStart : form.text.length;
-      form.text = form.text.slice(0, pos) + tag + form.text.slice(ta ? ta.selectionEnd : pos);
-      nextTick(() => { if (ta) { ta.focus(); ta.selectionStart = ta.selectionEnd = pos + tag.length; } });
+    // 跨语言: 选择语言 -> 在文本开头放置对应标签 (已有开头标签则替换, 不堆叠)
+    function pickLang(code) {
+      const tag = `<|${code}|>`;
+      const stripped = form.text.replace(/^(?:<\|[a-z]{2}\|>\s*)+/, '');
+      form.text = tag + stripped;
     }
     function switchMode(key) { form.mode = key; }
     function toggleStream() { form.stream = !form.stream; }
@@ -699,11 +709,11 @@ createApp({
     const appVm = {
       view, views, health, form, busy, busyText, workbenchError, lastResult,
       voices, tasks, taskFilter, toasts, banner, upload, uploadDrag, player: playerState,
-      modeDefs, langTags, sampleTexts,
+      modeDefs, langs, sampleTexts,
       stateClass, stateText, gpuText, vramPct, availableModels, visibleModeDefs, currentDefaults,
       canSynth, synthBlocker, canUpload, filteredTasks, currentVoice,
       fmt, modeName, modelLabel, voiceOrSpk,
-      toast, dismissBanner, switchView, applySample, insertTag, switchMode, toggleStream, goVoices,
+      toast, dismissBanner, switchView, applySample, pickLang, switchMode, toggleStream, goVoices,
       synthesize, previewSpeaker, previewVoice, reloadParams, downloadTask, deleteTask, stopPlayer, playTask,
       onFilePick, onDrop, uploadVoice, useVoice, deleteVoice,
       editVoice, startVoiceEdit, cancelVoiceEdit, saveVoiceEdit,

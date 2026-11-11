@@ -68,8 +68,9 @@
             <button class="chip chip-ghost" @click="form.text=''" v-if="form.text">清空</button>
           </div>
           <div class="lang-tags" v-if="form.mode==='cross_lingual'">
-            <span class="chip-label">语言标签插入：</span>
-            <button v-for="t in langTags" :key="t" class="chip chip-tag" @click="insertTag(t)">{{ t }}</button>
+            <span class="chip-label">语言（点击在文本开头添加标签）：</span>
+            <button v-for="l in langs" :key="l.code" class="chip" :class="{active: form.text.startsWith('<|'+l.code+'|>')}"
+                    @click="pickLang(l.code)">{{ l.name }}</button>
           </div>
         </div>
 
