@@ -462,6 +462,7 @@
           </div>
 
           <!-- ③ 输出 -->
+          <div class="pod-rail">
           <div class="card pod-col">
             <div class="card-head"><span class="card-title">③ 输出设置</span></div>
             <div class="field-col">
@@ -528,7 +529,7 @@
                           :disabled="!pod.lines.length || pod.pushing">
                     🔴 开始合成并推流
                   </button>
-                  <button class="btn btn-danger" style="width:100%; margin-top:6px;" @click="stopPush"
+                  <button class="btn btn-danger" style="width:100%; margin-top:6px;" @click="stopPush()"
                           v-if="pushStatus.status==='pushing'">⏹ 停止推流</button>
                 </div>
                 <div class="muted small" style="margin-top:6px;" v-if="pushStatus.status && (!podEpisode || pushStatus.episode_id===podEpisode.id)">
@@ -550,6 +551,38 @@
               </template>
             </div>
           </div>
+
+          <!-- 任务队列 (右侧栏) -->
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">🗂 任务队列
+                <span class="tag live" v-if="queueRunning" style="margin-left:8px;">{{ queueRunning }} 进行中</span>
+              </span>
+              <button class="btn btn-ghost" style="padding:3px 10px; font-size:12px;" @click="pollPod(true)">刷新</button>
+            </div>
+            <p class="hint" style="margin:0 0 10px;">合成 / 推流实时进度，切换页面或刷新都不会丢失，点击查看详情。</p>
+            <div class="queue-list" v-if="podQueue.length">
+              <div v-for="t in podQueue" :key="t.id" class="queue-item" @click="openQueueDetail(t)">
+                <span class="tag" :class="queueBadge(t.status).cls">{{ queueBadge(t.status).text }}</span>
+                <div class="q-main">
+                  <div class="q-title">{{ t.title }}</div>
+                  <div class="q-meta muted small">
+                    <span>{{ queueTaskText(t) || '—' }}</span>
+                    <span class="q-time">{{ t.created_at }}</span>
+                  </div>
+                  <div class="qbar" v-if="t.status==='synthesizing' && t.lines_count">
+                    <div class="qbar-fill" :style="{ width: Math.min(100, Math.round(100*(t.progress||0)/t.lines_count)) + '%' }"></div>
+                  </div>
+                  <div class="qbar" v-else-if="t.status==='pushing' && t.push && t.push.duration_s">
+                    <div class="qbar-fill" :style="{ width: Math.min(100, Math.round(100*(t.push.elapsed_s||0)/t.push.duration_s)) + '%' }"></div>
+                  </div>
+                </div>
+                <span class="q-go muted">›</span>
+              </div>
+            </div>
+            <div v-else class="empty">暂无任务。开始合成后，任务会在这里实时更新进度。</div>
+          </div>
+          </div>
         </div>
 
         <!-- 播客列表 -->
@@ -568,7 +601,7 @@
                 <td><span class="tag" :class="{ok: e.status==='completed', warn: e.status==='failed'}">{{ e.status }}</span></td>
                 <td class="nowrap muted small">{{ e.created_at }}</td>
                 <td class="nowrap actions">
-                  <button class="btn btn-ghost" v-if="e.status==='completed'" @click.stop="downloadEpisode(e)">⬇</button>
+                  <button class="btn btn-ghost" v-if="e.has_audio" @click.stop="downloadEpisode(e)">⬇</button>
                   <button class="btn btn-ghost btn-danger" @click.stop="removeEpisode(e)">🗑</button>
                 </td>
               </tr>
@@ -670,6 +703,61 @@
         <button class="btn btn-primary" @click="saveLLMConfig">保存配置</button>
         <button class="btn" @click="testLLM">测试连通</button>
         <span class="muted small">{{ llmTestResult }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 任务详情模态框 -->
+  <div class="modal-mask" v-if="queueModal && queueDetail" @click.self="queueModal=false">
+    <div class="modal">
+      <div class="card-head">
+        <span class="card-title">🗂 任务详情</span>
+        <button class="btn btn-ghost" style="padding:2px 10px" @click="queueModal=false">✕</button>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <span class="tag" :class="queueBadge(queueDetail.status).cls" style="font-size:13px; flex:none;">{{ queueBadge(queueDetail.status).text }}</span>
+        <b style="font-size:15px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ queueDetail.title }}</b>
+      </div>
+
+      <template v-if="queueDetail.status==='synthesizing'">
+        <div class="qbar" v-if="queueDetail.lines_count" style="margin:6px 0;">
+          <div class="qbar-fill" :style="{ width: Math.min(100, Math.round(100*(queueDetail.progress||0)/queueDetail.lines_count)) + '%' }"></div>
+        </div>
+        <div class="muted small">正在合成 {{ queueDetail.progress || 0 }} / {{ queueDetail.lines_count }} 句…（本页实时刷新，切走也不会中断）</div>
+      </template>
+
+      <template v-if="queueDetail.status==='pushing' && queueDetail.push">
+        <div class="status-meta">推流协议：{{ queueDetail.push.protocol.toUpperCase() }}
+          <span class="muted small">{{ queueDetail.push.mode==='live' ? '（实时合成推流）' : '（成品直推）' }}</span></div>
+        <div class="status-meta" v-if="queueDetail.push.url">推流地址：<span class="kbd">{{ queueDetail.push.url }}</span></div>
+        <div class="status-meta" v-if="queueDetail.push.duration_s">
+          已推送 {{ fmt(queueDetail.push.elapsed_s) }} / {{ fmt(queueDetail.push.duration_s) }}
+          <span v-if="queueDetail.push.mode==='live'"> · {{ queueDetail.push.lines_done }}/{{ queueDetail.push.lines_total }} 句</span>
+        </div>
+        <button class="btn btn-danger" style="margin-top:8px;" @click="stopPush(queueDetail.id)">⏹ 停止推流</button>
+      </template>
+
+      <p class="hint" v-if="queueDetail.status==='failed'" style="color: var(--warn);">{{ queueDetail.error || '合成失败' }}</p>
+
+      <template v-if="queueDetail.has_audio">
+        <div class="status-meta">成品时长：{{ queueDetail.duration ? queueDetail.duration.toFixed(1) + 's' : '—' }}</div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button class="btn" @click="playEpisode(queueDetail)">▶ 试听</button>
+          <a class="btn" :href="`/api/podcast/episodes/${queueDetail.id}/audio`" download>⬇ 下载成品</a>
+        </div>
+      </template>
+
+      <div style="margin-top:14px; border-top:1px solid var(--edge); padding-top:10px;">
+        <div class="status-meta">来源：{{ {text:'粘贴文本', file:'上传文件', url:'网页 URL'}[queueDetail.source_type] || queueDetail.source_type }}
+          <span class="muted" v-if="queueDetail.source_ref">（{{ String(queueDetail.source_ref).slice(0, 60) }}）</span></div>
+        <div class="status-meta">对话稿：{{ queueDetail.lines_count || (queueDetail.script ? queueDetail.script.length : 0) }} 轮 · 语速 ×{{ queueDetail.speed }}</div>
+        <div class="status-meta">音色：主播 {{ voiceName(queueDetail.voice_host) }} / 嘉宾 {{ voiceName(queueDetail.voice_guest) }}</div>
+        <div class="status-meta">创建时间：{{ queueDetail.created_at }}</div>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn btn-primary" @click="loadFromQueue(queueDetail)">✎ 载入编辑器</button>
+        <button class="btn btn-danger" @click="removeFromQueue(queueDetail)">🗑 删除剧集</button>
       </div>
     </div>
   </div>

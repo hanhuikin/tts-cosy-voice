@@ -429,8 +429,11 @@ class PushManager:
                 storage.update_episode(ep_id, file=str(out),
                                        duration=sum(len(p) for p in all_parts) / 2 / SAMPLE_RATE,
                                        progress=done)
-            if status != "stopped":
-                storage.update_episode(ep_id, status=status, error=error)
+            # 手动停止: 成品直推的音频本身完整(仍算 completed), 实时推流则标记 stopped。
+            # 无论如何都落库, 否则剧集状态会一直卡在 pushing (任务队列误显示推流中)。
+            if self._stop_flag and status == "completed" and self.info.get("mode") != "file":
+                status, error = "stopped", "手动停止"
+            storage.update_episode(ep_id, status=status, error=error)
             self.info["status"] = status
             self.info["error"] = error
             self.proc = None
@@ -444,7 +447,7 @@ class PushManager:
         if self.proc:
             try:
                 self.proc.stdin.close()
-                self.proc.wait(timeout=5)
+                self.proc.wait(timeout=1)   # 给 ffmpeg 1s 优雅退出, 否则强杀 (接口响应不被拖慢)
             except Exception:
                 self.proc.kill()
             self.proc = None

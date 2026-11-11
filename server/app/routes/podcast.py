@@ -128,10 +128,16 @@ def create_episode(body: EpisodeBody):
 
 @router.get("/podcast/episodes")
 def list_episodes(limit: int = 50):
+    """剧集列表, 同时作为播客任务队列的数据源:
+    附带 lines_count 与正在推流剧集的实时推流状态 (elapsed/进度)。"""
     eps = storage.list_episodes(limit)
+    pushing_id = podcast.push_manager.info.get("episode_id") if podcast.push_manager.active else None
     for e in eps:
+        e["has_audio"] = bool(e.get("file"))
         e.pop("file", None)
         e["lines_count"] = len(json.loads(e.pop("script_json") or "[]"))
+        if e["id"] == pushing_id:
+            e["push"] = podcast.push_manager.status()
     return {"episodes": eps}
 
 
@@ -141,6 +147,7 @@ def get_episode(pid: str):
     if not ep:
         raise HTTPException(404, "episode not found")
     ep["script"] = json.loads(ep.pop("script_json") or "[]")
+    ep["has_audio"] = bool(ep.get("file"))
     ep.pop("file", None)
     ep["push"] = podcast.push_manager.status() if ep["id"] == podcast.push_manager.info.get("episode_id") else None
     return ep

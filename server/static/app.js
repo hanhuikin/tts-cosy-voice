@@ -280,7 +280,8 @@ createApp({
       extractText: '', extractChars: 0, extracting: false, fileDrag: false, sourceError: '',
       genning: false, genRaw: '', lines: [], saving: false,
       speed: 1.0, protocol: 'rtmp', pushUrl: '', ffmpeg: true, pushEnabled: false,
-      busyFinal: false, busyStream: false, progress: 0, synthError: '', pushing: false,
+      busyFinal: false, busyStream: false, busySince: 0, progress: 0, synthError: '', pushing: false,
+      stopRequested: '',
     });
     const voiceIds = reactive({ host: '', guest: '' });
     const llmCfg = reactive({ base_url: '', model: '', api_key_masked: '' });
@@ -290,6 +291,36 @@ createApp({
     const episodes = ref([]);
     const podEpisode = ref(null);
     const pushStatus = reactive({ status: '', lines_done: 0, lines_total: 0, error: '', protocol: '', url: '' });
+    // ---------- 播客任务队列 ----------
+    const queueModal = ref(false);
+    const queueDetail = ref(null);
+    const adopted = new Map();   // id -> 接管时的任务类型(synthesizing/pushing), 终态时补通知
+    let podPollTick = 0;
+    const QUEUE_ACTIVE = ['synthesizing', 'pushing'];
+    const podQueue = computed(() => episodes.value
+      .filter(e => e.status && e.status !== 'draft')   // draft = 尚未合成过的存稿, 不进队列
+      .slice()
+      .sort((a, b) => (QUEUE_ACTIVE.includes(b.status) - QUEUE_ACTIVE.includes(a.status))
+        || (a.created_at < b.created_at ? 1 : -1)));   // 进行中优先, 其余按时间倒序
+    const queueActive = computed(() => episodes.value.some(e => QUEUE_ACTIVE.includes(e.status)));
+    const queueRunning = computed(() => episodes.value.filter(e => QUEUE_ACTIVE.includes(e.status)).length);
+    const queueBadge = (s) => ({
+      synthesizing: { cls: 'live', text: '合成中' },
+      pushing: { cls: 'live', text: '推流中' },
+      completed: { cls: 'ok', text: '已完成' },
+      failed: { cls: 'warn', text: '失败' },
+      stopped: { cls: 'warn', text: '已停止' },
+    }[s] || { cls: '', text: s });
+    const queueTaskText = (t) => {
+      if (t.status === 'synthesizing') return `${t.progress || 0}/${t.lines_count} 句`;
+      if (t.status === 'pushing' && t.push) {
+        const base = t.push.mode === 'live' ? `${t.push.lines_done}/${t.push.lines_total} 句` : '成品直推';
+        return t.push.duration_s ? `${base} · ${fmt(t.push.elapsed_s)}/${fmt(t.push.duration_s)}` : base;
+      }
+      if (t.status === 'completed') return t.duration ? `时长 ${t.duration.toFixed(1)}s` : '';
+      if (t.status === 'failed') return (t.error || '').slice(0, 60) || '未知错误';
+      return '';
+    };
     const editLine = ref(-1);
     const editLineText = ref('');
 
@@ -874,8 +905,10 @@ createApp({
     async function saveEpisode() {
       pod.saving = true;
       try {
+        // 更新已有剧集时保留原标题 (autoTitle 仅用于新建, 否则载入后再次保存/合成会被改名)
+        const keepTitle = podEpisode.value && podEpisode.value.title ? podEpisode.value.title : autoTitle();
         const body = {
-          title: autoTitle(), source_type: pod.source, source_ref: pod.source === 'url' ? pod.url : pod.fileName,
+          title: keepTitle, source_type: pod.source, source_ref: pod.source === 'url' ? pod.url : pod.fileName,
           lines: pod.lines.map(l => ({ role: l.role, text: l.text })),
           voice_host: voiceIds.host, voice_guest: voiceIds.guest, speed: pod.speed,
         };
@@ -897,6 +930,7 @@ createApp({
     async function loadEpisodes() {
       const j = await (await api('/api/podcast/episodes')).json();
       episodes.value = j.episodes;
+      syncPodTasks();
     }
     async function loadEpisode(e) {
       podEpisode.value = await (await api(`/api/podcast/episodes/${e.id}`)).json();
@@ -908,29 +942,19 @@ createApp({
     }
     async function synthPod() {
       if (!pod.lines.length || pod.busyFinal || pod.busyStream) return;
-      pod.busyFinal = true; pod.progress = 0; pod.synthError = '';
+      pod.busyFinal = true; pod.busySince = Date.now(); pod.progress = 0; pod.synthError = '';
       try {
         await saveEpisode();  // 合成前自动保存 (无剧集则创建)
         await api(`/api/podcast/episodes/${podEpisode.value.id}/synthesize`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'final' }),
         });
-        // 轮询进度
-        while (true) {
-          await new Promise(r => setTimeout(r, 1500));
-          const st = await (await api(`/api/podcast/episodes/${podEpisode.value.id}/status`)).json();
-          pod.progress = st.progress;
-          if (st.status === 'completed') {
-            podEpisode.value = await (await api(`/api/podcast/episodes/${podEpisode.value.id}`)).json();
-            toast('播客成品已生成', 'ok');
-            break;
-          }
-          if (st.status === 'failed') throw new Error(st.error || '合成失败');
-        }
-        loadEpisodes();
+        // 进度与终态交给任务队列轮询 (syncPodTasks), 切换页面/刷新也不丢
+        await pollPod(true);
       } catch (e) {
+        pod.busyFinal = false;
         pod.synthError = e.message;
-        toast('合成失败: ' + e.message, 'error', 6000);
-      } finally { pod.busyFinal = false; }
+        toast('合成启动失败: ' + e.message, 'error', 6000);
+      }
     }
     function playPodcast() {
       player.playFile(`/api/podcast/episodes/${podEpisode.value.id}/audio`, '播客 · ' + (podEpisode.value.title || ''), null);
@@ -949,7 +973,7 @@ createApp({
     }
     async function synthPodStream() {
       if (!pod.lines.length || pod.busyFinal || pod.busyStream) return;
-      pod.busyStream = true; pod.progress = 0; pod.synthError = '';
+      pod.busyStream = true; pod.busySince = Date.now(); pod.progress = 0; pod.synthError = '';
       try {
         await saveEpisode();  // 自动保存剧集
         const resp = await fetch(`/api/podcast/episodes/${podEpisode.value.id}/synthesize`, {
@@ -979,23 +1003,115 @@ createApp({
           body: JSON.stringify({ protocol: pod.protocol, url: pod.pushUrl.trim() }),
         })).json());
         toast('推流已开始', 'ok');
-      } catch (e) { pod.pushing = false; toast('推流启动失败: ' + e.message, 'error', 6000); }
+        loadEpisodes();   // 队列立即显示推流任务
+      } catch (e) {
+        pod.pushing = false; pushStatus.status = '';
+        toast('推流启动失败: ' + e.message, 'error', 6000);
+      }
     }
-    async function stopPush() {
+    async function stopPush(pid) {
+      const id = pid || podEpisode.value?.id;
+      if (!id) return;
+      pod.stopRequested = id;            // 停止是用户主动行为, 终态不再提示"推流完成"
+      toast('正在停止推流…');
       try {
-        Object.assign(pushStatus, await (await api(`/api/podcast/episodes/${podEpisode.value.id}/push`, { method: 'DELETE' })).json());
+        Object.assign(pushStatus, await (await api(`/api/podcast/episodes/${id}/push`, { method: 'DELETE' })).json());
         toast('已停止推流');
         loadEpisodes();
       } catch (e) { toast(e.message, 'error'); }
       finally { pod.pushing = false; }
     }
-    async function pollPush() {
-      if (view.value !== 'podcast' || pushStatus.status === 'completed' || pushStatus.status === 'stopped') return;
+    // ---------- 任务队列轮询: 2s 高频(有活动任务) / 10s 低频保底 ----------
+    async function pollPod(force) {
+      podPollTick++;
+      if (!force && !queueActive.value && podPollTick % 5 !== 0) return;
       try {
-        const st = await (await api('/api/podcast/push/status')).json();
-        if (st.status) Object.assign(pushStatus, st);
-        if (st.status === 'completed' || st.status === 'failed') { pod.pushing = false; loadEpisodes(); }
+        const j = await (await api('/api/podcast/episodes')).json();
+        episodes.value = j.episodes;
+        syncPodTasks();
       } catch (e) {}
+    }
+    function syncPodTasks() {
+      // 推流面板状态同步 (剧集列表内嵌了正在推流剧集的实时状态)
+      const pushing = episodes.value.find(e => e.status === 'pushing' && e.push);
+      if (pushing) Object.assign(pushStatus, pushing.push);
+      else if (pushStatus.status === 'pushing') {
+        pod.pushing = false;
+        // 推流已结束, 拉一次最终状态用于面板展示
+        api('/api/podcast/push/status').then(r => r.json())
+          .then(st => { if (st.status && st.status !== 'pushing') Object.assign(pushStatus, st); })
+          .catch(() => {});
+      }
+      // 详情弹窗打开时实时刷新
+      if (queueModal.value && queueDetail.value) {
+        const fresh = episodes.value.find(e => e.id === queueDetail.value.id);
+        if (fresh) Object.assign(queueDetail.value, fresh);
+      }
+      const mine = episodes.value.find(e => e.id === podEpisode.value?.id);
+      if (mine && (pod.busyFinal || pod.busyStream)) pod.progress = mine.progress || 0;
+      for (const e of episodes.value) {
+        // 接管: 本页发起的任务不提示, 刷新/切页后发现的进行中任务提示一次
+        if (QUEUE_ACTIVE.includes(e.status) && !adopted.has(e.id)) {
+          adopted.set(e.id, e.status);
+          const isSelf = e.id === podEpisode.value?.id && (pod.busyFinal || pod.busyStream || pod.pushing);
+          if (!isSelf) toast(`已接管进行中的任务「${e.title}」`);
+          if (e.id === podEpisode.value?.id && e.status === 'synthesizing') pod.busyFinal = true;
+        }
+        // 终态: 补一条结果通知, 并恢复编辑器状态
+        if (adopted.has(e.id) && !QUEUE_ACTIVE.includes(e.status)) {
+          const kind = adopted.get(e.id);
+          adopted.delete(e.id);
+          if (kind === 'pushing' && pod.stopRequested === e.id) {
+            pod.stopRequested = '';      // 已在 stopPush 里提示过, 不重复
+          } else if (e.status === 'failed') {
+            toast(`「${e.title}」${kind === 'pushing' ? '推流失败' : '合成失败'}: ${e.error || '未知错误'}`, 'error', 6000);
+          } else if (e.status === 'stopped') {
+            toast(`「${e.title}」推流已停止`);
+          } else {
+            toast(`「${e.title}」${kind === 'pushing' ? '推流完成' : '合成完成'}`, 'ok');
+          }
+          if (e.id === podEpisode.value?.id) {
+            pod.busyFinal = false; pod.busyStream = false; pod.pushing = false; pod.busySince = 0;
+            if (e.status === 'failed') pod.synthError = e.error || '合成失败';
+            refreshPodEpisode(e.id);
+          }
+        }
+      }
+      // 兜底: 极短任务可能在轮询看到前就结束了, 避免编辑器卡在忙碌态
+      if (mine && mine.status !== 'draft' && !QUEUE_ACTIVE.includes(mine.status)
+          && (pod.busyFinal || pod.busyStream) && Date.now() - (pod.busySince || 0) > 2500) {
+        pod.busyFinal = false; pod.busyStream = false; pod.busySince = 0;
+        if (mine.status === 'failed') pod.synthError = mine.error || '合成失败';
+        refreshPodEpisode(mine.id);
+      }
+    }
+    async function refreshPodEpisode(pid) {
+      try { podEpisode.value = await (await api(`/api/podcast/episodes/${pid}`)).json(); } catch (e) {}
+    }
+    async function openQueueDetail(e) {
+      queueModal.value = true;
+      queueDetail.value = { ...e };
+      try {
+        queueDetail.value = await (await api(`/api/podcast/episodes/${e.id}`)).json();
+      } catch (err) { toast('获取任务详情失败: ' + err.message, 'error'); }
+    }
+    function playEpisode(ep) {
+      if (!ep) return;
+      player.playFile(`/api/podcast/episodes/${ep.id}/audio`, '播客 · ' + (ep.title || ''), null);
+    }
+    async function loadFromQueue(e) {
+      queueModal.value = false;
+      await loadEpisode(e);
+    }
+    async function removeFromQueue(e) {
+      if (!confirm(`删除剧集「${e.title}」？成品音频将一并删除。`)) return;
+      try {
+        await api(`/api/podcast/episodes/${e.id}`, { method: 'DELETE' });
+        queueModal.value = false;
+        loadEpisodes();
+        if (podEpisode.value && podEpisode.value.id === e.id) podEpisode.value = null;
+        toast('剧集已删除', 'ok');
+      } catch (err) { toast(err.message, 'error'); }
     }
 
     // ---------- 系统 ----------
@@ -1039,8 +1155,9 @@ createApp({
       fetchHealth();
       loadVoices();
       connectSSE();
+      loadEpisodes();   // 恢复任务队列 (刷新后仍能看到进行中的合成/推流)
       setInterval(fetchHealth, 8000);
-      setInterval(pollPush, 4000);
+      setInterval(() => pollPod(false), 2000);
       // 未手动选择主题时, 跟随系统偏好实时切换
       window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
         if (!localStorage.getItem('cv-theme')) {
@@ -1065,12 +1182,14 @@ createApp({
       onFilePick, onDrop, uploadVoice, useVoice, deleteVoice,
       editVoice, startVoiceEdit, cancelVoiceEdit, saveVoiceEdit,
       pod, voiceIds, llmCfg, llmModal, llmForm, llmTestResult, episodes, podEpisode, pushStatus,
+      queueModal, queueDetail, podQueue, queueActive, queueRunning, queueBadge, queueTaskText,
       editLine, editLineText,
-      podCanGen, podFileNeedsLLM, estimateText, pushUrlPlaceholder, hlsUrl, pushStatusText,
+      podCanGen, podFileNeedsLLM, estimateText, pushUrlPlaceholder, hlsUrl, pushStatusText, voiceName,
       openLLMConfig, saveLLMConfig, testLLM,
       onPodFilePick, onPodFileDrop, extractUrl, genScript,
       startEditLine, saveLine, delLine, addLine, saveEpisode, loadEpisode,
       synthPod, synthPodStream, playPodcast, downloadEpisode, removeEpisode, startPush, stopPush,
+      openQueueDetail, pollPod, playEpisode, loadFromQueue, removeFromQueue,
       switchModel, modelTagClass, modelTagText,
     };
     return appVm;
