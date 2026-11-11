@@ -337,6 +337,66 @@
       <section v-else-if="view==='podcast'" class="view">
         <h2 class="view-title">播客工坊</h2>
 
+        <div class="pod-layout">
+        <!-- 左侧栏: 任务队列 + 播客列表 -->
+        <div class="pod-side">
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">🗂 任务队列
+                <span class="tag live" v-if="queueRunning" style="margin-left:8px;">{{ queueRunning }} 进行中</span>
+              </span>
+              <button class="btn btn-ghost" style="padding:3px 10px; font-size:12px;" @click="pollPod(true)">刷新</button>
+            </div>
+            <p class="hint" style="margin:0 0 10px;">合成 / 推流实时进度，切换页面或刷新都不会丢失，点击查看详情。</p>
+            <div class="queue-list" v-if="podQueue.length">
+              <div v-for="t in podQueue" :key="t.id" class="queue-item" @click="openQueueDetail(t)">
+                <span class="tag" :class="queueBadge(t.status).cls">{{ queueBadge(t.status).text }}</span>
+                <div class="q-main">
+                  <div class="q-title">{{ t.title }}</div>
+                  <div class="q-meta muted small">
+                    <span>{{ queueTaskText(t) || '—' }}</span>
+                    <span class="q-time">{{ t.created_at }}</span>
+                  </div>
+                  <div class="qbar" v-if="t.status==='synthesizing' && t.lines_count">
+                    <div class="qbar-fill" :style="{ width: Math.min(100, Math.round(100*(t.progress||0)/t.lines_count)) + '%' }"></div>
+                  </div>
+                  <div class="qbar" v-else-if="t.status==='pushing' && t.push && t.push.duration_s">
+                    <div class="qbar-fill" :style="{ width: Math.min(100, Math.round(100*(t.push.elapsed_s||0)/t.push.duration_s)) + '%' }"></div>
+                  </div>
+                </div>
+                <span class="q-go muted">›</span>
+              </div>
+            </div>
+            <div v-else class="empty">暂无任务。开始合成后，任务会在这里实时更新进度。</div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">📚 播客列表</span>
+              <button class="btn btn-ghost" style="padding:3px 10px; font-size:12px;" @click="loadEpisodes">刷新</button>
+            </div>
+            <div class="ep-list" v-if="episodes.length">
+              <div v-for="e in episodes" :key="e.id" class="queue-item" @click="loadEpisode(e)" title="点击载入到编辑器">
+                <span class="tag" :class="queueBadge(e.status).cls">{{ queueBadge(e.status).text }}</span>
+                <div class="q-main">
+                  <div class="q-title">{{ e.title }}</div>
+                  <div class="q-meta muted small">
+                    <span>{{ e.lines_count }} 轮 · {{ e.duration ? e.duration.toFixed(1)+'s' : '—' }}</span>
+                    <span class="q-time">{{ e.created_at }}</span>
+                  </div>
+                </div>
+                <span class="ep-actions">
+                  <button class="btn btn-ghost" v-if="e.has_audio" @click.stop="downloadEpisode(e)" title="下载成品">⬇</button>
+                  <button class="btn btn-ghost" @click.stop="removeEpisode(e)" title="删除">🗑</button>
+                </span>
+              </div>
+            </div>
+            <div v-else class="empty">暂无播客剧集。生成对话稿并保存后，会出现在这里。</div>
+          </div>
+        </div>
+
+        <!-- 主区域: 三段式工作区 -->
+        <div class="pod-main">
         <div class="podcast-grid">
           <!-- ① 内容源 -->
           <div class="card pod-col">
@@ -462,7 +522,6 @@
           </div>
 
           <!-- ③ 输出 -->
-          <div class="pod-rail">
           <div class="card pod-col">
             <div class="card-head"><span class="card-title">③ 输出设置</span></div>
             <div class="field-col">
@@ -551,63 +610,8 @@
               </template>
             </div>
           </div>
-
-          <!-- 任务队列 (右侧栏) -->
-          <div class="card">
-            <div class="card-head">
-              <span class="card-title">🗂 任务队列
-                <span class="tag live" v-if="queueRunning" style="margin-left:8px;">{{ queueRunning }} 进行中</span>
-              </span>
-              <button class="btn btn-ghost" style="padding:3px 10px; font-size:12px;" @click="pollPod(true)">刷新</button>
-            </div>
-            <p class="hint" style="margin:0 0 10px;">合成 / 推流实时进度，切换页面或刷新都不会丢失，点击查看详情。</p>
-            <div class="queue-list" v-if="podQueue.length">
-              <div v-for="t in podQueue" :key="t.id" class="queue-item" @click="openQueueDetail(t)">
-                <span class="tag" :class="queueBadge(t.status).cls">{{ queueBadge(t.status).text }}</span>
-                <div class="q-main">
-                  <div class="q-title">{{ t.title }}</div>
-                  <div class="q-meta muted small">
-                    <span>{{ queueTaskText(t) || '—' }}</span>
-                    <span class="q-time">{{ t.created_at }}</span>
-                  </div>
-                  <div class="qbar" v-if="t.status==='synthesizing' && t.lines_count">
-                    <div class="qbar-fill" :style="{ width: Math.min(100, Math.round(100*(t.progress||0)/t.lines_count)) + '%' }"></div>
-                  </div>
-                  <div class="qbar" v-else-if="t.status==='pushing' && t.push && t.push.duration_s">
-                    <div class="qbar-fill" :style="{ width: Math.min(100, Math.round(100*(t.push.elapsed_s||0)/t.push.duration_s)) + '%' }"></div>
-                  </div>
-                </div>
-                <span class="q-go muted">›</span>
-              </div>
-            </div>
-            <div v-else class="empty">暂无任务。开始合成后，任务会在这里实时更新进度。</div>
-          </div>
-          </div>
         </div>
-
-        <!-- 播客列表 -->
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">📚 播客列表</span>
-            <button class="btn btn-ghost" style="padding:3px 10px; font-size:12px;" @click="loadEpisodes">刷新</button>
-          </div>
-          <table class="table" v-if="episodes.length">
-            <thead><tr><th>标题</th><th>轮数</th><th>时长</th><th>状态</th><th>创建</th><th></th></tr></thead>
-            <tbody>
-              <tr v-for="e in episodes" :key="e.id" @click="loadEpisode(e)" style="cursor:pointer;">
-                <td>{{ e.title }}</td>
-                <td>{{ e.lines_count }}</td>
-                <td>{{ e.duration ? e.duration.toFixed(1)+'s' : '—' }}</td>
-                <td><span class="tag" :class="{ok: e.status==='completed', warn: e.status==='failed'}">{{ e.status }}</span></td>
-                <td class="nowrap muted small">{{ e.created_at }}</td>
-                <td class="nowrap actions">
-                  <button class="btn btn-ghost" v-if="e.has_audio" @click.stop="downloadEpisode(e)">⬇</button>
-                  <button class="btn btn-ghost btn-danger" @click.stop="removeEpisode(e)">🗑</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-else class="empty">暂无播客剧集。生成对话稿并保存后，会出现在这里。</div>
+        </div>
         </div>
       </section>
 

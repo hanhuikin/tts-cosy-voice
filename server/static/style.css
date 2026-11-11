@@ -289,9 +289,16 @@ code { background: var(--bg-soft); border: 1px solid var(--card-edge); padding: 
 .dlg.guest { flex-direction: row-reverse; text-align: right; }
 .tag.live { background: rgba(79, 140, 255, .12); color: var(--primary-2); border-color: rgba(79, 140, 255, .35); }
 
-/* ---------- 播客任务队列 ---------- */
-.pod-rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.pod-rail .queue-list { max-height: 46vh; overflow-y: auto; padding-right: 2px; }
+/* ---------- 播客任务队列 (左侧栏) ---------- */
+.pod-layout { display: grid; grid-template-columns: minmax(320px, 380px) 1fr; gap: 14px; align-items: start; }
+.pod-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.pod-main { min-width: 0; }
+@media (max-width: 1500px) {
+  .pod-layout { grid-template-columns: 1fr; }
+  .pod-side { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+}
+@media (max-width: 900px) { .pod-side { grid-template-columns: 1fr; } }
+.pod-side .queue-list { max-height: 38vh; overflow-y: auto; padding-right: 2px; }
 .queue-list { display: flex; flex-direction: column; gap: 8px; }
 .queue-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
   border: 1px solid var(--edge); border-radius: 10px; cursor: pointer; transition: background .15s, border-color .15s; }
@@ -302,6 +309,9 @@ code { background: var(--bg-soft); border: 1px solid var(--card-edge); padding: 
 .q-meta { margin-top: 2px; }
 .q-time { margin-left: 6px; white-space: nowrap; }
 .q-go { flex: none; font-size: 18px; line-height: 1; }
+.ep-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; padding-right: 2px; }
+.ep-actions { flex: none; display: flex; gap: 4px; }
+.ep-actions .btn { padding: 2px 8px; font-size: 12px; }
 .qbar { height: 5px; background: var(--edge); border-radius: 999px; overflow: hidden; margin-top: 6px; }
 .qbar-fill { height: 100%; background: var(--accent-grad); border-radius: 999px; transition: width .5s; }
 

@@ -305,6 +305,7 @@ createApp({
     const queueActive = computed(() => episodes.value.some(e => QUEUE_ACTIVE.includes(e.status)));
     const queueRunning = computed(() => episodes.value.filter(e => QUEUE_ACTIVE.includes(e.status)).length);
     const queueBadge = (s) => ({
+      draft: { cls: '', text: '存稿' },
       synthesizing: { cls: 'live', text: '合成中' },
       pushing: { cls: 'live', text: '推流中' },
       completed: { cls: 'ok', text: '已完成' },
