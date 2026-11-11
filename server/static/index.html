@@ -378,11 +378,29 @@
               <button class="btn btn-ghost" style="padding:4px 12px; font-size:12px;" @click="openLLMConfig">配置 / 测试连通</button>
             </div>
 
-            <button class="btn btn-primary" style="width:100%; margin-top:12px;" @click="genScript"
-                    :disabled="!podCanGen || pod.genning">
-              <span v-if="pod.genning" class="spinner spinner-light"></span>
-              {{ pod.genning ? '生成中…' : '🤖 生成对话稿' }}
-            </button>
+            <div style="margin-top:12px;">
+              <template v-if="pod.source==='url' || podFileNeedsLLM">
+                <button class="btn btn-primary" style="width:100%;" @click="genScript"
+                        :disabled="!podCanGen || pod.genning">
+                  <span v-if="pod.genning" class="spinner spinner-light"></span>
+                  {{ pod.genning ? '生成中…' : '🤖 由大模型生成对话稿' }}
+                </button>
+                <p class="hint" v-if="pod.source==='url'">网页内容由大模型归纳改写为双人对话稿（需先配置大模型）。</p>
+                <p class="hint" v-else>该文档格式将由大模型归纳改写为双人对话稿（需先配置大模型）。</p>
+              </template>
+              <template v-else>
+                <button class="btn btn-primary" style="width:100%;" @click="directRead"
+                        :disabled="!podCanGen">
+                  📖 直接朗读（单音色 · 无需大模型）
+                </button>
+                <button class="btn btn-ghost" style="width:100%; margin-top:6px;" @click="genScript"
+                        :disabled="!podCanGen || pod.genning">
+                  <span v-if="pod.genning" class="spinner spinner-light"></span>
+                  {{ pod.genning ? '生成中…' : '🤖 改写为双人对话稿（需大模型）' }}
+                </button>
+                <p class="hint">直接朗读：按语句切分为朗读稿，由主播音色通读；对话稿：交给大模型改写为双人对谈。</p>
+              </template>
+            </div>
           </div>
 
           <!-- ② 对话稿 -->

@@ -467,6 +467,34 @@ createApp({
     function pickLang(code) {
       form.lang = form.lang === code ? '' : code;
     }
+
+    // ---------- 播客: 文本直读切句 (无需大模型) ----------
+    function splitToLines(text, maxLen = 120, minLen = 15) {
+      const sentences = (text || '').replace(/\s+/g, ' ').match(/[^。！？!?\n]+[。！？!?\n]?/g) || [];
+      const lines = [];
+      let buf = '';
+      for (let s of sentences.map(x => x.trim()).filter(Boolean)) {
+        // 超长句在逗号处二次切分
+        while (s.length > maxLen) {
+          let cut = s.lastIndexOf('，', maxLen);
+          if (cut < minLen) cut = s.lastIndexOf('、', maxLen);
+          if (cut < minLen) cut = maxLen;
+          lines.push(s.slice(0, cut + 1));
+          s = s.slice(cut + 1);
+        }
+        buf += (buf ? '' : '') + s;
+        if (buf.length >= minLen) { lines.push(buf); buf = ''; }
+      }
+      if (buf) lines.push(buf);
+      return lines.map(t => ({ role: 'host', text: t }));
+    }
+    function directRead() {
+      const source = pod.source === 'text' ? pod.sourceText : pod.extractText;
+      const lines = splitToLines(source);
+      if (!lines.length) return toast('内容源为空', 'error');
+      pod.lines = lines;
+      toast(`已切分为 ${lines.length} 句朗读稿（单音色）`, 'ok');
+    }
     function switchMode(key) { form.mode = key; }
     function toggleStream() { form.stream = !form.stream; }
     function goVoices() { switchView('voices'); }
@@ -709,6 +737,9 @@ createApp({
       const src = pod.source === 'text' ? pod.sourceText : pod.extractText;
       return src.trim().length >= 10 && !pod.genning && !pod.extracting;
     });
+    // 粘贴文本 / txt 文件可不经大模型直接朗读; 其他文件格式走 LLM 改写
+    const podFileNeedsLLM = computed(() =>
+      pod.source === 'file' && !pod.fileName.toLowerCase().endsWith('.txt'));
     const estimateText = computed(() => {
       const chars = pod.lines.reduce((n, l) => n + l.text.length, 0);
       const sec = Math.round(chars / 4.3 / Math.max(0.5, pod.speed));
@@ -992,7 +1023,7 @@ createApp({
       editVoice, startVoiceEdit, cancelVoiceEdit, saveVoiceEdit,
       pod, voiceIds, llmCfg, llmModal, llmForm, llmTestResult, episodes, podEpisode, pushStatus,
       editLine, editLineText,
-      podCanGen, estimateText, pushUrlPlaceholder, hlsUrl, pushStatusText,
+      podCanGen, podFileNeedsLLM, estimateText, pushUrlPlaceholder, hlsUrl, pushStatusText,
       openLLMConfig, saveLLMConfig, testLLM,
       onPodFilePick, onPodFileDrop, extractUrl, genScript,
       startEditLine, saveLine, delLine, addLine, saveEpisode, loadEpisode,
