@@ -322,6 +322,15 @@ createApp({
       if (t.status === 'failed') return (t.error || '').slice(0, 60) || '未知错误';
       return '';
     };
+    // ---------- TTS 任务队列 (工作台右边栏) ----------
+    const ttsBadge = (s) => ({
+      running: { cls: 'live', text: '合成中' },
+      ok: { cls: 'ok', text: '已完成' },
+      completed: { cls: 'ok', text: '已完成' },
+      failed: { cls: 'warn', text: '失败' },
+    }[s] || { cls: '', text: s });
+    const ttsQueue = computed(() => tasks.value.slice(0, 12));
+    const ttsRunning = computed(() => tasks.value.filter(t => t.status === 'running').length);
     const editLine = ref(-1);
     const editLineText = ref('');
 
@@ -1157,8 +1166,10 @@ createApp({
       loadVoices();
       connectSSE();
       loadEpisodes();   // 恢复任务队列 (刷新后仍能看到进行中的合成/推流)
+      loadTasks();      // 工作台右边栏的 TTS 任务队列
       setInterval(fetchHealth, 8000);
       setInterval(() => pollPod(false), 2000);
+      setInterval(() => { if (view.value === 'workbench') loadTasks(); }, 3000);
       // 未手动选择主题时, 跟随系统偏好实时切换
       window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
         if (!localStorage.getItem('cv-theme')) {
@@ -1184,6 +1195,7 @@ createApp({
       editVoice, startVoiceEdit, cancelVoiceEdit, saveVoiceEdit,
       pod, voiceIds, llmCfg, llmModal, llmForm, llmTestResult, episodes, podEpisode, pushStatus,
       queueModal, queueDetail, podQueue, queueActive, queueRunning, queueBadge, queueTaskText,
+      ttsBadge, ttsQueue, ttsRunning,
       editLine, editLineText,
       podCanGen, podFileNeedsLLM, estimateText, pushUrlPlaceholder, hlsUrl, pushStatusText, voiceName,
       openLLMConfig, saveLLMConfig, testLLM,

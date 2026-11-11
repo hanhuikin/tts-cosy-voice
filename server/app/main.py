@@ -80,6 +80,9 @@ async def startup() -> None:
         if ep["status"] in ("synthesizing", "pushing"):
             storage.update_episode(ep["id"], status="failed",
                                    error="服务重启中断, 请重新合成")
+    for t in storage.list_tasks(500):
+        if t["status"] == "running":
+            storage.finish_task(t["id"], None, None, 0, "failed", "服务重启中断", 0, None)
     # 默认加载 cosyvoice3; 若未下载则尝试 cosyvoice2, 都没有则保持 idle 等待 /api/admin/model
     target = None
     for key in (_default_model, "cosyvoice2"):
