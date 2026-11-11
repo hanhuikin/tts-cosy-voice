@@ -224,7 +224,7 @@ class Player {
         grad.addColorStop(0, '#4f8cff'); grad.addColorStop(1, '#22d3ee');
         g.fillStyle = grad;
       } else {
-        g.fillStyle = '#3a465e';
+        g.fillStyle = document.documentElement.dataset.theme === 'light' ? '#c9d3e4' : '#3a465e';
       }
       g.beginPath();
       const r = Math.min(barW / 2, 2);
@@ -1012,6 +1012,16 @@ createApp({
     const modelTagText = (m) => m.loaded ? '已加载' : (m.available ? '已下载' : '未下载');
 
     // ---------- 快捷键 / 生命周期 ----------
+    // ---------- 主题切换 (localStorage 记忆, 未设置时跟随系统, 首帧由 head 内联脚本应用) ----------
+    const theme = ref(document.documentElement.dataset.theme || 'dark');
+    function applyTheme(t) {
+      document.documentElement.dataset.theme = t;
+      theme.value = t;
+      try { localStorage.setItem('cv-theme', t); } catch (e) {}
+      if (player) player.draw();  // 波形颜色随主题重绘
+    }
+    function toggleTheme() { applyTheme(theme.value === 'dark' ? 'light' : 'dark'); }
+
     function onKeydown(e) {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && view.value === 'workbench') { synthesize(); }
       else if (e.code === 'Space' && playerState.active && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
@@ -1031,6 +1041,14 @@ createApp({
       connectSSE();
       setInterval(fetchHealth, 8000);
       setInterval(pollPush, 4000);
+      // 未手动选择主题时, 跟随系统偏好实时切换
+      window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
+        if (!localStorage.getItem('cv-theme')) {
+          document.documentElement.dataset.theme = e.matches ? 'light' : 'dark';
+          theme.value = e.matches ? 'light' : 'dark';
+          if (playerState.active) player.draw();
+        }
+      });
       window.addEventListener('keydown', onKeydown);
       window.addEventListener('resize', () => { if (playerState.active) player.draw(); });
     });
@@ -1039,7 +1057,7 @@ createApp({
       view, views, health, form, busy, busyText, workbenchError, lastResult,
       voices, tasks, taskFilter, toasts, banner, upload, uploadDrag, player: playerState,
       modeDefs, langs, sampleTexts,
-      stateClass, stateText, gpuText, vramPct, port, availableModels, visibleModeDefs, currentDefaults,
+      stateClass, stateText, gpuText, vramPct, port, theme, toggleTheme, availableModels, visibleModeDefs, currentDefaults,
       canSynth, synthBlocker, canUpload, filteredTasks, currentVoice,
       fmt, modeName, modelLabel, voiceOrSpk, displayTaskText,
       toast, dismissBanner, switchView, applySample, pickLang, switchMode, toggleStream, goVoices,

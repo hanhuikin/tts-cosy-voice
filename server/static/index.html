@@ -3,12 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
 <title>CosyVoice 控制台</title>
+<script>
+  /* 首帧前应用主题: localStorage 记忆 > 系统偏好 > 深色 (防闪烁) */
+  (function () {
+    try {
+      var t = localStorage.getItem('cv-theme');
+      if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+  })();
+</script>
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙</text></svg>">
 </head>
 <body>
 <div id="app" v-cloak>
+
+  <!-- 主题切换 -->
+  <button class="theme-toggle" :title="theme==='dark' ? '切换到浅色模式' : '切换到深色模式'"
+          @click="toggleTheme">{{ theme==='dark' ? '☀' : '🌙' }}</button>
 
   <!-- 顶部横幅: 模型加载 / 错误 -->
   <div v-if="banner" class="banner" :class="banner.type">
