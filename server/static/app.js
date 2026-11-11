@@ -746,9 +746,9 @@ createApp({
       return `${Math.floor(sec / 60)} 分 ${sec % 60} 秒`;
     });
     const pushUrlPlaceholder = computed(() => ({
-      rtmp: 'rtmp://127.0.0.1:1935/live/podcast01',
-      srt: 'srt://127.0.0.1:9000?streamid=podcast',
-      rtsp: 'rtsp://127.0.0.1:8554/podcast',
+      rtmp: '请填写: rtmp://服务器:1935/app/推流码',
+      srt: '请填写: srt://服务器:9000?streamid=xxx',
+      rtsp: '请填写: rtsp://服务器:8554/流名',
       hls: '无需地址（本服务托管分片）',
     }[pod.protocol] || ''));
     const hlsUrl = computed(() => podEpisode.value
@@ -906,9 +906,10 @@ createApp({
       toast(`已载入「${e.title}」`);
     }
     async function synthPod() {
-      if (!podEpisode.value) return;
+      if (!pod.lines.length) return;
       pod.busy = true; pod.progress = 0; pod.synthError = '';
       try {
+        await saveEpisode();  // 合成前自动保存 (无剧集则创建)
         await api(`/api/podcast/episodes/${podEpisode.value.id}/synthesize`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'final' }),
         });
