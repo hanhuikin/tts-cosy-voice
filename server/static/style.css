@@ -29,7 +29,7 @@ code { background: var(--bg-soft); border: 1px solid var(--card-edge); padding: 
 
 /* ---------- 布局 ---------- */
 .layout { display: flex; min-height: 100vh; }
-.main { flex: 1; padding: 24px 28px 120px; max-width: 1060px; margin: 0 auto; min-width: 0; }
+.main { flex: 1; padding: 24px 32px 120px; min-width: 0; }
 .view-title { font-size: 20px; font-weight: 700; margin: 4px 0 18px; letter-spacing: .5px; }
 
 /* ---------- 顶部横幅 ---------- */
