@@ -704,3 +704,70 @@ body{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
 #pod-output{flex:0 0 auto;height:auto;overflow:visible}
 /* 修正: inline 元素上 overflow/ellipsis 不生效, 长标题把右侧栏/列表撑出横向滚动条 */
 .recent .r-name,.list-row .lr-title{display:block}
+/* ===== v2.1 响应式修正 =====
+   症状: 窄窗口里标题区仍是单行 flex, 操作按钮把标题压成逐字竖排
+   (系统页「系统状态与设置」整列断行, 播客页说明缩成窄条); 顶栏页名与
+   模型名同样被挤成两行。
+   处理: ≤1000 标题区改为「标题整行 + 操作换行」; 顶栏文字单行省略;
+   操作按钮在窄屏撑满可用宽度, 不再互相挤压。 */
+@media(max-width:1000px){
+  .view-head{flex-wrap:wrap;align-items:flex-start;column-gap:10px;row-gap:10px}
+  .view-head>div:first-child{flex:1 1 100%;min-width:0}
+  .view-head>.spacer{display:none}
+  .view-head h2{white-space:nowrap}
+  .view-head p{max-width:none}
+  /* 顶栏与卡片标题在中等宽度同样要单行, 否则逐字折行 */
+  .page-title,.top-brand .brand-name,.top-brand .brand-sub{white-space:nowrap}
+  .page-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .model-btn{flex:0 0 auto}
+  .model-btn .lbl,.model-btn .val{white-space:nowrap}
+  .pcol-head{flex-wrap:wrap;row-gap:6px}
+  .pcol-head h3,.panel-head .panel-title{white-space:nowrap}
+}
+@media(max-width:720px){
+  .topbar{gap:8px;padding:0 12px}
+  .page-title{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .model-btn{flex:0 0 auto;min-height:36px;padding:5px 10px}
+  .model-btn .val{display:block;max-width:112px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .view-head{gap:8px;margin-bottom:14px}
+  .view-head h2{font-size:19px}
+  .view-head p{line-height:1.5}
+  .view-head>.btn{flex:1 1 auto;justify-content:center}
+  .view-head>.icon-btn,.view-head>.chip-label{flex:0 0 auto}
+  .panel-head{flex-wrap:wrap;row-gap:4px}
+  .out-head{flex-wrap:wrap;row-gap:6px}
+}
+@media(max-width:460px){
+  .page-title{font-size:14px}
+  .model-btn .val{max-width:88px}
+  .panel-desc{display:none}
+  .view-head h2{font-size:18px}
+}
+/* ≤400: 顶栏页名让位给模型选择器 (各视图标题已在内容区显示) */
+@media(max-width:400px){.page-title{display:none}}
+/* ===== v2.2 播客三栏断点归位 =====
+   v1.5 的模板覆盖写在断点之后, 与 ≤1180 的「主持阵容整行」冲突:
+   1100 左右会同时套用三栏比例 + 整行跨列, 内容源被压到 151px、列标题竖排。
+   这里在文件末尾显式重列三档, 保证后写者生效。 */
+.pcol-head h3{white-space:nowrap}
+@media(max-width:1180px) and (min-width:721px){
+  .pod-grid3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  #pod-cast-col{grid-column:1/-1}
+}
+@media(max-width:720px){
+  .pod-grid3{grid-template-columns:minmax(0,1fr)}
+  #pod-cast-col{grid-column:auto}
+}
+/* ===== v2.3 播客高度自适应 =====
+   ≥1001 仍是「成品区固定 + 三栏吸收剩余高度」; 但矮窗口或 2 行布局时
+   这份剩余高度会归零(实测 1100×700 列高 37px)。给三栏保底高度,
+   余下部分交给视图滚动; ≤1180 直接走自然高度, 列内不再各自滚动。 */
+.pod-grid3{min-height:300px}
+@media(max-width:1180px){
+  .pod-grid3{flex:none;min-height:0}
+  .pod-grid3>.pcol{overflow:visible}
+  #pod-output{flex:none}
+}
+/* 内容源分段按钮在窄列里不折行 (1100 左右每格仅 61px) */
+.src-tabs button{white-space:nowrap}
+@media(max-width:1180px){.src-tabs button{font-size:11.5px;padding:6px 6px}}
