@@ -1,889 +1,226 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
-<title>CosyVoice 控制台</title>
+<title>Voice Studio · 语音创作控制台</title>
 <script>
-  /* 首帧前应用主题: localStorage 记忆 > 系统偏好 > 深色 (防闪烁) */
-  (function () {
-    try {
-      var t = localStorage.getItem('cv-theme');
-      if (!t) t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', t);
-    } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
-  })();
+/* 首帧前应用主题: localStorage 记忆 > 系统偏好 > 深色 (防闪烁) — 与原型一致 (vs-theme) */
+(function(){try{var t=localStorage.getItem('vs-theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t)}catch(e){}})();
 </script>
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙</text></svg>">
 </head>
 <body>
-<div id="app" v-cloak>
+<svg style="display:none" aria-hidden="true">
+<symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h2m3-5v10m4-14v18m4-14v10m4-7v4m2-2h0"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8"/></symbol>
+<symbol id="i-lib" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></symbol>
+<symbol id="i-pod" viewBox="0 0 24 24"><circle cx="12" cy="11" r="7"/><path d="M12 18v3m-3 0h6M9 11h.01M15 11h.01"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1-2.8 2.8-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21h-4v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1-2.8-2.8.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3v-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1 2.8-2.8.1.1a1.6 1.6 0 0 0 1.8.3 1.6 1.6 0 0 0 1-1.5V3h4v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1 2.8 2.8-.1.1a1.6 1.6 0 0 0-.3 1.8 1.6 1.6 0 0 0 1.5 1H21v4h-.1a1.6 1.6 0 0 0-1.5 1z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5 19 12 7 19.5z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M7 4h3v16H7zM14 4h3v16h-3z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 20h16"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6M20 5v6h-6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 17V5m-4 4 4-4 4 4M4 20h16"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+</svg>
 
-  <!-- 主题切换 -->
-  <button class="theme-toggle" :class="{ 'sidebar-on': view==='workbench' || view==='podcast' || view==='voices' }"
-          :title="theme==='dark' ? '切换到浅色模式' : '切换到深色模式'"
-          @click="toggleTheme">{{ theme==='dark' ? '☀' : '🌙' }}</button>
+<div class="app">
+  <header class="topbar">
+    <div class="top-brand">
+      <div class="brand-mark"><svg class="ic lg"><use href="#i-wave"/></svg></div>
+      <div><div class="brand-name">Voice Studio</div><div class="brand-sub">语音创作控制台</div></div>
+    </div>
+    <div class="top-divider"></div>
+    <h1 class="page-title" id="page-title">创作台</h1>
+    <span class="page-sub" id="page-sub">把文字变成声音</span>
+    <div class="top-spacer"></div>
+    <div class="model-wrap">
+      <button class="model-btn" id="model-btn" data-act="toggle-menu" aria-haspopup="listbox" aria-expanded="false">
+        <span class="dot"></span><span class="lbl">当前模型</span><span class="val" id="model-name">—</span>
+        <svg class="ic"><use href="#i-chev"/></svg>
+      </button>
+      <div class="menu" id="model-menu" role="listbox" hidden></div>
+    </div>
+    <button class="icon-btn" data-act="theme" title="切换明暗主题" aria-label="切换明暗主题"><svg class="ic" id="theme-icon"><use href="#i-moon"/></svg></button>
+    <button class="icon-btn" data-act="help" title="快捷键说明" aria-label="快捷键说明"><svg class="ic"><use href="#i-info"/></svg></button>
+  </header>
 
-  <!-- 顶部横幅: 模型加载 / 错误 -->
-  <div v-if="banner" class="banner" :class="banner.type">
-    <span class="banner-icon">{{ banner.icon }}</span>
-    <span>{{ banner.text }}</span>
-    <span v-if="banner.busy" class="spinner"></span>
-    <button class="banner-close" v-if="banner.closable" @click="dismissBanner">✕</button>
-  </div>
-
-  <div class="layout">
-    <!-- 侧边栏 -->
+  <div class="frame">
     <aside class="sidebar">
-      <div class="logo">
-        <div class="logo-mark">🎙</div>
-        <div>
-          <div class="logo-title">CosyVoice</div>
-          <div class="logo-sub">语音合成控制台</div>
-        </div>
-      </div>
-      <nav class="nav">
-        <a v-for="v in views" :key="v.key" :class="{active: view===v.key}" @click="switchView(v.key)">
-          <span class="nav-icon">{{ v.icon }}</span>{{ v.name }}
-        </a>
+      <div class="panel-caption"><svg class="ic sm"><use href="#i-wave"/></svg><h3>工作区</h3><span class="cap-meta">5 个视图</span></div>
+      <div class="nav-label">创作</div>
+      <nav class="nav" id="nav-primary" aria-label="主导航">
+        <a data-act="view" data-key="workbench" class="active"><svg class="ic"><use href="#i-home"/></svg>创作台</a>
+        <a data-act="view" data-key="podcast"><svg class="ic"><use href="#i-pod"/></svg>播客工坊</a>
+        <a data-act="view" data-key="voices"><svg class="ic"><use href="#i-mic"/></svg>我的音色</a>
+        <a data-act="view" data-key="library"><svg class="ic"><use href="#i-lib"/></svg>作品库<span class="nav-badge" id="nav-count">0</span></a>
       </nav>
-      <div class="side-status">
-        <div class="status-row">
-          <span class="dot" :class="stateClass"></span>
-          <span>{{ stateText }}</span>
-        </div>
-        <div class="status-meta">{{ health.gpu ? health.gpu.name : '…' }}</div>
-        <div class="status-meta" v-if="health.gpu && health.gpu.vram_total_gb">
-          显存 {{ health.gpu.vram_used_gb }} / {{ health.gpu.vram_total_gb }} GB
-        </div>
-        <div class="status-meta">排队 {{ health.queue_len }} / {{ health.queue_max }}</div>
-        <div class="status-meta" v-if="health.sample_rate">输出 {{ health.sample_rate }} Hz</div>
-        <div class="status-meta">服务端口 {{ port }}</div>
+      <div class="nav-label">管理</div>
+      <nav class="nav" aria-label="次级导航">
+        <a data-act="view" data-key="system"><svg class="ic"><use href="#i-set"/></svg>系统状态与设置</a>
+      </nav>
+      <div class="side-foot">
+        <div class="sys-cap"><svg class="ic sm"><use href="#i-cpu"/></svg><span>系统信息</span></div>
+        <div class="sys-mini" id="sys-mini"></div>
+        <div class="side-note">模型权重、自检与目录配置见「系统状态与设置」</div>
       </div>
     </aside>
 
-    <!-- 主区域 -->
-    <main class="main">
+    <div class="workspace">
+      <main class="content" id="content">
 
-      <!-- ========== 合成工作台 ========== -->
-      <section v-if="view==='workbench'" class="view">
-        <h2 class="view-title">合成工作台</h2>
+        <!-- 创作台 -->
+        <section class="view" data-view="workbench">
+          <div class="wb">
+            <div class="notice" id="cap-notice"><svg class="ic sm"><use href="#i-spark"/></svg><span id="cap-text"></span></div>
 
-        <!-- 文本输入卡 -->
-        <div class="card">
-          <div class="card-head">
-            <span class="card-title">合成文本</span>
-            <span class="muted">{{ form.text.length }} / 2000 字符</span>
-          </div>
-          <textarea v-model="form.text" ref="ta" class="textarea" rows="5"
-                    placeholder="输入要合成的文本，支持中 / 英 / 日 / 韩 / 德 / 法 / 西 / 意 / 俄 及 18 种中文方言…（Ctrl+Enter 合成）"></textarea>
-          <div class="chips">
-            <span class="chip-label">示例：</span>
-            <button v-for="s in sampleTexts" :key="s.text" class="chip" @click="applySample(s)">{{ s.label }}</button>
-            <button class="chip chip-ghost" @click="form.text=''" v-if="form.text">清空</button>
-          </div>
-          <div class="lang-tags" v-if="form.mode==='cross_lingual'">
-            <span class="chip-label">目标语言（选中后合成时自动应用）：</span>
-            <button v-for="l in visibleLangs" :key="l.code" class="chip" :class="{active: form.lang===l.code}"
-                    @click="pickLang(l.code)">{{ l.name }}</button>
-          </div>
-        </div>
-
-        <!-- 模式 + 参考区 -->
-        <div class="card">
-          <div class="mode-tabs" :style="{ gridTemplateColumns: 'repeat(' + visibleModeDefs.length + ', 1fr)' }">
-            <button v-for="m in visibleModeDefs" :key="m.key" class="mode-tab" :class="{active: form.mode===m.key}"
-                    @click="switchMode(m.key)">
-              <span class="mode-icon">{{ m.icon }}</span>
-              <span>{{ m.name }}</span>
-            </button>
-          </div>
-
-          <!-- 预置音色 -->
-          <div v-if="form.mode==='sft'" class="mode-panel">
-            <template v-if="health.speakers.length">
-              <div class="field-row">
-                <label>内置说话人</label>
-                <select v-model="form.spk_id" class="input">
-                  <option disabled value="">请选择说话人</option>
-                  <option v-for="s in health.speakers" :key="s" :value="s">{{ s }}</option>
-                </select>
-                <button class="btn btn-ghost" @click="previewSpeaker" :disabled="!form.spk_id || busy">试听</button>
+            <div class="panel" id="wb-text-panel">
+              <div class="panel-head"><span class="step">1</span><h2 class="panel-title">要合成的内容</h2><span class="panel-desc">支持中英日韩与方言</span><span class="panel-hint" id="char-count">0 / 2000</span></div>
+              <textarea class="textarea" id="text-input" maxlength="2000" placeholder="在这里输入或粘贴要转成语音的文字…" aria-label="合成文本"></textarea>
+              <div class="chips" id="sample-chips">
+                <span class="chip-label">试试：</span>
+                <button class="chip" data-act="sample" data-i="0">产品发布词</button>
+                <button class="chip" data-act="sample" data-i="1">播客开场</button>
+                <button class="chip" data-act="sample" data-i="2">英文短句</button>
+                <button class="chip ghost" data-act="clear-text">清空</button>
               </div>
-              <p class="hint">使用模型内置音色直接合成，无需参考音频。</p>
-            </template>
-            <div v-else class="empty" style="padding: 18px;">
-              当前模型（{{ modelLabel(form.model) }}）没有内置说话人<br>
-              <button class="btn" @click="switchMode('zero_shot')" style="margin-top: 8px;">改用 🧬 声音克隆</button>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head"><span class="step">2</span><h2 class="panel-title">用谁的声音</h2><span class="panel-desc">选一个声音即可，其余参数交给默认设置</span></div>
+              <div class="tabs" id="group-tabs" role="tablist"></div>
+              <div class="grid" id="sound-grid"></div>
+              <div id="extra-fields"></div>
+            </div>
+
+            <details class="adv" id="adv">
+              <summary><svg class="ic"><use href="#i-set"/></svg>高级设置<svg class="ic caret" style="margin-left:auto"><use href="#i-chev"/></svg></summary>
+              <div class="adv-body" id="adv-body"></div>
+            </details>
+
+            <div class="actionbar">
+              <div class="action-info" id="action-info"></div>
+              <button class="btn btn-primary btn-lg" id="gen-btn" data-act="generate"><svg class="ic"><use href="#i-wave"/></svg><span id="gen-label">生成语音</span></button>
+              <span class="kbd">Ctrl + ↵</span>
             </div>
           </div>
+        </section>
 
-          <!-- 声音克隆 -->
-          <div v-else-if="form.mode==='zero_shot'" class="mode-panel">
-            <div class="field-row">
-              <label>克隆音色</label>
-              <select v-model="form.voice_id" class="input">
-                <option disabled value="">请选择音色</option>
-                <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}（{{ v.duration.toFixed(1) }}s）</option>
-              </select>
-              <button class="btn btn-ghost" @click="previewVoice" :disabled="!form.voice_id || busy">试听参考</button>
-              <button class="btn btn-ghost" @click="goVoices">＋ 新建音色</button>
+        <!-- 播客工坊：保留原有全部能力，按 内容源 → 阵容 → 对话稿 → 成品 重组 -->
+        <section class="view" data-view="podcast" hidden>
+          <div class="wrap">
+            <div class="view-head" style="max-width:none">
+              <div><h2>播客工坊</h2><p>文章 / 文件 / 链接 → 多人对话稿 → 成品与直播推流</p></div>
+              <div class="spacer"></div>
+              <button class="btn" data-act="pod-save"><svg class="ic sm"><use href="#i-down"/></svg>保存剧集</button>
+              <button class="btn btn-primary" data-act="pod-synth"><svg class="ic sm"><use href="#i-wave"/></svg>合成播客成品</button>
             </div>
-            <div class="field-col" v-if="form.voice_id && needsPromptText">
-              <label>参考音频文字内容 <span class="muted">（与参考音频一致，部分模型会用作克隆提示）</span></label>
-              <input v-model="form.prompt_text" class="input" placeholder="参考音频里说的那句话…">
+            <div class="pod-stepper" id="pod-stepper"></div>
+            <div class="pod-grid3">
+              <div class="pcol" id="pod-source"></div>
+              <div class="pcol" id="pod-script-col"></div>
+              <div class="pcol" id="pod-cast-col"></div>
             </div>
-            <p class="hint" v-if="currentModel && currentModel.family !== 'cosyvoice'">
-              {{ currentModel.label }} 仅需参考音频即可零样本克隆；语速由「语速」滑块控制。</p>
-            <p class="hint" v-else>3~30 秒干净的单人语音即可克隆音色，建议先在「音色库」完成上传与校验。</p>
+            <div class="pcol out-zone" id="pod-output"></div>
           </div>
+        </section>
 
-          <!-- 跨语言 -->
-          <div v-else-if="form.mode==='cross_lingual'" class="mode-panel">
-            <div class="field-row">
-              <label>克隆音色</label>
-              <select v-model="form.voice_id" class="input">
-                <option disabled value="">请选择音色</option>
-                <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}（{{ v.duration.toFixed(1) }}s）</option>
-              </select>
-              <button class="btn btn-ghost" @click="previewVoice" :disabled="!form.voice_id || busy">试听参考</button>
-            </div>
-            <p class="hint" v-if="form.model==='cosyvoice3'">用参考音色说任意语言；在上方「语言」中选中后合成时自动应用语种标签（再次点击可取消），服务端自动添加指令前缀。</p>
-            <p class="hint" v-else-if="form.model==='cosyvoice2'">用参考音色说任意语言，支持 [laughter] [breath] 等细粒度控制标记。</p>
-            <p class="hint" v-else>在上方「目标语言」中选中后，语言标签会转换为该模型的 language 参数（支持 {{ visibleLangs.map(l => l.name).join(' / ') }}）。</p>
+        <!-- 我的音色 -->
+        <section class="view" data-view="voices" hidden>
+          <div class="wrap">
+            <div class="view-head"><div><h2>我的音色</h2><p>上传 3~30 秒干净人声，之后在任何模型里复用</p></div><div class="spacer"></div>
+              <span class="tag" id="voice-count">0 个音色</span>
+              <button class="btn" data-act="voice-refresh"><svg class="ic sm"><use href="#i-refresh"/></svg>刷新</button>
+              <button class="btn btn-primary" data-act="voice-focus"><svg class="ic sm"><use href="#i-plus"/></svg>新建音色</button></div>
+            <!-- 上传新音色：拖拽/校验/波形 + 名称/参考文本表单 -->
+            <div id="voice-upload-card"></div>
+            <div class="vlib-list-head"><h3>已保存的音色</h3><span class="chip-label" id="voice-list-note"></span></div>
+            <div class="voice-grid" id="voice-cards"></div>
           </div>
+        </section>
 
-          <!-- 指令控制: 按模型能力切换三种形态 -->
-          <div v-else class="mode-panel">
-            <template v-if="currentModel && currentModel.instruct_kind === 'design'">
-              <div class="field-col">
-                <label>声音描述 <span class="muted">（描述性别 / 年龄 / 音调 / 情绪 / 场景，模型据此设计音色）</span></label>
-                <textarea v-model="form.instruct_text" class="textarea" rows="3"
-                          placeholder="例如：沉稳的中年男声，语速偏慢，适合纪录片旁白"></textarea>
-                <div class="chips">
-                  <button v-for="i in currentDefaults" :key="i" class="chip" @click="form.instruct_text=i">{{ i }}</button>
-                </div>
-              </div>
-              <p class="hint">无需参考音频，直接由文字描述生成全新音色。</p>
-            </template>
-            <template v-else-if="currentModel && currentModel.instruct_kind === 'style'">
-              <div class="field-row">
-                <label>内置说话人</label>
-                <select v-model="form.spk_id" class="input">
-                  <option disabled value="">请选择说话人</option>
-                  <option v-for="s in health.speakers" :key="s" :value="s">{{ s }}</option>
-                </select>
-                <button class="btn btn-ghost" @click="previewSpeaker" :disabled="!form.spk_id || busy">试听</button>
-              </div>
-              <div class="field-col">
-                <label>风格 / 情绪指令 <span class="muted">（可留空，使用音色默认风格）</span></label>
-                <input v-model="form.instruct_text" class="input" placeholder="例如：用特别愤怒的语气说">
-                <div class="chips">
-                  <button v-for="i in currentDefaults" :key="i" class="chip" @click="form.instruct_text=i">{{ i }}</button>
-                </div>
-              </div>
-              <p class="hint">通过自然语言控制目标音色的语气、情绪与节奏。</p>
-            </template>
-            <template v-else>
-              <div class="field-row">
-                <label>克隆音色</label>
-                <select v-model="form.voice_id" class="input">
-                  <option disabled value="">请选择音色</option>
-                  <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}（{{ v.duration.toFixed(1) }}s）</option>
-                </select>
-                <button class="btn btn-ghost" @click="previewVoice" :disabled="!form.voice_id || busy">试听参考</button>
-              </div>
-              <div class="field-col">
-                <label>自然语言指令 <span class="muted">（方言 / 语速 / 情绪等，服务端自动补全 &lt;|endofprompt|&gt;）</span></label>
-                <input v-model="form.instruct_text" class="input" placeholder="例如：请用四川话说这句话。">
-                <div class="chips">
-                  <button v-for="i in currentDefaults" :key="i" class="chip" @click="form.instruct_text=i">{{ i }}</button>
-                </div>
-              </div>
-              <p class="hint">通过自然语言控制方言、语速、情绪等表达方式。</p>
-            </template>
+        <!-- 作品库 -->
+        <section class="view" data-view="library" hidden>
+          <div class="wrap">
+            <div class="view-head"><div><h2>作品库</h2><p>每次生成自动归档，参数可一键复用</p></div><div class="spacer"></div><button class="btn" data-act="lib-refresh"><svg class="ic sm"><use href="#i-refresh"/></svg>刷新</button></div>
+            <div class="stat-row" id="lib-stats"></div>
+            <div class="chips" style="margin-bottom:14px" id="lib-filters"></div>
+            <div class="list" id="lib-list"></div>
           </div>
-        </div>
+        </section>
 
-        <!-- 参数条 -->
-        <div class="card param-bar">
-          <div class="param">
-            <label>模型</label>
-            <select v-model="form.model" class="input" :disabled="busy || health.state==='loading'">
-              <option v-for="m in availableModels" :key="m.key" :value="m.key">{{ m.label }}</option>
-            </select>
-            <span class="muted small" v-if="health.model && form.model !== health.model">
-              当前加载 {{ health.model_label }}，请到「系统状态」加载所选模型
-            </span>
+        <!-- 系统状态与设置 -->
+        <section class="view" data-view="system" hidden>
+          <div class="wrap">
+            <div class="view-head"><div><h2>系统状态与设置</h2><p>模型权重、运行环境与资源占用一目了然，可在此配置权重目录</p></div><div class="spacer"></div><span class="chip-label" id="sys-updated">刚刚刷新</span><button class="icon-btn" data-act="sys-refresh" id="sys-refresh-btn" title="刷新状态" aria-label="刷新状态"><svg class="ic sm" id="sys-refresh-icon"><use href="#i-refresh"/></svg></button><button class="btn sec" data-act="sys-settings"><svg class="ic sm"><use href="#i-set"/></svg>权重目录设置</button><button class="btn btn-primary" data-act="sys-doctor-all"><svg class="ic sm"><use href="#i-cpu"/></svg>运行环境自检</button></div>
+            <div class="sys-overview">
+              <div class="sys-overview-head"><svg class="ic sm"><use href="#i-cpu"/></svg><span>运行概览</span><span class="spacer"></span><span class="ov-note" id="sys-ov-note">服务、资源与产出的实时快照</span></div>
+              <div class="stat-row" id="sys-stats"></div>
+            </div>
+            <div class="model-cards" id="model-cards"></div>
+            <p class="sys-footnote">切换模型会卸载当前权重并释放显存；「环境自检」只读取权重文件与解释器，不占用 GPU。点击卡片中的权重目录可展开完整路径。</p>
           </div>
-          <div class="param">
-            <label>语速 ×{{ form.speed.toFixed(2) }}<span class="muted small" v-if="form.stream && form.model==='cosyvoice2'">（v2 流式不支持）</span></label>
-            <input type="range" min="0.5" max="2" step="0.05" v-model.number="form.speed" :disabled="form.stream && form.model==='cosyvoice2'">
-          </div>
-          <div class="param param-stream">
-            <label>流式合成</label>
-            <button class="toggle" :class="{on: form.stream}" @click="toggleStream">
-              <span class="knob"></span>
-            </button>
-            <span class="muted small">{{ form.stream ? streamHint : '整段合成，音质更稳' }}</span>
-          </div>
-          <div class="param-grow"></div>
-          <span class="muted small" v-if="synthBlocker && !busy">{{ synthBlocker }}</span>
-          <button class="btn btn-primary btn-lg" @click="synthesize" :disabled="!canSynth" :title="synthBlocker">
-            <span v-if="busy" class="spinner spinner-light"></span>
-            <span v-else>▶</span>
-            {{ busy ? busyText : '开始合成' }}
-          </button>
-        </div>
+        </section>
+      </main>
 
-        <!-- 错误卡 -->
-        <div class="card error-card" v-if="workbenchError">
-          <b>合成失败</b>
-          <p>{{ workbenchError }}</p>
-          <button class="btn btn-ghost" @click="workbenchError=''">知道了</button>
-        </div>
-
-        <!-- 结果元信息卡 -->
-        <div class="card result-meta" v-if="lastResult">
-          <div class="result-row"><span class="muted">任务</span><code>{{ lastResult.id }}</code></div>
-          <div class="result-row"><span class="muted">模式</span>{{ modeName(lastResult.mode) }} · {{ modelLabel(lastResult.model) }}</div>
-          <div class="result-row" v-if="lastResult.firstMs"><span class="muted">首包延迟</span><b class="accent">{{ lastResult.firstMs }} ms</b></div>
-          <div class="result-row" v-if="lastResult.duration"><span class="muted">音频时长</span>{{ lastResult.duration.toFixed(2) }} s</div>
-          <div class="result-row" v-if="lastResult.inferMs"><span class="muted">合成耗时</span>{{ lastResult.inferMs }} ms</div>
-          <div class="result-actions">
-            <button class="btn btn-ghost" @click="downloadTask(lastResult.id)">下载 WAV</button>
-            <button class="btn btn-ghost" @click="reloadParams(lastResult)">重载参数</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- ========== 音色库 ========== -->
-      <section v-else-if="view==='voices'" class="view">
-        <h2 class="view-title">音色库</h2>
-
-        <div class="card">
-          <div class="card-head"><span class="card-title">上传新音色（3~30 秒参考音频）</span></div>
-          <div class="upload-grid">
-            <div class="dropzone" :class="{drag:uploadDrag, invalid:upload.checkError}" @click="$refs.file.click()"
-                 @dragover.prevent="uploadDrag=true" @dragleave="uploadDrag=false"
-                 @drop.prevent="onDrop">
-              <input type="file" ref="file" accept=".wav,.mp3,.flac,.m4a,.ogg,.opus" hidden @change="onFilePick">
-              <div v-if="!upload.file" class="dz-hint">
-                <div class="dz-icon">📁</div>
-                点击或拖拽音频到此处<br>
-                <span class="muted small">wav / mp3 / flac / m4a，建议 5~15s 干净单人语音</span>
-              </div>
-              <div v-else class="dz-file">
-                <b>{{ upload.file.name }}</b>
-                <span class="muted">{{ upload.duration ? upload.duration.toFixed(1)+'s · '+upload.sr+' Hz' : '解析中…' }}</span>
-                <span class="dz-ok" v-if="upload.duration && upload.duration>=1 && upload.duration<=30">✓ 可用</span>
-                <span class="dz-bad" v-else-if="upload.duration">✗ 时长需在 1~30 秒</span>
-              </div>
-              <canvas ref="dzWave" class="dz-wave"></canvas>
-            </div>
-            <div class="upload-form">
-              <div class="field-col">
-                <label>音色名称 *</label>
-                <input v-model="upload.name" class="input" placeholder="例如：小雅（温柔女声）">
-              </div>
-              <div class="field-col">
-                <label>参考音频文字内容 *</label>
-                <textarea v-model="upload.prompt_text" class="textarea" rows="3" placeholder="逐字填写音频里说的内容，克隆质量的关键"></textarea>
-              </div>
-              <button class="btn btn-primary" @click="uploadVoice" :disabled="!canUpload">
-                {{ upload.busy ? '保存中…' : '保存音色' }}
-              </button>
-              <p class="hint" v-if="upload.checkError">{{ upload.checkError }}</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="voice-grid" v-if="voices.length">
-          <div class="card voice-card" v-for="v in voices" :key="v.id">
-            <!-- 编辑态 -->
-            <template v-if="editVoice && editVoice.id === v.id">
-              <div class="field-col">
-                <label>音色名称</label>
-                <input v-model="editVoice.name" class="input" maxlength="50" placeholder="音色名称">
-              </div>
-              <div class="field-col">
-                <label>参考音频文字内容</label>
-                <textarea v-model="editVoice.prompt_text" class="textarea" rows="3" maxlength="500"></textarea>
-              </div>
-              <div class="voice-actions">
-                <button class="btn btn-primary" @click="saveVoiceEdit">保存</button>
-                <button class="btn btn-ghost" @click="cancelVoiceEdit">取消</button>
-              </div>
-            </template>
-            <!-- 展示态 -->
-            <template v-else>
-              <div class="voice-head">
-                <b>{{ v.name }}</b>
-                <span class="tag">{{ v.duration.toFixed(1) }}s</span>
-              </div>
-              <p class="voice-prompt">{{ v.prompt_text }}</p>
-              <div class="voice-actions">
-                <button class="btn btn-ghost" @click="previewVoice(v.id)">▶ 试听参考</button>
-                <button class="btn btn-ghost" @click="useVoice(v)">用于合成</button>
-                <button class="btn btn-ghost" @click="startVoiceEdit(v)">✏ 编辑</button>
-                <button class="btn btn-ghost btn-danger" @click="deleteVoice(v)">删除</button>
-              </div>
-              <div class="voice-date muted small">{{ v.created_at }}</div>
-            </template>
-          </div>
-        </div>
-        <div v-else class="card empty">还没有克隆音色。上传一段 3~30 秒的参考音频开始克隆。</div>
-      </section>
-
-      <!-- ========== 历史记录 ========== -->
-      <section v-else-if="view==='history'" class="view">
-        <h2 class="view-title">历史记录</h2>
-        <div class="card">
-          <div class="chips filter-chips">
-            <button class="chip" :class="{active: taskFilter.mode===null}" @click="taskFilter.mode=null">全部</button>
-            <button v-for="m in modeDefs" :key="m.key" class="chip" :class="{active: taskFilter.mode===m.key}"
-                    @click="taskFilter.mode=m.key">{{ m.name }}</button>
-            <span class="param-grow"></span>
-            <button class="btn btn-ghost" @click="loadTasks">刷新</button>
-          </div>
-          <table class="table" v-if="filteredTasks.length">
-            <thead><tr><th>时间</th><th>文本</th><th>模式</th><th>音色</th><th>时长</th><th>首包</th><th></th></tr></thead>
-            <tbody>
-              <tr v-for="t in filteredTasks" :key="t.id" :class="{failed: t.status!=='ok'}">
-                <td class="nowrap">{{ t.created_at.slice(5,16) }}</td>
-                <td class="clip" :title="t.text">{{ displayTaskText(t.text) }}</td>
-                <td class="nowrap">{{ modeName(t.mode) }}<div class="muted small">{{ modelLabel(t.model) }}</div></td>
-                <td class="nowrap">{{ voiceOrSpk(t) || '—' }}</td>
-                <td class="nowrap">{{ t.duration ? t.duration.toFixed(1)+'s' : '—' }}</td>
-                <td class="nowrap">{{ t.first_chunk_ms!=null ? t.first_chunk_ms+'ms' : '—' }}</td>
-                <td class="nowrap actions">
-                  <button v-if="t.status==='ok'" class="btn btn-ghost" @click="playTask(t)">▶</button>
-                  <button v-if="t.status==='ok'" class="btn btn-ghost" @click="downloadTask(t.id)">⬇</button>
-                  <button class="btn btn-ghost" @click="reloadParams(t)" title="回填到工作台">↺</button>
-                  <button class="btn btn-ghost btn-danger" @click="deleteTask(t)">🗑</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-else class="empty">暂无合成记录。去工作台合成第一条语音吧。</div>
-        </div>
-      </section>
-
-      <!-- ========== 播客工坊 ========== -->
-      <section v-else-if="view==='podcast'" class="view">
-        <h2 class="view-title">播客工坊</h2>
-
-        <div class="podcast-grid">
-          <!-- ① 内容源 -->
-          <div class="card pod-col">
-            <div class="card-head">
-              <span class="card-title">① 内容源</span>
-              <button class="btn btn-ghost" style="padding:3px 10px; font-size:12px;" @click="openLLMConfig">⚙ 大模型</button>
-            </div>
-            <div class="mode-tabs" style="grid-template-columns: repeat(3, 1fr); margin-bottom:10px;">
-              <button class="mode-tab" :class="{active: pod.source==='text'}" @click="pod.source='text'">📄 粘贴</button>
-              <button class="mode-tab" :class="{active: pod.source==='file'}" @click="pod.source='file'">📁 文件</button>
-              <button class="mode-tab" :class="{active: pod.source==='url'}" @click="pod.source='url'">🌐 链接</button>
-            </div>
-
-            <div v-if="pod.source==='text'">
-              <textarea v-model="pod.sourceText" class="textarea" rows="8" style="font-size:13px;"
-                        placeholder="在此粘贴文章、会议记录、学习笔记…（将按③的主持阵容改写为多轮多人对话，约 4~10 分钟节目）"></textarea>
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                <span class="muted small" :class="{accent: pod.sourceText.length>20000}">{{ pod.sourceText.length }} / 20000 字符</span>
-              </div>
-            </div>
-
-            <div v-else-if="pod.source==='file'">
-              <div class="dropzone" :class="{drag: pod.fileDrag}" @click="$refs.podFile.click()"
-                   @dragover.prevent="pod.fileDrag=true" @dragleave="pod.fileDrag=false" @drop.prevent="onPodFileDrop">
-                <input type="file" ref="podFile" accept=".txt,.md,.pdf,.docx" hidden @change="onPodFilePick">
-                <div v-if="!pod.fileName" class="dz-hint">
-                  <div class="dz-icon">📄</div>
-                  点击或拖拽文件<br><span class="muted small">txt / md / pdf / docx · ≤20MB</span>
-                </div>
-                <div v-else class="dz-file">
-                  <b>{{ pod.fileName }}</b>
-                  <span class="muted small">{{ pod.extractText ? '已提取 ' + pod.extractChars + ' 字' : '解析中…' }}</span>
-                </div>
-              </div>
-              <p class="hint" v-if="pod.sourceError">{{ pod.sourceError }}</p>
-            </div>
-
-            <div v-else>
-              <div style="display:flex; gap:8px;">
-                <input v-model="pod.url" class="input" placeholder="https:// 文章页面地址" style="flex:1;">
-                <button class="btn" @click="extractUrl" :disabled="!pod.url || pod.extracting">
-                  {{ pod.extracting ? '抓取中…' : '抓取' }}
-                </button>
-              </div>
-              <p class="hint" v-if="pod.extractText">✓ 已提取 {{ pod.extractChars }} 字正文，可直接生成对话稿</p>
-              <p class="hint" v-if="pod.sourceError">{{ pod.sourceError }}</p>
-            </div>
-
-            <div style="margin-top:12px; border-top:1px solid var(--edge); padding-top:10px;">
-              <b style="font-size:13px;">⚙️ 大模型</b>
-              <div class="muted" style="font-size:12px; margin:4px 0;">
-                {{ llmCfg.model || '未配置' }} <span v-if="llmCfg.base_url" class="muted">· {{ llmCfg.base_url }}</span>
-              </div>
-              <button class="btn btn-ghost" style="padding:4px 12px; font-size:12px;" @click="openLLMConfig">配置 / 测试连通</button>
-            </div>
-
-            <div style="margin-top:12px;">
-              <template v-if="pod.source==='url' || podFileNeedsLLM">
-                <button class="btn btn-primary" style="width:100%;" @click="genScript"
-                        :disabled="!podCanGen || pod.genning">
-                  <span v-if="pod.genning" class="spinner spinner-light"></span>
-                  {{ pod.genning ? '生成中…' : '🤖 由大模型生成对话稿' }}
-                </button>
-                <p class="hint" v-if="pod.source==='url'">网页内容由大模型按③的主持阵容改写为多人对话稿（需先配置大模型）。</p>
-                <p class="hint" v-else>该文档格式将由大模型按③的主持阵容改写为多人对话稿（需先配置大模型）。</p>
-              </template>
-              <template v-else>
-                <button class="btn btn-primary" style="width:100%;" @click="directRead"
-                        :disabled="!podCanGen">
-                  📖 直接朗读（单音色 · 无需大模型）
-                </button>
-                <button class="btn btn-ghost" style="width:100%; margin-top:6px;" @click="genScript"
-                        :disabled="!podCanGen || pod.genning">
-                  <span v-if="pod.genning" class="spinner spinner-light"></span>
-                  {{ pod.genning ? '生成中…' : '🤖 改写为多人对话稿（需大模型）' }}
-                </button>
-                <p class="hint">直接朗读：按语句切分为朗读稿，由主播音色通读；对话稿：交给大模型按③阵容改写为多人对谈。</p>
-              </template>
-            </div>
-          </div>
-
-          <!-- ② 对话稿 -->
-          <div class="card pod-col pod-script">
-            <div class="card-head">
-              <span class="card-title">② 对话稿</span>
-              <span>
-                <span class="badge info" v-if="pod.lines.length">{{ pod.lines.length }} 轮 · 预计 {{ estimateText }}</span>
-                <button class="btn btn-ghost" style="padding:3px 10px; font-size:12px;" @click="genScript"
-                        :disabled="!podCanGen || pod.genning">↻ 重新生成</button>
-              </span>
-            </div>
-
-            <div class="pod-script-body" v-if="pod.lines.length">
-              <div v-for="(line, i) in pod.lines" :key="i" class="dlg" :class="line.role==='host' ? 'host' : 'guest'">
-                <div class="avatar">{{ line.role==='host' ? '🎙' : '🧑‍🔬' }}</div>
-                <div style="flex:1; min-width:0;">
-                  <div class="who">
-                    <span class="tag" :class="line.role==='host' ? 'info' : ''">{{ line.role==='host' ? '主播' : '嘉宾' }}</span>
-                    <select v-model="line.name" @change="syncLineRole(line)" class="input"
-                            style="display:inline-block; width:auto; padding:2px 8px; font-size:12px;"
-                            title="切换该行说话人 (连同音色)">
-                      <option v-for="s in speakers" :key="spkLabel(s)" :value="spkLabel(s)">{{ spkLabel(s) }} · {{ voiceName(s.voice_id) }}</option>
-                    </select>
-                    <button class="btn btn-ghost" style="padding:1px 8px; font-size:11px; float:right" @click="delLine(i)">✕</button>
-                  </div>
-                  <div v-if="editLine===i">
-                    <textarea v-model="editLineText" class="textarea" rows="3" style="font-size:13px;"></textarea>
-                    <button class="btn btn-primary" style="padding:3px 12px; font-size:12px;" @click="saveLine(i)">保存</button>
-                    <button class="btn btn-ghost" style="padding:3px 12px; font-size:12px;" @click="editLine=-1">取消</button>
-                  </div>
-                  <div v-else class="bubble" style="cursor:text;" @click="startEditLine(i)">{{ line.text }}</div>
-                </div>
-              </div>
-              <div v-if="pod.genRaw && !pod.lines.length" class="input" style="white-space:pre-wrap; font-size:12.5px; color:var(--muted);">{{ pod.genRaw }}</div>
-              <button class="btn btn-ghost" style="width:100%; margin-top:6px;" @click="addLine">
-                ＋ 插入一轮对话
-              </button>
-            </div>
-            <div v-else class="empty">还没有对话稿。完成左侧内容源后点击「生成对话稿」。</div>
-
-            <button class="btn btn-primary" style="width:100%; margin-top:10px;" @click="saveEpisode"
-                    :disabled="!pod.lines.length || pod.saving">
-              {{ pod.saving ? '保存中…' : '💾 保存剧集' }}
-            </button>
-          </div>
-
-          <!-- ③ 输出 -->
-          <div class="card pod-col">
-            <div class="card-head">
-              <span class="card-title">③ 主持阵容</span>
-              <span class="muted small">主播 ×1 · 嘉宾 ×{{ guestCount }}</span>
-            </div>
-
-            <!-- 主播 -->
-            <div class="spk-block">
-              <div class="spk-head"><span class="tag info">🎙 主播</span></div>
-              <div class="spk-row">
-                <input v-model="hostSpk.name" class="input" placeholder="姓名，如 阿远">
-                <select v-model="hostSpk.voice_id" class="input" title="主播音色">
-                  <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
-                </select>
-              </div>
-              <textarea v-model="hostSpk.desc" class="textarea" rows="2" style="margin-top:6px; font-size:12.5px;"
-                        placeholder="人设 / 简介（生成对话稿时供大模型参考）：如 资深科技主播，擅长用生活化的比喻讲清技术原理"></textarea>
-            </div>
-
-            <!-- 嘉宾 (可多个) -->
-            <template v-for="(s, i) in speakers" :key="i">
-              <div v-if="s.role !== 'host'" class="spk-block">
-                <div class="spk-head">
-                  <span class="tag">🧑‍🔬 嘉宾 {{ guestSeq(s) + 1 }}</span>
-                  <button class="btn btn-ghost" style="padding:1px 8px; font-size:11px;"
-                          :disabled="guestCount <= 1" :title="guestCount <= 1 ? '至少保留一位嘉宾' : '移除该嘉宾'"
-                          @click="removeGuest(i)">✕</button>
-                </div>
-                <div class="spk-row">
-                  <input v-model="s.name" class="input" placeholder="姓名，如 张老师">
-                  <select v-model="s.voice_id" class="input" title="嘉宾音色">
-                    <option v-for="v in voices" :key="v.id" :value="v.id">{{ v.name }}</option>
-                  </select>
-                </div>
-                <textarea v-model="s.desc" class="textarea" rows="2" style="margin-top:6px; font-size:12.5px;"
-                          placeholder="人设 / 简介（生成对话稿时供大模型参考）：如 AI 研究员，专注语音合成，观点犀利、爱抬杠"></textarea>
-              </div>
-            </template>
-            <button class="btn btn-ghost" style="width:100%; margin-top:2px;" @click="addGuest">＋ 添加嘉宾</button>
-
-            <div class="field-col">
-              <label>语速 ×{{ pod.speed.toFixed(2) }}</label>
-              <input type="range" min="0.5" max="2" step="0.05" v-model.number="pod.speed">
-            </div>
-
-            <div style="margin-top:10px; border-top:1px solid var(--edge); padding-top:10px;">
-              <b style="font-size:13px;">④ 成品（非流式）</b>
-              <div style="margin-top:8px;">
-                <button class="btn btn-primary" style="width:100%;" @click="synthPod"
-                        :disabled="!pod.lines.length || pod.busyFinal || pod.busyStream"
-                        :title="pod.lines.length ? '' : '请先生成或载入对话稿'">
-                  <span v-if="pod.busyFinal" class="spinner spinner-light"></span>
-                  {{ pod.busyFinal ? `合成中 ${pod.progress}/${pod.lines.length}` : '▶ 合成播客成品' }}
-                </button>
-                <p class="hint" v-if="!pod.lines.length">请先生成 / 载入对话稿（合成时自动保存剧集）。</p>
-              </div>
-              <div v-if="podEpisode && podEpisode.status==='completed' && podEpisode.duration" style="margin-top:8px;">
-                <div class="muted small">时长 {{ podEpisode.duration.toFixed(1) }}s</div>
-                <div style="display:flex; gap:8px; margin-top:6px;">
-                  <button class="btn btn-ghost" @click="playPodcast">▶ 试听</button>
-                  <a class="btn btn-ghost" :href="`/api/podcast/episodes/${podEpisode.id}/audio`" download>⬇ 下载</a>
-                </div>
-              </div>
-              <p class="hint" v-if="pod.synthError">{{ pod.synthError }}</p>
-            </div>
-
-            <div style="margin-top:10px; border-top:1px solid var(--edge); padding-top:10px;">
-              <b style="font-size:13px;">📡 流式合成</b>
-              <div style="margin:6px 0; display:flex; align-items:center; gap:10px;">
-                <button class="toggle" :class="{on: pod.pushEnabled}" @click="pod.pushEnabled=!pod.pushEnabled">
-                  <span class="knob"></span>
-                </button>
-                <span class="muted small">{{ pod.pushEnabled ? '推流到流媒体服务器' : '不推流 · 本地播放（与合成工作台一致）' }}</span>
-              </div>
-
-              <template v-if="pod.pushEnabled">
-                <div style="margin:6px 0;">
-                  <span v-for="p in ['rtmp','srt','rtsp','hls']" :key="p" class="chip"
-                        :class="{active: pod.protocol===p}" @click="pod.protocol=p">{{ p.toUpperCase() }}</span>
-                </div>
-                <input v-if="pod.protocol!=='hls'" v-model="pod.pushUrl" class="input"
-                       :placeholder="pushUrlPlaceholder" style="font-family:Consolas; font-size:12px;">
-                <p class="hint" v-if="pod.protocol!=='hls'">RTMP / SRT / RTSP 需要一个接收端（如本机 docker 起一个 SRS，或直播平台的推流地址）；只在本机试听推荐用 HLS。</p>
-                <div class="muted small" v-if="pod.protocol==='hls'" style="margin-top:6px;">
-                  拉流地址（推流开始后）：<span class="kbd">{{ hlsUrl }}</span>
-                  <br>用 VLC / IINA 等支持 HLS 的播放器打开观看；浏览器地址栏直接打开只会显示文本。
-                </div>
-                <div style="margin-top:8px;">
-                  <button class="btn btn-primary" style="width:100%;" @click="startPush"
-                          :disabled="!pod.lines.length || pod.pushing">
-                    🔴 开始合成并推流
-                  </button>
-                  <button class="btn btn-danger" style="width:100%; margin-top:6px;" @click="stopPush()"
-                          v-if="pushStatus.status==='pushing'">⏹ 停止推流</button>
-                </div>
-                <div class="muted small" style="margin-top:6px;" v-if="pushStatus.status && (!podEpisode || pushStatus.episode_id===podEpisode.id)">
-                  <span class="badge" :class="pushStatus.status==='pushing' ? 'live' : (pushStatus.status==='completed' ? 'ok' : 'warn')">
-                    {{ pushStatusText }}
-                  </span>
-                  <span v-if="pushStatus.status==='pushing' && pushStatus.mode==='live'"> {{ pushStatus.lines_done }}/{{ pushStatus.lines_total }} 句</span>
-                  <span v-if="pushStatus.status==='pushing' && pushStatus.duration_s"> {{ fmt(pushStatus.elapsed_s) }} / {{ fmt(pushStatus.duration_s) }}（实时速率，预计 {{ fmt(pushStatus.duration_s - pushStatus.elapsed_s) }} 后推完）</span>
-                </div>
-                <p class="hint" v-if="!pod.ffmpeg">⚠️ 未检测到 ffmpeg，推流不可用（winget install Gyan.FFmpeg）</p>
-              </template>
-              <template v-else>
-                <button class="btn btn-primary" style="width:100%;" @click="synthPodStream"
-                        :disabled="!pod.lines.length || pod.busyFinal || pod.busyStream">
-                  <span v-if="pod.busyStream" class="spinner spinner-light"></span>
-                  {{ pod.busyStream ? `流式合成中 ${pod.progress}/${pod.lines.length}` : '▶ 流式合成并播放' }}
-                </button>
-                <p class="hint">逐句合成实时播放（2.5 秒预缓冲），完成后自动存为成品，可下载。</p>
-              </template>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ========== 系统状态 ========== -->
-      <section v-else class="view">
-        <h2 class="view-title">系统状态</h2>
-        <div class="grid-2">
-          <div class="card" v-for="m in health.models" :key="m.key">
-            <div class="card-head">
-              <span class="card-title">{{ m.label }}</span>
-              <span class="tag" :class="modelTagClass(m)">{{ modelTagText(m) }}</span>
-            </div>
-            <div class="status-meta">推理模式：{{ m.modes.map(modeName).join(' / ') }}</div>
-            <div class="status-meta">权重目录：{{ m.dir }}</div>
-            <div class="status-meta" v-if="m.backend === 'external'">运行环境：{{ m.runtime }}</div>
-            <div class="status-meta" v-if="m.stream_mode === 'buffered'">流式：整段生成后分块下发</div>
-            <p class="hint" v-if="!m.available">{{ m.install_hint || '权重未下载，可运行 scripts/download_models.py' }}</p>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-              <button class="btn" :class="m.loaded ? 'btn-ghost' : 'btn-primary'"
-                      :disabled="m.loaded || health.state==='loading'" @click="switchModel(m.key)">
-                {{ m.loaded ? '当前已加载' : '加载此模型' }}
-              </button>
-              <button class="btn btn-ghost" @click="checkModel(m.key)" :disabled="doctorBusy[m.key]">
-                {{ doctorBusy[m.key] ? '检测中…' : '环境自检' }}
-              </button>
-            </div>
-            <div v-if="doctorResult[m.key]" style="margin-top:8px;">
-              <div class="status-meta">权重：{{ doctorResult[m.key].weights ? '就绪' : '缺失 ' + (doctorResult[m.key].missing_files || []).join(', ') }}</div>
-              <div class="status-meta" v-if="doctorResult[m.key].dependencies">
-                推理依赖：{{ doctorResult[m.key].dependencies.ok ? '可导入' : doctorResult[m.key].dependencies.detail }}</div>
-              <div class="status-meta" v-if="doctorResult[m.key].repo">
-                index-tts 源码：{{ doctorResult[m.key].repo.ok ? '已找到' : doctorResult[m.key].repo.dir }}</div>
-              <div class="status-meta" v-if="doctorResult[m.key].error">{{ doctorResult[m.key].error }}</div>
-            </div>
-          </div>
-          <div class="card" v-if="health.gpu">
-            <div class="card-head"><span class="card-title">GPU</span></div>
-            <div class="status-meta">{{ health.gpu.name }}</div>
-            <div class="meter" v-if="health.gpu.vram_total_gb">
-              <div class="meter-fill" :style="{width: vramPct+'%'}"></div>
-            </div>
-            <div class="status-meta" v-if="health.gpu.vram_total_gb">
-              {{ health.gpu.vram_used_gb }} / {{ health.gpu.vram_total_gb }} GB（{{ vramPct }}%）
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-head"><span class="card-title">服务</span></div>
-            <div class="status-meta">推理队列：{{ health.queue_len }} / {{ health.queue_max }}</div>
-            <div class="status-meta">最近一次合成耗时：{{ health.last_infer_ms ? health.last_infer_ms+' ms' : '—' }}</div>
-            <div class="status-meta">克隆音色：{{ health.voices_count }} 个</div>
-            <div class="status-meta">输出采样率：{{ health.sample_rate || '—' }} Hz</div>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <!-- 右侧栏 (与左侧导航平级, 扁平化): 各视图的队列/记录 -->
-    <aside class="right-side" v-show="view==='workbench' || view==='podcast' || view==='voices'">
-      <!-- 任务队列: 工作台=TTS 任务 / 播客工坊=合成推流任务 -->
-      <section class="rs-group" v-if="view==='workbench' || view==='podcast'">
-        <div class="rs-head">
-          <span class="rs-title">任务队列</span>
-          <span class="rs-live" v-if="view==='workbench' ? ttsRunning : queueRunning">● {{ view==='workbench' ? ttsRunning : queueRunning }} 进行中</span>
-          <button class="rs-refresh" title="刷新" @click="view==='workbench' ? loadTasks() : pollPod(true)">⟳</button>
-        </div>
-        <!-- 工作台: TTS 任务 -->
-        <template v-if="view==='workbench'">
-          <div class="rs-list" v-if="tasks.length">
-            <div v-for="t in ttsQueue" :key="t.id" class="rs-item" @click="t.status==='ok' && playTask(t)"
-                 :title="t.status==='ok' ? '点击回放' : displayTaskText(t.text)">
-              <span class="st-dot" :class="ttsBadge(t.status).cls"></span>
-              <div class="q-main">
-                <div class="q-title">{{ displayTaskText(t.text).slice(0, 30) || '(空)' }}</div>
-                <div class="q-meta muted">{{ t.duration ? t.duration.toFixed(1)+'s' : (t.status==='running' ? '合成中…' : (t.error || '').slice(0, 36)) }} · {{ timeAgo(t.created_at) }}</div>
-              </div>
-              <span class="rs-act" v-if="t.status==='ok'">▶</span>
-            </div>
-          </div>
-          <div v-else class="rs-empty">暂无合成任务，去工作台合成第一条语音吧。</div>
-        </template>
-        <!-- 播客工坊: 合成/推流任务 -->
-        <template v-else>
-          <div class="rs-list" v-if="podQueue.length">
-            <div v-for="t in podQueue" :key="t.id" class="rs-item" @click="openQueueDetail(t)" :title="t.title">
-              <span class="st-dot" :class="queueBadge(t.status).cls"></span>
-              <div class="q-main">
-                <div class="q-title">{{ t.title }}</div>
-                <div class="q-meta muted">{{ queueTaskText(t) || '—' }} · {{ timeAgo(t.created_at) }}</div>
-                <div class="qbar" v-if="t.status==='synthesizing' && t.lines_count">
-                  <div class="qbar-fill" :style="{ width: Math.min(100, Math.round(100*(t.progress||0)/t.lines_count)) + '%' }"></div>
-                </div>
-                <div class="qbar" v-else-if="t.status==='pushing' && t.push && t.push.duration_s">
-                  <div class="qbar-fill" :style="{ width: Math.min(100, Math.round(100*(t.push.elapsed_s||0)/t.push.duration_s)) + '%' }"></div>
-                </div>
-              </div>
-              <span class="rs-act muted">›</span>
-            </div>
-          </div>
-          <div v-else class="rs-empty">暂无任务。开始合成后，这里会实时更新进度。</div>
-        </template>
-      </section>
-
-      <!-- 播客列表 (工作台 + 播客工坊) -->
-      <section class="rs-group rs-grow" v-if="view==='workbench' || view==='podcast'">
-        <div class="rs-head">
-          <span class="rs-title">播客列表</span>
-          <span class="rs-count">{{ episodes.length }}</span>
-          <button class="rs-refresh" title="刷新" @click="loadEpisodes">⟳</button>
-        </div>
-        <div class="rs-list" v-if="episodes.length">
-          <div v-for="e in episodes" :key="e.id" class="rs-item" @click="loadEpisode(e)" title="点击载入到播客编辑器">
-            <span class="st-dot" :class="queueBadge(e.status).cls"></span>
-            <div class="q-main">
-              <div class="q-title">{{ e.title }}</div>
-              <div class="q-meta muted">{{ e.lines_count }} 轮 · {{ e.duration ? e.duration.toFixed(1)+'s' : '—' }} · {{ timeAgo(e.created_at) }}</div>
-            </div>
-            <span class="ep-actions">
-              <button class="rs-btn" v-if="e.has_audio" @click.stop="downloadEpisode(e)" title="下载成品">⬇</button>
-              <button class="rs-btn" @click.stop="removeEpisode(e)" title="删除">🗑</button>
-            </span>
-          </div>
-        </div>
-        <div v-else class="rs-empty">暂无播客剧集。生成对话稿并保存后，会出现在这里。</div>
-      </section>
-
-      <!-- 音色提交记录 (音色库) -->
-      <section class="rs-group rs-grow" v-if="view==='voices'">
-        <div class="rs-head">
-          <span class="rs-title">音色提交记录</span>
-          <span class="rs-count">{{ voices.length }}</span>
-          <button class="rs-refresh" title="刷新" @click="loadVoices">⟳</button>
-        </div>
-        <div class="rs-list" v-if="voices.length">
-          <div v-for="v in voices" :key="v.id" class="rs-item" @click="previewVoice(v.id)" title="点击试听参考音频">
-            <span class="st-dot ok"></span>
-            <div class="q-main">
-              <div class="q-title">{{ v.name }}</div>
-              <div class="q-meta muted">参考 {{ v.duration.toFixed(1) }}s · {{ timeAgo(v.created_at) }}</div>
-            </div>
-            <span class="rs-act">▶</span>
-          </div>
-        </div>
-        <div v-else class="rs-empty">还没有音色提交记录。上传参考音频克隆后，这里会记录每次提交。</div>
-      </section>
-    </aside>
-  </div>
-
-  <!-- 全局播放器 -->
-  <div class="playerbar" :class="{ 'sidebar-on': view==='workbench' || view==='podcast' || view==='voices' }" v-if="player.active">
-    <button class="pb-btn" @click="togglePlay">{{ player.playing ? '⏸' : '▶' }}</button>
-    <canvas ref="waveCanvas" class="pb-wave"></canvas>
-    <div class="pb-info">
-      <div class="pb-title">{{ player.title }}</div>
-      <div class="pb-sub muted small">
-        <template v-if="player.streaming">流式播放中 · 已缓冲 {{ player.buffered.toFixed(1) }}s · 首包 {{ player.firstMs }}ms</template>
-        <template v-else>{{ fmt(player.position) }} / {{ fmt(player.duration) }}<span v-if="player.sampleRate"> · {{ player.sampleRate }} Hz</span></template>
-      </div>
+      <aside class="output" id="output-panel" aria-label="输出与播放">
+        <div class="out-head panel-caption"><svg class="ic sm" id="out-icon"><use href="#i-wave"/></svg><h3 id="out-title">本次结果</h3><span class="pill" id="out-pill">待生成</span><div style="flex:1"></div><button class="icon-btn" data-act="side-refresh" title="刷新"><svg class="ic sm"><use href="#i-refresh"/></svg></button></div>
+        <div id="out-body"></div>
+        <div class="out-section" id="out-recent"><h4><svg class="ic sm"><use href="#i-clock"/></svg>最近生成</h4><div id="recent-list"></div></div>
+        <div class="out-tip" id="out-tip">结果会自动保存到「作品库」。切换模型不会影响已生成的音频。</div>
+      </aside>
     </div>
-    <button class="pb-btn" @click="downloadTask(player.taskId)" title="下载 WAV">⬇</button>
-    <button class="pb-btn" @click="stopPlayer" title="关闭">✕</button>
-  </div>
-
-  <!-- LLM 配置模态框 -->
-  <div class="modal-mask" v-if="llmModal" @click.self="llmModal=false">
-    <div class="modal">
-      <div class="card-head">
-        <span class="card-title">⚙️ 大模型配置（OpenAI 兼容）</span>
-        <button class="btn btn-ghost" style="padding:2px 10px" @click="llmModal=false">✕</button>
-      </div>
-      <div class="field-col">
-        <label>API 地址（base_url）</label>
-        <input v-model="llmForm.base_url" class="input" placeholder="https://api.deepseek.com/v1">
-      </div>
-      <div class="field-col">
-        <label>API Key <span class="muted small" v-if="llmForm.api_key_masked">（已保存: {{ llmForm.api_key_masked }}，留空则不修改）</span></label>
-        <input v-model="llmForm.api_key" class="input" type="password" placeholder="sk-...">
-      </div>
-      <div class="field-col">
-        <label>模型名称</label>
-        <input v-model="llmForm.model" class="input" placeholder="deepseek-chat / qwen-plus / gpt-4o-mini …">
-      </div>
-      <div class="grid2" style="gap:10px;">
-        <div class="field-col">
-          <label>温度</label>
-          <input v-model.number="llmForm.temperature" class="input" type="number" min="0" max="2" step="0.1">
-        </div>
-        <div class="field-col">
-          <label>对话轮数偏好</label>
-          <select v-model="llmForm.rounds_hint" class="input">
-            <option>6~10</option><option selected>10~16</option><option>16~24</option>
-          </select>
-        </div>
-      </div>
-      <div class="field-col">
-        <label>对话稿风格指令</label>
-        <textarea v-model="llmForm.style_prompt" class="textarea" rows="3"></textarea>
-      </div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <button class="btn btn-primary" @click="saveLLMConfig">保存配置</button>
-        <button class="btn" @click="testLLM">测试连通</button>
-        <span class="muted small">{{ llmTestResult }}</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- 任务详情模态框 -->
-  <div class="modal-mask" v-if="queueModal && queueDetail" @click.self="queueModal=false">
-    <div class="modal">
-      <div class="card-head">
-        <span class="card-title">🗂 任务详情</span>
-        <button class="btn btn-ghost" style="padding:2px 10px" @click="queueModal=false">✕</button>
-      </div>
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
-        <span class="tag" :class="queueBadge(queueDetail.status).cls" style="font-size:13px; flex:none;">{{ queueBadge(queueDetail.status).text }}</span>
-        <b style="font-size:15px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ queueDetail.title }}</b>
-      </div>
-
-      <template v-if="queueDetail.status==='synthesizing'">
-        <div class="qbar" v-if="queueDetail.lines_count" style="margin:6px 0;">
-          <div class="qbar-fill" :style="{ width: Math.min(100, Math.round(100*(queueDetail.progress||0)/queueDetail.lines_count)) + '%' }"></div>
-        </div>
-        <div class="muted small">正在合成 {{ queueDetail.progress || 0 }} / {{ queueDetail.lines_count }} 句…（本页实时刷新，切走也不会中断）</div>
-      </template>
-
-      <template v-if="queueDetail.status==='pushing' && queueDetail.push">
-        <div class="status-meta">推流协议：{{ queueDetail.push.protocol.toUpperCase() }}
-          <span class="muted small">{{ queueDetail.push.mode==='live' ? '（实时合成推流）' : '（成品直推）' }}</span></div>
-        <div class="status-meta" v-if="queueDetail.push.url">推流地址：<span class="kbd">{{ queueDetail.push.url }}</span></div>
-        <div class="status-meta" v-if="queueDetail.push.duration_s">
-          已推送 {{ fmt(queueDetail.push.elapsed_s) }} / {{ fmt(queueDetail.push.duration_s) }}
-          <span v-if="queueDetail.push.mode==='live'"> · {{ queueDetail.push.lines_done }}/{{ queueDetail.push.lines_total }} 句</span>
-        </div>
-        <button class="btn btn-danger" style="margin-top:8px;" @click="stopPush(queueDetail.id)">⏹ 停止推流</button>
-      </template>
-
-      <p class="hint" v-if="queueDetail.status==='failed'" style="color: var(--warn);">{{ queueDetail.error || '合成失败' }}</p>
-
-      <template v-if="queueDetail.has_audio">
-        <div class="status-meta">成品时长：{{ queueDetail.duration ? queueDetail.duration.toFixed(1) + 's' : '—' }}</div>
-        <div style="display:flex; gap:8px; margin-top:8px;">
-          <button class="btn" @click="playEpisode(queueDetail)">▶ 试听</button>
-          <a class="btn" :href="`/api/podcast/episodes/${queueDetail.id}/audio`" download>⬇ 下载成品</a>
-        </div>
-      </template>
-
-      <div style="margin-top:14px; border-top:1px solid var(--edge); padding-top:10px;">
-        <div class="status-meta">来源：{{ {text:'粘贴文本', file:'上传文件', url:'网页 URL'}[queueDetail.source_type] || queueDetail.source_type }}
-          <span class="muted" v-if="queueDetail.source_ref">（{{ String(queueDetail.source_ref).slice(0, 60) }}）</span></div>
-        <div class="status-meta">对话稿：{{ queueDetail.lines_count || (queueDetail.script ? queueDetail.script.length : 0) }} 轮 · 语速 ×{{ queueDetail.speed }}</div>
-        <div class="status-meta">主持阵容：{{ speakersSummary(queueDetail) }}</div>
-        <div class="status-meta">创建时间：{{ queueDetail.created_at }}</div>
-      </div>
-
-      <div style="display:flex; gap:8px; margin-top:14px;">
-        <button class="btn btn-primary" @click="loadFromQueue(queueDetail)">✎ 载入编辑器</button>
-        <button class="btn btn-danger" @click="removeFromQueue(queueDetail)">🗑 删除剧集</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast -->
-  <div class="toasts" :class="{ 'sidebar-on': view==='workbench' || view==='podcast' || view==='voices' }">
-    <transition-group name="toast">
-      <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type">{{ t.text }}</div>
-    </transition-group>
   </div>
 </div>
-<script src="vendor/vue.global.prod.js"></script>
+
+<div class="modal-mask" id="llm-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="llm-title">
+    <h3 id="llm-title">大模型配置</h3>
+    <p class="msub">用于把内容源改写为多人对话稿；「直接朗读」不需要大模型。</p>
+    <div class="mfield"><label for="llm-base">服务地址 Base URL</label><input id="llm-base" placeholder="https://api.example.com/v1"></div>
+    <div class="mfield"><label for="llm-key">API Key</label><input id="llm-key" type="password" placeholder="留空表示不修改"></div>
+    <div class="mfield"><label for="llm-model">模型名称</label><input id="llm-model" placeholder="例如 deepseek-chat"></div>
+    <div class="mfield"><label for="llm-temp">温度 / 对话轮数提示</label><div style="display:flex;gap:8px"><input id="llm-temp" type="number" step="0.1" min="0" max="2" style="flex:1"><input id="llm-rounds" style="flex:1" placeholder="10~16"></div></div>
+    <div class="mfield"><label for="llm-style">风格提示词</label><textarea id="llm-style" rows="2" placeholder="例如：口语化、有来有回、每轮不超过 80 字"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="btn sec" data-act="pod-llm-test">测试连通</button><span style="flex:1"></span><button class="btn sec" data-act="pod-llm-close">取消</button><button class="btn" data-act="pod-llm-save">保存配置</button></div>
+    <p id="llm-test-result" style="font-size:12px;color:var(--ok);margin:10px 0 0"></p>
+  </div>
+</div>
+
+<div class="modal-mask" id="pod-detail-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pod-detail-title">
+    <div id="pod-detail-body"></div>
+  </div>
+</div>
+
+<div class="modal-mask" id="sys-settings-modal" hidden>
+  <div class="modal sys-settings" role="dialog" aria-modal="true" aria-labelledby="sys-settings-title">
+    <h3 id="sys-settings-title">权重目录与运行环境</h3>
+    <p class="msub">对应服务启动时的环境变量。保存到本地配置后重启服务生效；留空会沿用默认目录。</p>
+    <div id="sys-settings-body"></div>
+    <p class="sys-env-hint">落地说明：后端由 <code>COSYVOICE_MODELS_DIR</code> 与各模型 <code>*_DIR</code> 环境变量在启动时读取；界面配置需由服务端写入 <code>.env</code> 或新增 <code>/api/admin/config</code> 接口后重启。当前版本先保存在浏览器本地（localStorage）演示完整交互。</p>
+    <div class="ss-actions">
+      <button class="btn sec" data-act="sys-settings-reset">恢复默认</button><span style="flex:1"></span>
+      <button class="btn sec" data-act="sys-settings-close">取消</button>
+      <button class="btn" data-act="sys-settings-save">保存配置</button>
+    </div>
+  </div>
+</div>
+<div class="toast-stack" id="toasts" aria-live="polite"></div>
 <script src="app.js"></script>
 </body>
 </html>

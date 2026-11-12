@@ -83,7 +83,7 @@ button{cursor:pointer;border:none;background:none}
 .output{width:336px;flex:0 0 336px;border-left:1px solid var(--line);background:var(--surface);overflow-y:auto;padding:20px 20px 40px}
 .output[hidden]{display:none}
 .view[hidden]{display:none}
-.wb{max-width:880px;margin:0 auto}
+.wb{width:100%}
 
 /* 通用组件 */
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow-sm);padding:20px 22px;margin-bottom:18px}
@@ -160,14 +160,14 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 .kbd{font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace;padding:2px 6px;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;color:var(--text-3)}
 .notice{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-ctl);background:var(--primary-soft);color:var(--primary);font-size:12px;line-height:1.55;margin-bottom:16px}
 .notice .ic{flex:none;margin-top:2px}
-.notice.warn{background:var(--warn-soft);color:var(--warn)}
+.notice.warn{background:var(--surface-2);color:var(--text-2);border-left:3px solid var(--warn)}
 
 /* 输出面板 */
 .out-head{display:flex;align-items:center;gap:8px;margin-bottom:16px}
 .out-head h3{margin:0;font-size:14px;font-weight:650}
 .pill{font-size:11px;padding:2px 9px;border-radius:var(--r-pill);background:var(--surface-3);color:var(--text-2);font-weight:600}
 .pill.ok{background:var(--ok-soft);color:var(--ok)}
-.pill.busy{background:var(--warn-soft);color:var(--warn)}
+.pill.busy{background:var(--primary-soft);color:var(--primary)}
 .out-empty{text-align:center;padding:34px 12px 30px;border:1px dashed var(--line-2);border-radius:14px;background:var(--surface-2)}
 .out-empty .wave-static{display:flex;align-items:center;justify-content:center;gap:3px;height:44px;margin-bottom:14px}
 .out-empty .wave-static i{display:block;width:3px;border-radius:3px;background:var(--line-2);height:var(--h)}
@@ -201,16 +201,16 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 .progress-fill{height:100%;width:0;background:var(--primary);border-radius:5px;transition:width .3s linear}
 
 /* 其它视图 */
-.view-head{display:flex;align-items:flex-end;gap:14px;margin-bottom:20px;max-width:1100px;margin-left:auto;margin-right:auto}
+.view-head{display:flex;align-items:flex-end;gap:14px;margin-bottom:20px}
 .view-head h2{margin:0;font-size:21px;font-weight:700;letter-spacing:.2px}
 .view-head p{margin:2px 0 0;font-size:12px;color:var(--text-3)}
 .view-head .spacer{flex:1}
-.stat-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px;max-width:1100px;margin-left:auto;margin-right:auto}
+.stat-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 17px}
 .stat .k{font-size:11px;color:var(--text-3)}
 .stat .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.35}
 .stat .v small{font-size:12px;font-weight:500;color:var(--text-3)}
-.wrap{max-width:1100px;margin:0 auto}
+.wrap{width:100%}
 .list{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;box-shadow:var(--shadow-sm)}
 .list-row{display:flex;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid var(--line);min-height:64px}
 .list-row:last-child{border-bottom:none}
@@ -403,16 +403,303 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 .og-head{padding-bottom:9px;margin-bottom:10px;border-bottom:1px solid var(--line)}
 .og-count{background:var(--surface-3);padding:1px 8px;border-radius:999px}
 .task-row,.ep-row{padding:10px;border-radius:11px;margin-bottom:3px;transition:background .16s var(--ease)}
-.task-row.st-live,.ep-row.st-live{background:var(--warn-soft)}
-.task-row.st-err,.ep-row.st-err{background:var(--danger-soft)}
-.tag.ok{background:var(--ok-soft);color:var(--ok)}
-.tag.warn,.tag.live{background:var(--warn-soft);color:var(--warn)}
-.tag.err{background:var(--danger-soft);color:var(--danger)}
+/* 状态色规则已统一迁移到 v1.6 段（避免暖色告警墙），此处不再重复定义 */
 .times,.range-val,.og-count,.task-row .tm span,.ep-row .em span,.stat .v,.llm-strip .lm{font-variant-numeric:tabular-nums}
 .modal{border-radius:20px;padding:24px}
 .modal .detail-grid{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0}
 @media(max-width:1180px){.pod-grid3{grid-template-columns:1fr 1fr}#pod-cast-col{grid-column:1/-1}}
 @media(max-width:720px){.pod-grid3{grid-template-columns:1fr}#pod-cast-col{grid-column:auto}.pcol{padding:16px}.pcol-sub{padding-left:0}.dlg-list{margin-left:8px;padding-left:12px}.out-zone{padding:16px}.out-tabs{overflow-x:auto}.out-tabs button{white-space:nowrap}}
+/* ===== v1.4 全局框架：左右侧栏等高、同风格 ===== */
+.app{flex-direction:column}
+.topbar{width:100%;flex:0 0 64px;padding:0 20px;gap:14px}
+.top-brand{display:flex;align-items:center;gap:10px;width:216px;flex:none;padding-right:16px}
+.top-brand .brand-name{font-size:14px}
+.top-divider{width:1px;height:26px;background:var(--line);flex:none}
+.frame{display:flex;flex:1;min-height:0;width:100%}
+.workspace{flex:1;min-width:0;min-height:0}
+.panel-caption{display:flex;align-items:center;gap:8px;padding:0 4px 12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.panel-caption h3{margin:0;font-size:13px;font-weight:650;letter-spacing:.1px}
+.panel-caption .ic{color:var(--primary)}
+.cap-meta{margin-left:auto;font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.sidebar .nav-label{padding:0 12px 6px;margin-top:10px}
+.sidebar .nav a{min-height:44px}
+.out-head{gap:8px;margin-bottom:12px;padding:0 4px 12px;border-bottom:1px solid var(--line)}
+.out-head h3{font-size:13px}
+.side-foot,.out-tip{border-top:1px solid var(--line);padding-top:14px;font-size:11px;color:var(--text-3)}
+.out-tip{margin-top:18px;line-height:1.6}
+@media(min-width:721px){.sidebar{width:240px;flex:0 0 240px;height:auto;position:static;padding:18px 12px 16px}}
+@media(min-width:1001px){.output{width:320px;flex:0 0 320px;padding:18px 16px 32px}.top-brand{width:216px}}
+@media(max-width:1000px){.top-brand{width:auto;padding-right:0}.top-divider{display:none}}
+@media(max-width:720px){.frame{padding-bottom:62px}.topbar{flex:0 0 58px;padding:0 12px;gap:8px}.top-brand{width:auto;padding-right:2px}.top-brand .brand-name,.top-brand .brand-sub{display:none}.top-brand .brand-mark{width:30px;height:30px;border-radius:9px}.sidebar .panel-caption{display:none}}
+/* ===== v1.5 内容区铺满：去掉居中留白，宽高都撑满 ===== */
+.content{padding:20px 22px 24px;display:flex;flex-direction:column}
+.content>.view{flex:1;min-height:0;display:flex;flex-direction:column}
+.content>.view[hidden]{display:none}
+.wb,.wrap,.view-head,.stat-row{max-width:none;width:100%;margin-left:0;margin-right:0}
+.wb{flex:1;display:flex;flex-direction:column}
+#wb-text-panel{flex:1;display:flex;flex-direction:column;min-height:230px}
+#wb-text-panel .textarea{flex:1;min-height:180px}
+.wb>details.adv,.wb>.actionbar,.view-head,.pod-stepper{flex:0 0 auto}
+.wrap{flex:1;display:flex;flex-direction:column;min-height:0}
+.pod-grid3{flex:1.35;min-height:0;align-items:stretch}
+.pod-grid3>.pcol{display:flex;flex-direction:column;min-height:0}
+.dlg-list{flex:1;min-height:160px;max-height:none;overflow-y:auto}
+.out-zone{flex:1;min-height:230px;display:flex;flex-direction:column}
+.list,.model-cards,.voice-grid{flex:1}
+@media(max-width:1000px){.dlg-list{max-height:60vh}#wb-text-panel .textarea{min-height:150px}.pod-grid3{flex:none}.out-zone{flex:none}}
+@media(max-width:720px){.content{padding:14px 12px 20px}.wb,.wrap{display:block}.content>.view{display:block}#wb-text-panel{display:block}#wb-text-panel .textarea{min-height:150px}.pod-grid3,.out-zone{display:block}.dlg-list{max-height:52vh}.list,.model-cards,.voice-grid{flex:none}}
+/* ===== v1.5 修正：消除纵向溢出与三栏列宽失衡 ===== */
+.wb{min-height:0}
+#wb-text-panel{min-height:0}
+#wb-text-panel .textarea{min-height:120px}
+.actionbar{position:static}
+.pod-grid3{grid-template-columns:minmax(0,1.02fr) minmax(0,1.18fr) minmax(0,.84fr);flex:1.7}
+.pod-grid3>.pcol{min-width:0}
+.pod-grid3 .textarea,.pod-grid3 .input,.pod-grid3 select,.pod-grid3 .llm-strip .lm{min-width:0;max-width:100%}
+.spk-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.dlg-list{min-height:0}
+.out-zone{flex:1;min-height:200px}
+@media(min-width:1001px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:1000px){.pod-grid3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* ===== v1.5 二次修正：三栏内部滚动，内容不再溢出卡片 ===== */
+.pod-grid3{flex:2}
+.pod-grid3>.pcol{min-width:0;overflow-y:auto;overflow-x:hidden}
+.dlg-list{flex:0 0 auto;overflow:visible;min-height:0;max-height:none}
+.out-zone{min-height:180px}
+/* ===== v1.5 三次修正：成稿按钮常驻底部，三栏比例再平衡 ===== */
+#pod-source{overflow:hidden}
+#pod-source .src-scroll{flex:1;min-height:0;overflow-y:auto;padding-right:2px;scrollbar-width:thin}
+#pod-source .src-actions{flex:0 0 auto;margin-top:8px;gap:6px}
+#pod-source .src-actions .btn{min-height:38px}
+#pod-source .textarea{height:110px;min-height:110px}
+.pod-grid3{flex:3}
+.out-zone{min-height:150px;overflow-y:auto}
+.spk-card{margin-bottom:8px}
+.pod-grid3>.pcol{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+/* ===== v1.5 收尾：成品区按钮完整可见 ===== */
+.pod-grid3{flex:2.6}
+.out-zone{min-height:185px;padding:14px 20px}
+.out-zone .pcol-head{margin-bottom:2px}
+.out-zone .out-tabs{margin-bottom:10px}
+.out-zone .out-tabs button{padding:6px 14px;min-height:34px}
+.out-zone .result-card{padding:12px}
+.out-zone .wave{height:36px}
+.out-zone .times{margin-bottom:6px}
+/* ===== v1.6 右侧面板配色重构：语义色降噪，回归单色系 ===== */
+/* 诊断：进行中/推流中被涂成警告黄、失败整行铺淡红、彩色标签+彩色圆点叠加，
+   形成「告警墙」；而全站只有蓝紫主色 + 中性灰 + 少量青绿。
+   重设计：① 语义归位（进行中=主色活动态，不是警告；完成=安静中性；失败=唯一警示）
+           ② 色彩面积收敛到 <5%（整行底色 → 3px 竖条 + 7px 圆点）
+           ③ 容器去「框中框」，与左栏/内容卡片同一套扁平语言            */
+.out-group{border:none;background:transparent;border-radius:0;padding:0;margin-bottom:18px}
+.og-head{padding:0 4px 8px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+.og-title{font-size:12px;font-weight:650;color:var(--text-2);letter-spacing:.2px}
+.og-count{background:var(--surface-3);color:var(--text-2);padding:1px 7px;font-weight:600}
+.og-live{font-size:11px;font-weight:650;color:var(--primary);background:var(--primary-soft);padding:2px 9px;border-radius:999px;letter-spacing:.1px}
+/* 行：统一中性，左侧语义竖条代替整行铺色 */
+.task-row,.ep-row{position:relative;background:transparent;border-radius:9px;padding:9px 10px 9px 14px;margin-bottom:2px;transition:background .16s var(--ease)}
+.task-row:hover,.ep-row:hover{background:var(--surface-2)}
+.task-row::before,.ep-row::before{content:'';position:absolute;left:4px;top:13px;bottom:13px;width:3px;border-radius:3px;background:transparent}
+.task-row.st-live::before,.ep-row.st-live::before{background:var(--primary)}
+.task-row.st-err::before,.ep-row.st-err::before{background:var(--danger)}
+.task-row.st-live,.ep-row.st-live,.task-row.st-err,.ep-row.st-err{background:transparent}
+.task-row.st-live:hover,.ep-row.st-live:hover,.task-row.st-err:hover,.ep-row.st-err:hover{background:var(--surface-2)}
+.task-row.st-live .tm b,.ep-row.st-live .em b{color:var(--primary)}
+/* 标签：一律中性胶囊，语义交给圆点与文字，不再四种底色 */
+.tag.ok,.tag.warn,.tag.live,.tag.err{background:var(--surface-3);color:var(--text-2);font-weight:600;border:1px solid var(--line);padding:2px 9px}
+.tag.err{color:var(--danger);border-color:var(--line)}
+.tag-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--text-3)}
+.tag.live .tag-dot{background:var(--primary)}
+.tag.acc .tag-dot{background:var(--accent)}
+.tag.ok .tag-dot{background:var(--text-3)}
+.tag.err .tag-dot{background:var(--danger)}
+/* 圆点：缩小 + 语义色环，消除实心高饱和色块 */
+.task-row .dot,.ep-row .dot{width:7px;height:7px;box-shadow:0 0 0 2px var(--surface-3);margin-top:6px;flex:none}
+.task-row.st-live .dot,.ep-row.st-live .dot{box-shadow:0 0 0 2px var(--primary-soft)}
+.task-row.st-err .dot,.ep-row.st-err .dot{box-shadow:0 0 0 2px var(--danger-soft)}
+/* 进度条、顶部计数同归主色系 */
+.qbar{height:3px;background:var(--surface-3)}
+.qbar-fill{background:var(--primary);opacity:.9}
+.pill.busy{background:var(--primary-soft);color:var(--primary)}
+/* 详情面板失败提示：中性底 + 左侧红条，不用整块暖色 */
+#pod-detail-body .notice.warn{border-left-color:var(--danger)}
+/* ===== v1.7 内容源：编辑区撑满 + 大模型配置归位到底部 ===== */
+/* 诊断：.src-scroll 仅 98px 却塞了 220px 内容 → 文本域被裁一半、配置条需滚动才可见。
+   重排：编辑区吃掉全部剩余高度；两个成稿按钮并排压缩；大模型配置从输入区内部
+   移到卡片最底部（次要设置，只服务「大模型改写」路径），顶部重复入口一并收拢。 */
+#pod-source .src-scroll{display:flex;flex-direction:column;overflow:hidden}
+#pod-source .src-tabs{flex:0 0 auto;margin-bottom:8px}
+#pod-source .src-tabs button{min-height:30px;padding:5px 8px}
+/* 关键：min-height 归零让编辑区按 flex 剩余高度收缩，不再顶出滚动区与按钮重叠 */
+#pod-source .textarea{flex:1;height:auto;min-height:0;resize:none}
+#pod-source .dropzone{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center}
+/* 副标题并入 placeholder，把这一行的高度让给编辑区 */
+#pod-source .pcol-sub{display:none}
+#pod-source .src-actions{flex-direction:row;gap:8px;margin-top:8px}
+#pod-source .src-actions .btn{flex:1;min-width:0;min-height:36px;padding:6px 8px;font-size:12px;white-space:nowrap}
+#pod-source .src-actions .btn .ic{width:14px;height:14px}
+/* 配置条：底部扁平 footer，用分隔线而非卡片框 */
+#pod-source .llm-strip{margin-top:7px;padding:7px 0 0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent}
+#pod-source .llm-strip .lm b{color:var(--text-2)}
+#pod-source .llm-strip .chip{min-height:24px;padding:1px 9px;font-size:11px}
+#pod-source>p.chip-label{margin-top:5px;font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pod-source .notice.warn{margin-top:6px;padding:7px 11px}
+/* 成品区沿用 v1.5 验证过的 185px 安全高度，保证三个按钮与波形完整可见 */
+@media(max-width:720px){#pod-source .src-actions{flex-direction:column}#pod-source .textarea{min-height:150px}}
+/* ===== v1.8 音色库：按原实现 1:1 补齐能力，只重组结构 ===== */
+.vlib-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:18px 20px 20px;box-shadow:var(--shadow-sm);margin-bottom:20px}
+.vlib-cap{display:flex;align-items:center;gap:9px;padding:0 2px 12px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+.vlib-cap h3{margin:0;font-size:13px;font-weight:650}
+.vlib-cap .spacer{flex:1}
+.vlib-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:18px}
+.vlib-drop{position:relative;border:1.5px dashed var(--line-2);border-radius:14px;background:var(--surface-2);min-height:208px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px;text-align:center;cursor:pointer;transition:border-color .16s var(--ease),background .16s var(--ease)}
+.vlib-drop:hover,.vlib-drop.drag{border-color:var(--primary);background:var(--primary-soft)}
+.vlib-drop.invalid{border-color:var(--danger)}
+.vlib-drop .dz-icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:var(--primary-soft);color:var(--primary);margin-bottom:4px}
+.vlib-drop .dz-title{font-size:13px;font-weight:650}
+.vlib-drop .dz-hint{font-size:11px;color:var(--text-3);line-height:1.55}
+.vlib-file{width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-top:8px}
+.vlib-file b{display:block;font-size:12px;word-break:break-all}
+.vlib-file span{font-size:11px;color:var(--text-3)}
+.vlib-file .ok{color:var(--primary);font-weight:650}
+.vlib-file .bad{color:var(--danger);font-weight:650}
+.vlib-wave{display:flex;align-items:center;gap:2px;height:26px;margin-top:8px}
+.vlib-wave i{flex:1;background:var(--primary);opacity:.4;border-radius:2px;height:var(--h)}
+.vlib-form{display:flex;flex-direction:column;gap:10px}
+.vlib-form .vfield label{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px}
+.vlib-form .vfield label .req{color:var(--danger);margin-left:2px}
+.vlib-form .input,.vlib-form .textarea{width:100%}
+.vlib-form .textarea{min-height:88px;resize:vertical}
+.vlib-form .hint{font-size:11px;color:var(--text-3);line-height:1.5;margin:0}
+.vlib-err{background:var(--surface-2);border-left:3px solid var(--danger);border-radius:0 9px 9px 0;padding:8px 11px;font-size:11px;color:var(--text-2);line-height:1.5}
+.vlib-save{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px}
+.vlib-save .btn{min-height:40px}
+.vlib-save .why{font-size:11px;color:var(--text-3)}
+.vlib-list-head{display:flex;align-items:center;gap:10px;margin:0 2px 12px}
+.vlib-list-head h3{margin:0;font-size:13px;font-weight:650}
+.vlib-list-head .spacer{flex:1}
+.voice-grid{align-content:start;grid-auto-rows:max-content}
+.vcard .vc-top{align-items:flex-start}
+.vcard .vc-top>span:nth-child(2){flex:1;min-width:0}
+.vcard .vc-name,.vcard .vc-meta{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vcard .vc-badge{margin-left:auto;flex:none}
+.vcard .vc-prompt{font-size:12px;color:var(--text-2);line-height:1.6;margin:8px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:38px}
+.vcard .mini-wave{margin:9px 0 4px;height:20px}
+.vcard .vc-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.vcard .vc-actions .btn{min-height:30px;padding:4px 9px;font-size:11px;flex:1;min-width:0;justify-content:center;white-space:nowrap}
+.vcard .vc-actions .btn.danger{color:var(--danger)}
+.vcard .vc-date{font-size:11px;color:var(--text-3);margin-top:9px;padding-top:8px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.vcard .vc-edit{display:flex;flex-direction:column;gap:8px}
+.vcard .vc-edit label{font-size:11px;font-weight:600;color:var(--text-2)}
+.vcard .vc-edit .textarea{min-height:70px}
+.vlib-empty{grid-column:1/-1;padding:34px 16px;text-align:center;border:1px dashed var(--line-2);border-radius:14px;background:var(--surface-2);color:var(--text-3);font-size:12px}
+/* 右侧「音色提交记录」分组，复用任务队列的单色系行样式 */
+.vside-row{display:flex;align-items:center;gap:9px;padding:9px 8px;border-radius:9px;cursor:pointer}
+.vside-row:hover{background:var(--surface-2)}
+.vside-row .dot{width:7px;height:7px;box-shadow:0 0 0 2px var(--primary-soft);background:var(--primary)}
+.vside-row .vm{flex:1;min-width:0}
+.vside-row .vm b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vside-row .vm span{font-size:11px;color:var(--text-3)}
+@media(max-width:1180px){.vlib-grid{grid-template-columns:1fr}.vlib-drop{min-height:160px}}
+@media(max-width:720px){.voice-grid{grid-template-columns:1fr}.vlib-cap{flex-wrap:wrap}.vcard .vc-actions .btn{flex:1 1 45%}}
+/* ── 05G 系统状态：模型元信息 / 逐卡自检 / GPU / 服务 ── */
+.model-cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.mcard{padding:10px 12px;display:flex;flex-direction:column;min-width:0}
+.mcard .mc-top{margin-bottom:5px;gap:7px}
+.mcard .mc-name{font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mcard .mc-note{font-size:10.5px;margin-bottom:6px;line-height:1.4}
+.mcard .mc-foot{margin-top:auto;flex-wrap:wrap;gap:6px;padding-top:7px;border-top:1px solid var(--line)}
+.view[data-view="system"]{overflow-y:auto}
+.view[data-view="system"] .model-cards{flex:0 0 auto;align-content:start}
+.sys-footnote{margin-top:auto;padding-top:14px;border-top:1px solid var(--line);font-size:11px;line-height:1.65;color:var(--text-3)}
+.mcard .mc-foot .btn{flex:1 1 auto;min-width:0;font-size:11px;padding:4px 8px;min-height:28px}
+.sys-kv{display:flex;gap:5px;font-size:10.5px;line-height:1.45;color:var(--text-3);min-width:0}
+.sys-kv .k{flex:none}
+.sys-kv .v{flex:1;min-width:0;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sys-kv .v.open{white-space:normal;word-break:break-all;overflow:visible}
+.sys-kv .v.link{cursor:pointer}
+.sys-kv .v.link:hover{color:var(--primary)}
+.sys-hint{margin-top:7px;padding:6px 8px;border-radius:0 8px 8px 0;border-left:2px solid var(--warn);background:var(--surface-2);font-size:10.5px;line-height:1.5;color:var(--text-2)}
+.sys-doct{margin-top:8px;padding:8px 9px;border-radius:9px;background:var(--surface-2);border-left:2px solid var(--primary);font-size:10.5px;line-height:1.55}
+.sys-doct .r{display:flex;gap:6px;color:var(--text-2)}
+.sys-doct .r .lb{flex:none;color:var(--text-3)}
+.sys-doct .ok{color:var(--ok)}
+.sys-doct .bad{color:var(--danger)}
+/* 概览卡合并 GPU / 服务信息后：主指标 + 两行明细，四项各只出现一次 */
+.stat .s-model{font-size:11px;line-height:1.45;color:var(--text-2);margin:5px 0 6px;word-break:break-word}
+.stat .s-mid{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.4;color:var(--text-2)}
+.stat .s-mid small{font-size:11px;font-weight:500;color:var(--text-3)}
+.stat .s-kv{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;color:var(--text-3);padding:2px 0;min-width:0}
+.stat .s-kv span{white-space:nowrap}
+.stat .s-kv b{color:var(--text-2);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat .bar-track{margin-top:7px}
+/* 左下红框：侧栏「系统信息」速览，沿用 panel-caption 的分隔线语言 */
+.sys-cap{display:flex;align-items:center;gap:7px;padding:0 12px 8px;font-size:11px;font-weight:650;color:var(--text-2);letter-spacing:.02em}
+.sys-cap .ic{color:var(--primary);width:13px;height:13px}
+.sys-mini{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;padding:2px 12px 8px}
+.sys-mini div{font-size:10.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sys-mini b{color:var(--text-2);font-weight:600;font-variant-numeric:tabular-nums}
+.sys-mini .full{grid-column:1/-1}
+.spin{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:1180px){.model-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.model-cards{grid-template-columns:1fr}.sys-mini{grid-template-columns:1fr}}
+/* ── 05G-2 概览加底色 + 字号层级重排，与下方模型网格明确分层 ── */
+.view[data-view="system"] .sys-overview{background:var(--primary-soft);border:1px solid var(--line);border-radius:16px;padding:11px 12px 13px;margin-bottom:16px;flex:0 0 auto}
+.sys-overview-head{display:flex;align-items:center;gap:8px;padding:0 3px 9px;font-size:12px;font-weight:650;color:var(--text-2)}
+.sys-overview-head .ic{width:14px;height:14px;color:var(--primary)}
+.sys-overview-head .spacer{flex:1}
+.sys-overview-head .ov-note{font-size:11px;font-weight:400;color:var(--text-3)}
+.view[data-view="system"] #sys-stats{margin-bottom:0;gap:10px}
+.view[data-view="system"] #sys-stats .stat{background:var(--surface);border-color:transparent;box-shadow:var(--shadow-sm);padding:11px 14px}
+.view[data-view="system"] #sys-stats .k{font-size:12px;font-weight:600;color:var(--text-2)}
+.view[data-view="system"] #sys-stats .v{font-size:23px}
+.view[data-view="system"] #sys-stats .v small{font-size:12px}
+.stat .s-model{font-size:12px;line-height:1.45;margin:4px 0 5px}
+.stat .s-mid{font-size:16px}
+.stat .s-mid small{font-size:11.5px}
+.stat .s-kv{font-size:11.5px;padding:2px 0}
+.stat .s-kv b{font-size:11.5px}
+/* 模型卡：取消拉伸留白，正文放大到可读尺寸 */
+.view[data-view="system"] .mcard{padding:13px 14px}
+.view[data-view="system"] .mcard .mc-name{font-size:13px}
+.view[data-view="system"] .mcard .tag{font-size:11px}
+.view[data-view="system"] .mcard .mc-note{font-size:11.5px;line-height:1.5;margin-bottom:8px}
+.view[data-view="system"] .sys-kv{font-size:11.5px;line-height:1.55}
+.view[data-view="system"] .mcard .mc-foot .btn{font-size:12px;padding:5px 9px;min-height:30px}
+.view[data-view="system"] .sys-hint,.view[data-view="system"] .sys-doct{font-size:11.5px}
+@media(max-width:1180px){.view[data-view="system"] .sys-overview .stat-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.view[data-view="system"] .sys-overview .stat-row{grid-template-columns:1fr}.sys-overview-head .ov-note{display:none}}
+/* ── 05H 权重目录设置弹窗 ── */
+.sys-settings{width:min(720px,100%)}
+.ss-section{margin-bottom:14px}
+.ss-section h4{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:12px;font-weight:650;color:var(--text-2)}
+.ss-section h4 span{font-size:11px;font-weight:400;color:var(--text-3)}
+.ss-row{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:7px}
+.ss-row.focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.ss-head{display:flex;align-items:center;gap:8px;margin-bottom:5px;min-width:0}
+.ss-head b{font-size:11.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ss-env{flex:none;font-size:10px;color:var(--text-3);background:var(--surface-3);border-radius:5px;padding:1px 6px;font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
+.ss-head .spacer{flex:1}
+.ss-path{width:100%;font-size:11.5px;font-family:ui-monospace,Consolas,monospace;padding:6px 9px;min-height:30px}
+.sys-env-hint{margin:12px 0 0;padding-top:10px;border-top:1px solid var(--line);font-size:11px;line-height:1.6;color:var(--text-3)}
+.sys-env-hint code{font-size:10.5px;background:var(--surface-3);padding:1px 4px;border-radius:4px}
+.mcard .sys-kv .ss-edit{flex:none;width:18px;height:18px;border:0;background:transparent;color:var(--text-3);cursor:pointer;padding:0;display:grid;place-items:center;border-radius:5px}
+.mcard .sys-kv .ss-edit:hover{color:var(--primary);background:var(--primary-soft)}
+.mcard .sys-kv .ss-edit .ic{width:12px;height:12px}
+.ss-section.models,.ss-section.envs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.ss-section.models h4,.ss-section.envs h4{grid-column:1/-1;margin-bottom:0}
+.ss-section.models .ss-row,.ss-section.envs .ss-row{margin-bottom:0}
+.ss-row{padding:5px 8px}
+.ss-head{margin-bottom:2px}
+.ss-env{max-width:148px;overflow:hidden;text-overflow:ellipsis}
+.ss-path{min-height:26px;padding:4px 8px;font-size:11px}
+.sys-settings{display:flex;flex-direction:column;max-height:90vh;padding-bottom:0}
+.sys-settings>h3,.sys-settings>.msub,.sys-settings>.ss-actions,.sys-settings>.sys-env-hint{flex:none}
+#sys-settings-body{flex:1;min-height:0;overflow-y:auto;padding-right:6px}
+.ss-actions{display:flex;gap:8px;flex-wrap:wrap;background:var(--surface);padding:12px 0 16px;border-top:1px solid var(--line);margin-top:10px}
+.sys-env-hint{padding-bottom:4px}
+@media(max-width:720px){.sys-settings{width:100%}.ss-env{display:none}.ss-section.models,.ss-section.envs{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -443,43 +730,46 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 </svg>
 
 <div class="app">
-  <aside class="sidebar">
-    <div class="brand">
+  <header class="topbar">
+    <div class="top-brand">
       <div class="brand-mark"><svg class="ic lg"><use href="#i-wave"/></svg></div>
       <div><div class="brand-name">Voice Studio</div><div class="brand-sub">语音创作控制台</div></div>
     </div>
-    <div class="nav-label">创作</div>
-    <nav class="nav" id="nav-primary" aria-label="主导航">
-      <a data-act="view" data-key="workbench" class="active"><svg class="ic"><use href="#i-home"/></svg>创作台</a>
-      <a data-act="view" data-key="podcast"><svg class="ic"><use href="#i-pod"/></svg>播客工坊</a>
-      <a data-act="view" data-key="voices"><svg class="ic"><use href="#i-mic"/></svg>我的音色</a>
-      <a data-act="view" data-key="library"><svg class="ic"><use href="#i-lib"/></svg>作品库<span class="nav-badge" id="nav-count">4</span></a>
-    </nav>
-    <div class="nav-label">管理</div>
-    <nav class="nav" aria-label="次级导航">
-      <a data-act="view" data-key="system"><svg class="ic"><use href="#i-set"/></svg>系统状态</a>
-    </nav>
-    <div class="side-foot">
-      <div class="status-line"><span class="dot"></span><span>服务就绪 · 7 个模型可用</span></div>
-      <div class="side-note">GPU 显存与队列详情见「系统状态」</div>
+    <div class="top-divider"></div>
+    <h1 class="page-title" id="page-title">创作台</h1>
+    <span class="page-sub" id="page-sub">把文字变成声音</span>
+    <div class="top-spacer"></div>
+    <div class="model-wrap">
+      <button class="model-btn" id="model-btn" data-act="toggle-menu" aria-haspopup="listbox" aria-expanded="false">
+        <span class="dot"></span><span class="lbl">当前模型</span><span class="val" id="model-name">CosyVoice 3.0</span>
+        <svg class="ic"><use href="#i-chev"/></svg>
+      </button>
+      <div class="menu" id="model-menu" role="listbox" hidden></div>
     </div>
-  </aside>
+    <button class="icon-btn" data-act="theme" title="切换明暗主题" aria-label="切换明暗主题"><svg class="ic" id="theme-icon"><use href="#i-moon"/></svg></button>
+    <button class="icon-btn" data-act="help" title="快捷键说明" aria-label="快捷键说明"><svg class="ic"><use href="#i-info"/></svg></button>
+  </header>
 
-  <div class="shell">
-    <header class="topbar">
-      <h1 class="page-title" id="page-title">创作台</h1>
-      <span class="page-sub" id="page-sub">把文字变成声音</span>
-      <div class="top-spacer"></div>
-      <div class="model-wrap">
-        <button class="model-btn" id="model-btn" data-act="toggle-menu" aria-haspopup="listbox" aria-expanded="false">
-          <span class="dot"></span><span class="lbl">当前模型</span><span class="val" id="model-name">CosyVoice 3.0</span>
-          <svg class="ic"><use href="#i-chev"/></svg>
-        </button>
-        <div class="menu" id="model-menu" role="listbox" hidden></div>
+  <div class="frame">
+    <aside class="sidebar">
+      <div class="panel-caption"><svg class="ic sm"><use href="#i-wave"/></svg><h3>工作区</h3><span class="cap-meta">5 个视图</span></div>
+      <div class="nav-label">创作</div>
+      <nav class="nav" id="nav-primary" aria-label="主导航">
+        <a data-act="view" data-key="workbench" class="active"><svg class="ic"><use href="#i-home"/></svg>创作台</a>
+        <a data-act="view" data-key="podcast"><svg class="ic"><use href="#i-pod"/></svg>播客工坊</a>
+        <a data-act="view" data-key="voices"><svg class="ic"><use href="#i-mic"/></svg>我的音色</a>
+        <a data-act="view" data-key="library"><svg class="ic"><use href="#i-lib"/></svg>作品库<span class="nav-badge" id="nav-count">4</span></a>
+      </nav>
+      <div class="nav-label">管理</div>
+      <nav class="nav" aria-label="次级导航">
+        <a data-act="view" data-key="system"><svg class="ic"><use href="#i-set"/></svg>系统状态与设置</a>
+      </nav>
+      <div class="side-foot">
+        <div class="sys-cap"><svg class="ic sm"><use href="#i-cpu"/></svg><span>系统信息</span></div>
+        <div class="sys-mini" id="sys-mini"></div>
+        <div class="side-note">模型权重、自检与目录配置见「系统状态与设置」</div>
       </div>
-      <button class="icon-btn" data-act="theme" title="切换明暗主题" aria-label="切换明暗主题"><svg class="ic" id="theme-icon"><use href="#i-moon"/></svg></button>
-      <button class="icon-btn" data-act="help" title="快捷键说明" aria-label="快捷键说明"><svg class="ic"><use href="#i-info"/></svg></button>
-    </header>
+    </aside>
 
     <div class="workspace">
       <main class="content" id="content">
@@ -489,7 +779,7 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
           <div class="wb">
             <div class="notice" id="cap-notice"><svg class="ic sm"><use href="#i-spark"/></svg><span id="cap-text"></span></div>
 
-            <div class="panel">
+            <div class="panel" id="wb-text-panel">
               <div class="panel-head"><span class="step">1</span><h2 class="panel-title">要合成的内容</h2><span class="panel-desc">支持中英日韩与方言</span><span class="panel-hint" id="char-count">0 / 2000</span></div>
               <textarea class="textarea" id="text-input" maxlength="2000" placeholder="在这里输入或粘贴要转成语音的文字…" aria-label="合成文本"></textarea>
               <div class="chips" id="sample-chips">
@@ -523,7 +813,7 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 
         <!-- 播客工坊：保留原有全部能力，按 内容源 → 阵容 → 对话稿 → 成品 重组 -->
         <section class="view" data-view="podcast" hidden>
-          <div class="wrap" style="max-width:1400px">
+          <div class="wrap">
             <div class="view-head" style="max-width:none">
               <div><h2>播客工坊</h2><p>文章 / 文件 / 链接 → 多人对话稿 → 成品与直播推流</p></div>
               <div class="spacer"></div>
@@ -543,8 +833,13 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
         <!-- 我的音色 -->
         <section class="view" data-view="voices" hidden>
           <div class="wrap">
-            <div class="view-head"><div><h2>我的音色</h2><p>上传 3~30 秒干净人声，之后在任何模型里复用</p></div><div class="spacer"></div><button class="btn btn-primary" data-act="upload"><svg class="ic sm"><use href="#i-up"/></svg>新建音色</button></div>
-            <div class="upload" id="upload-zone"><div class="up-icon"><svg class="ic lg"><use href="#i-up"/></svg></div><p>把音频拖到这里，或点击选择文件</p><span>WAV / MP3 · 3~30 秒 · 单人、无背景音乐效果最好</span></div>
+            <div class="view-head"><div><h2>我的音色</h2><p>上传 3~30 秒干净人声，之后在任何模型里复用</p></div><div class="spacer"></div>
+              <span class="tag" id="voice-count">0 个音色</span>
+              <button class="btn" data-act="voice-refresh"><svg class="ic sm"><use href="#i-refresh"/></svg>刷新</button>
+              <button class="btn btn-primary" data-act="voice-focus"><svg class="ic sm"><use href="#i-plus"/></svg>新建音色</button></div>
+            <!-- 上传新音色：拖拽/校验/波形 + 名称/参考文本表单 -->
+            <div id="voice-upload-card"></div>
+            <div class="vlib-list-head"><h3>已保存的音色</h3><span class="chip-label" id="voice-list-note"></span></div>
             <div class="voice-grid" id="voice-cards"></div>
           </div>
         </section>
@@ -562,20 +857,19 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
         <!-- 系统状态 -->
         <section class="view" data-view="system" hidden>
           <div class="wrap">
-            <div class="view-head"><div><h2>系统状态</h2><p>模型权重、运行环境与资源占用一目了然</p></div><div class="spacer"></div><button class="btn btn-primary" data-act="doctor"><svg class="ic sm"><use href="#i-cpu"/></svg>运行环境自检</button></div>
-            <div class="stat-row">
-              <div class="stat"><div class="k">服务状态</div><div class="v" style="color:var(--ok);font-size:18px">就绪</div></div>
-              <div class="stat"><div class="k">已就绪模型</div><div class="v">7 <small>/ 7</small></div></div>
-              <div class="stat"><div class="k">显存占用</div><div class="v">6.4 <small>/ 16 GB</small></div><div class="bar-track"><div class="bar-fill" style="width:40%"></div></div></div>
-              <div class="stat"><div class="k">推理队列</div><div class="v">0 <small>/ 16</small></div></div>
+            <div class="view-head"><div><h2>系统状态与设置</h2><p>模型权重、运行环境与资源占用一目了然，可在此配置权重目录</p></div><div class="spacer"></div><span class="chip-label" id="sys-updated">刚刚刷新</span><button class="icon-btn" data-act="sys-refresh" id="sys-refresh-btn" title="刷新状态" aria-label="刷新状态"><svg class="ic sm" id="sys-refresh-icon"><use href="#i-refresh"/></svg></button><button class="btn sec" data-act="sys-settings"><svg class="ic sm"><use href="#i-set"/></svg>权重目录设置</button><button class="btn btn-primary" data-act="sys-doctor-all"><svg class="ic sm"><use href="#i-cpu"/></svg>运行环境自检</button></div>
+            <div class="sys-overview">
+              <div class="sys-overview-head"><svg class="ic sm"><use href="#i-cpu"/></svg><span>运行概览</span><span class="spacer"></span><span class="ov-note" id="sys-ov-note">服务、资源与产出的实时快照</span></div>
+              <div class="stat-row" id="sys-stats"></div>
             </div>
             <div class="model-cards" id="model-cards"></div>
+            <p class="sys-footnote">切换模型会卸载当前权重并释放显存；「环境自检」只读取权重文件与解释器，不占用 GPU。点击卡片中的权重目录可展开完整路径。</p>
           </div>
         </section>
       </main>
 
       <aside class="output" id="output-panel" aria-label="输出与播放">
-        <div class="out-head"><h3 id="out-title">本次结果</h3><span class="pill" id="out-pill">待生成</span><div style="flex:1"></div><button class="icon-btn" data-act="toast" data-msg="输出面板已刷新" title="刷新"><svg class="ic sm"><use href="#i-refresh"/></svg></button></div>
+        <div class="out-head panel-caption"><svg class="ic sm" id="out-icon"><use href="#i-wave"/></svg><h3 id="out-title">本次结果</h3><span class="pill" id="out-pill">待生成</span><div style="flex:1"></div><button class="icon-btn" data-act="toast" data-msg="输出面板已刷新" title="刷新"><svg class="ic sm"><use href="#i-refresh"/></svg></button></div>
         <div id="out-body"></div>
         <div class="out-section" id="out-recent"><h4><svg class="ic sm"><use href="#i-clock"/></svg>最近生成</h4><div id="recent-list"></div></div>
         <div class="out-tip" id="out-tip">结果会自动保存到「作品库」。切换模型不会影响已生成的音频。</div>
@@ -603,6 +897,20 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
     <div id="pod-detail-body"></div>
   </div>
 </div>
+
+<div class="modal-mask" id="sys-settings-modal" hidden>
+  <div class="modal sys-settings" role="dialog" aria-modal="true" aria-labelledby="sys-settings-title">
+    <h3 id="sys-settings-title">权重目录与运行环境</h3>
+    <p class="msub">对应服务启动时的环境变量。保存到本地配置后重启服务生效；留空会沿用默认目录。</p>
+    <div id="sys-settings-body"></div>
+    <p class="sys-env-hint">落地说明：后端由 <code>COSYVOICE_MODELS_DIR</code> 与各模型 <code>*_DIR</code> 环境变量在启动时读取；界面配置需由服务端写入 <code>.env</code> 或新增 <code>/api/admin/config</code> 接口后重启。原型用 localStorage 演示完整交互。</p>
+    <div class="ss-actions">
+      <button class="btn sec" data-act="sys-settings-reset">恢复默认</button><span style="flex:1"></span>
+      <button class="btn sec" data-act="sys-settings-close">取消</button>
+      <button class="btn" data-act="sys-settings-save">保存配置</button>
+    </div>
+  </div>
+</div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
 
 <script>
@@ -615,12 +923,124 @@ const MODELS=[
  {key:'qwen3tts_base',label:'Qwen3-TTS 声音克隆',family:'Qwen3-TTS',tag:'克隆',note:'需要参考音频及其文字内容',caps:{preset:0,mine:1,design:0,lang:1,instruct:0,stream:0,cloneText:1},speakers:[]},
  {key:'qwen3tts_design',label:'Qwen3-TTS 声音设计',family:'Qwen3-TTS',tag:'创造',note:'用一句话描述，凭空设计新音色',caps:{preset:0,mine:0,design:1,lang:1,instruct:1,stream:0,cloneText:0},speakers:[]}
 ];
+/* 系统状态元信息：字段与后端 public_info() / /api/models/{key}/doctor 一一对应 */
+const SYS_MODE_NAMES={sft:'预置音色',zero_shot:'声音克隆',cross_lingual:'跨语种复刻',instruct:'指令控制'};
+const SYS_META={
+ cosyvoice3:{label:'CosyVoice 3.0 (0.5B)',dir:'D:\\work\\zcode\\tts\\models\\Fun-CosyVoice3-0.5B',runtime:'in-process',backend:'inprocess',family:'cosyvoice',modes:['sft','zero_shot','cross_lingual','instruct'],stream:'native',install_hint:'python scripts/download_models.py --models cosyvoice3'},
+ cosyvoice2:{label:'CosyVoice 2.0 (0.5B)',dir:'D:\\work\\zcode\\tts\\models\\CosyVoice2-0.5B',runtime:'in-process',backend:'inprocess',family:'cosyvoice',modes:['sft','zero_shot','cross_lingual','instruct'],stream:'native',install_hint:'python scripts/download_models.py --models cosyvoice2'},
+ indextts2:{label:'IndexTTS 2.0',dir:'D:\\work\\zcode\\tts\\models\\IndexTTS-2',runtime:'D:\\work\\zcode\\tts\\index-tts\\.venv\\Scripts\\python.exe',backend:'external',family:'indextts',modes:['zero_shot','cross_lingual'],stream:'buffered',install_hint:'下载权重: --models indextts2；源码: git clone index-tts；设 INDEXTTS_PYTHON'},
+ indextts25:{label:'IndexTTS 2.5 (多语言)',dir:'D:\\work\\zcode\\tts\\models\\IndexTTS-2.5',runtime:'D:\\work\\zcode\\tts\\index-tts\\.venv\\Scripts\\python.exe',backend:'external',family:'indextts',modes:['zero_shot','cross_lingual'],stream:'buffered',install_hint:'下载权重: --models indextts25；源码: git clone index-tts；设 INDEXTTS_PYTHON'},
+ qwen3tts:{label:'Qwen3-TTS CustomVoice (1.7B)',dir:'D:\\work\\zcode\\tts\\models\\Qwen3-TTS-12Hz-1.7B-CustomVoice',runtime:'D:\\work\\zcode\\tts\\.venv-qwen3\\Scripts\\python.exe',backend:'external',family:'qwen3tts',modes:['sft','instruct'],stream:'buffered',install_hint:'下载权重: --models qwen3tts；依赖: pip install -U qwen-tts；设 QWEN3TTS_PYTHON'},
+ qwen3tts_base:{label:'Qwen3-TTS Base (声音克隆)',dir:'D:\\work\\zcode\\tts\\models\\Qwen3-TTS-12Hz-1.7B-Base',runtime:'D:\\work\\zcode\\tts\\.venv-qwen3\\Scripts\\python.exe',backend:'external',family:'qwen3tts',modes:['zero_shot','cross_lingual'],stream:'buffered',install_hint:'下载权重: --models qwen3tts_base；依赖: pip install -U qwen-tts；设 QWEN3TTS_PYTHON'},
+ qwen3tts_design:{label:'Qwen3-TTS VoiceDesign (声音设计)',dir:'D:\\work\\zcode\\tts\\models\\Qwen3-TTS-12Hz-1.7B-VoiceDesign',runtime:'D:\\work\\zcode\\tts\\.venv-qwen3\\Scripts\\python.exe',backend:'external',family:'qwen3tts',modes:['instruct'],stream:'buffered',install_hint:'下载权重: --models qwen3tts_design；依赖: pip install -U qwen-tts；设 QWEN3TTS_PYTHON'}
+};
+/* /api/health 的运行时快照 + 逐卡自检状态 */
+const sys={
+ state:'ready',loaded:'cosyvoice3',port:8001,
+ gpu:{name:'NVIDIA GeForce RTX 4060 Ti',used:1.13,total:16},
+ queue:0,queueMax:16,lastInferMs:7864,voicesCount:11,sampleRate:24000,
+ refreshing:false,doctorBusy:{},doctorResult:{},expanded:{},updated:'刚刚'
+};
+function sysMeta(k){return SYS_META[k]||{}}
+function sysModes(k){return (sysMeta(k).modes||[]).map(x=>SYS_MODE_NAMES[x]||x).join(' / ')}
+function sysDoctorData(k){
+ const m=sysMeta(k),external=m.backend==='external';
+ return {key:k,weights:true,missing_files:[],
+  dependencies:{ok:true,detail:external?(m.family==='indextts'?'indextts 可导入':'qwen_tts 可导入'):'随服务主环境加载'},
+  repo:external&&m.family==='indextts'?{ok:true,dir:'D:\\work\\zcode\\tts\\index-tts'}:null,
+  runtime:m.runtime};
+}
+/* ── 05H 权重目录配置：字段与后端启动环境变量一一对应 ── */
+const SYS_DIR_ENV={
+ cosyvoice3:'COSYVOICE_MODELS_DIR',
+ cosyvoice2:'COSYVOICE_MODELS_DIR',
+ indextts2:'INDEXTTS2_DIR',indextts25:'INDEXTTS25_DIR',
+ qwen3tts:'QWEN3TTS_DIR',qwen3tts_base:'QWEN3TTS_BASE_DIR',qwen3tts_design:'QWEN3TTS_DESIGN_DIR'
+};
+const SYS_DEFAULTS={
+ root:'D:\\work\\zcode\\tts\\models',
+ repo:'D:\\work\\zcode\\tts\\index-tts',
+ pyIndextts:'D:\\work\\zcode\\tts\\index-tts\\.venv\\Scripts\\python.exe',
+ pyQwen3:'D:\\work\\zcode\\tts\\.venv-qwen3\\Scripts\\python.exe',
+ dirs:Object.fromEntries(MODELS.map(m=>[m.key,SYS_META[m.key].dir]))
+};
+function loadSysConfig(){
+ const d=JSON.parse(JSON.stringify(SYS_DEFAULTS));
+ try{const o=JSON.parse(localStorage.getItem('vs-sys-config')||'{}');
+  ['root','repo','pyIndextts','pyQwen3'].forEach(k=>{if(o[k])d[k]=o[k]});
+  if(o.dirs)Object.keys(d.dirs).forEach(k=>{if(o.dirs[k])d.dirs[k]=o.dirs[k]});
+ }catch(_){}
+ return d;
+}
+const sysConfig=loadSysConfig();
+sys.settings=false;
+function applySysConfig(){
+ MODELS.forEach(m=>{
+  const meta=SYS_META[m.key];
+  if(sysConfig.dirs[m.key])meta.dir=sysConfig.dirs[m.key];
+  if(meta.backend==='external')meta.runtime=meta.family==='indextts'?sysConfig.pyIndextts:sysConfig.pyQwen3;
+ });
+}
+applySysConfig();
+function sysCustomCount(){return MODELS.filter(m=>sysConfig.dirs[m.key]!==SYS_DEFAULTS.dirs[m.key]).length}
+function sysOverviewNote(){const n=sysCustomCount();return '权重根目录 '+sysConfig.root+(n?' · 已自定义 '+n+' 项':'')}
+function renderSysSettings(){
+ const row=(label,env,field,key,val,custom)=>`<div class="ss-row" data-row="${key||field}">
+  <div class="ss-head"><b title="${esc(label)}">${esc(label)}</b><span class="ss-env" title="${esc(env)}">${esc(env)}</span><span class="spacer"></span>${custom?'<span class="tag pri">自定义</span>':''}</div>
+  <input class="input ss-path" data-cfg="${field}" ${key?`data-key="${key}"`:''} value="${esc(val)}" spellcheck="false" aria-label="${esc(label)}目录"></div>`;
+ const modelRows=MODELS.map(m=>row(sysMeta(m.key).label||m.label,SYS_DIR_ENV[m.key],'dir',m.key,
+  sysConfig.dirs[m.key],sysConfig.dirs[m.key]!==SYS_DEFAULTS.dirs[m.key])).join('');
+ $('#sys-settings-body').innerHTML=`
+  <div class="ss-section"><h4>全局 <span>1 项</span></h4>
+   ${row('权重根目录','COSYVOICE_MODELS_DIR','root','',sysConfig.root,sysConfig.root!==SYS_DEFAULTS.root)}</div>
+  <div class="ss-section models"><h4>模型权重目录 <span>7 个 · 对应 public_info().dir</span></h4>${modelRows}</div>
+  <div class="ss-section envs"><h4>独立运行环境 <span>外部 worker 解释器</span></h4>
+   ${row('index-tts 源码','INDEXTTS_REPO','repo','',sysConfig.repo,sysConfig.repo!==SYS_DEFAULTS.repo)}
+   ${row('IndexTTS 解释器','INDEXTTS_PYTHON','pyIndextts','',sysConfig.pyIndextts,sysConfig.pyIndextts!==SYS_DEFAULTS.pyIndextts)}
+   ${row('Qwen3-TTS 解释器','QWEN3TTS_PYTHON','pyQwen3','',sysConfig.pyQwen3,sysConfig.pyQwen3!==SYS_DEFAULTS.pyQwen3)}</div>`;
+}
+function collectSysConfig(){
+ $$('#sys-settings-body [data-cfg]').forEach(el=>{
+  const f=el.dataset.cfg,k=el.dataset.key,v=el.value.trim();
+  if(f==='dir'&&k)sysConfig.dirs[k]=v;
+  else if(f in sysConfig)sysConfig[f]=v;
+ });
+}
+function openSysSettings(key){
+ renderSysSettings();$('#sys-settings-modal').hidden=false;sys.settings=true;
+ if(key){
+  $$('#sys-settings-body .ss-row').forEach(r=>r.classList.toggle('focus',r.dataset.row===key));
+  const el=$('#sys-settings-body input[data-key="'+key+'"]');
+  if(el){el.focus();if(el.scrollIntoView)el.scrollIntoView({block:'nearest'})}
+ }
+}
+function closeSysSettings(){$('#sys-settings-modal').hidden=true;sys.settings=false}
+function saveSysConfig(){
+ collectSysConfig();
+ try{localStorage.setItem('vs-sys-config',JSON.stringify(sysConfig))}catch(_){}
+ applySysConfig();closeSysSettings();renderSystem();
+ toast('权重目录配置已保存，重启服务后生效（原型演示）');
+}
+function resetSysConfig(){
+ /* 只重置表单，不动内存配置；点「取消」即可撤销，点「保存」才写入 */
+ $$('#sys-settings-body [data-cfg]').forEach(el=>{
+  const f=el.dataset.cfg,k=el.dataset.key;
+  el.value=(f==='dir'&&k?SYS_DEFAULTS.dirs[k]:SYS_DEFAULTS[f])||'';
+ });
+ $$('#sys-settings-body .ss-row').forEach(r=>{const t=r.querySelector('.tag.pri');if(t)t.remove()});
+ toast('表单已恢复默认值，点「保存配置」生效');
+}
 const VOICES=[
- {id:'v1',name:'小满',meta:'女声 · 亲切 · 8.4s',text:'你好，欢迎使用语音合成服务。',tag:'已校验'},
- {id:'v2',name:'老陈',meta:'男声 · 沉稳 · 12.1s',text:'今天我们来聊一聊人工智能。',tag:'已校验'},
- {id:'v3',name:'Narrator',meta:'英语 · 播报 · 6.8s',text:'Welcome to our daily podcast.',tag:'已校验'},
- {id:'v4',name:'阿哲',meta:'男声 · 自然 · 9.6s',text:'',tag:'缺参考文本'}
+ {id:'v1',name:'小满',meta:'女声 · 亲切',duration:8.4,sr:24000,text:'你好，欢迎使用语音合成服务。',tag:'已校验',created:'2026-11-11 11:45',file:'xiaoman.wav'},
+ {id:'v2',name:'老陈',meta:'男声 · 沉稳',duration:12.1,sr:24000,text:'今天我们来聊一聊人工智能。',tag:'已校验',created:'2026-11-11 11:34',file:'laochen.wav'},
+ {id:'v3',name:'Narrator',meta:'英语 · 播报',duration:6.8,sr:22050,text:'Welcome to our daily podcast.',tag:'已校验',created:'2026-11-11 10:08',file:'narrator.wav'},
+ {id:'v4',name:'阿哲',meta:'男声 · 自然',duration:9.6,sr:24000,text:'',tag:'缺参考文本',created:'2026-11-11 09:26',file:'azhe.wav'}
 ];
+/* 音色库交互状态：上传表单 / 文件校验 / 内联编辑 / 删除确认 */
+const vlib={
+ file:null,name:'',prompt:'',busy:false,error:'',drag:false,decode:false,
+ editId:null,editName:'',editPrompt:'',confirmDel:null,
+};
 const SAMPLES=[
  {label:'产品发布词',text:'大家好，欢迎来到今天的发布会。我们花了整整一年时间，把一件复杂的事情做得足够简单。现在，让我们一起看看它。'},
  {label:'播客开场',text:'欢迎收听新一期的节目。我是主播，今天想和你聊聊，为什么好的工具总是让人感觉不到它的存在。'},
@@ -812,13 +1232,218 @@ function renderLibrary(){
  const list=state.filter==='全部'?state.library:state.library.filter(t=>t.kind===state.filter);
  $('#lib-list').innerHTML=list.length?list.map(t=>`<div class="list-row"><span class="avatar a4" style="width:34px;height:34px;font-size:12px">${icon('play','ic sm')}</span><span class="lr-main"><span class="lr-title">${esc(t.title)}</span><span class="lr-meta">${esc(t.model)} · ${esc(t.voice)} · ${esc(t.time)}</span></span><span class="tag ${t.kind==='声音设计'?'acc':''}">${esc(t.kind)}</span><span class="r-dur" style="width:46px;text-align:right">${t.dur.toFixed(1)}s</span><button class="mini-btn" data-act="play-recent" data-key="${t.id}" aria-label="播放">${icon('play','ic sm')}</button><button class="mini-btn" data-act="download" aria-label="下载">${icon('down','ic sm')}</button></div>`).join(''):'<div class="out-empty" style="border:none"><p>这个分类下还没有作品</p><span>去创作台生成第一条吧</span></div>';
 }
+/* ===== 音色库（v1.8）：上传校验 / 卡片四操作 / 内联编辑 / 提交记录 ===== */
+const VLIB_EXTS=['wav','mp3','flac','m4a','ogg','opus'];
+let vlibDemoIdx=-1;
+const VLIB_DEMOS=['reference_8.4s.wav','too_long_35.2s.mp3','notes.txt'];
+function vlibInspect(name){
+ const ext=String(name).split('.').pop().toLowerCase();
+ if(!VLIB_EXTS.includes(ext))return {name,ok:false,reason:`不支持的格式 .${ext}，请使用 wav / mp3 / flac / m4a / ogg / opus`,peaks:[]};
+ const dur=/long|35/.test(name)?35.2:8.4;
+ if(dur<1||dur>30)return {name,duration:dur,sr:44100,ok:false,reason:'时长需在 1~30 秒',peaks:waveBars(40)};
+ return {name,duration:dur,sr:24000,ok:true,reason:'',peaks:waveBars(40)};
+}
+function vlibPick(name){
+ if(name===undefined){
+  vlibDemoIdx=(vlibDemoIdx+1)%(VLIB_DEMOS.length+1);
+  name=vlibDemoIdx<VLIB_DEMOS.length?VLIB_DEMOS[vlibDemoIdx]:null;
+ }
+ if(name===null){vlib.file=null;vlib.error='';renderVoiceUpload();return}
+ vlib.file=vlibInspect(name);
+ vlib.error=vlib.file.ok?'':vlib.file.reason;
+ renderVoiceUpload();
+}
+function vlibCanSave(){return !vlib.busy&&!!vlib.file&&vlib.file.ok&&!!vlib.name.trim()&&!!vlib.prompt.trim()}
+function vlibWhy(){
+ if(vlib.busy)return '正在保存…';
+ if(!vlib.file)return '先选择一段参考音频';
+ if(!vlib.file.ok)return '音频不符合要求，请重新选择';
+ if(!vlib.name.trim())return '请填写音色名称';
+ if(!vlib.prompt.trim())return '请填写参考音频文字内容';
+ return '名称与参考文本会随音色一起保存';
+}
+function vlibUpdateSave(){
+ const b=$('#voice-save-btn');if(b)b.disabled=!vlibCanSave();
+ const w=$('#voice-save-why');if(w)w.textContent=vlibWhy();
+}
+function renderVoiceUpload(){
+ const f=vlib.file;
+ const fileHtml=f?`<div class="vlib-file" style="text-align:center"><b>${esc(f.name)}</b>
+   <span>${f.duration?f.duration.toFixed(1)+'s · '+f.sr+' Hz':'无法解析音频'}</span>
+   <span class="${f.ok?'ok':'bad'}" style="display:block;margin-top:3px">${f.ok?'✓ 可用':'✗ '+(f.reason||'不可用')}</span></div>
+   ${f.peaks&&f.peaks.length?`<div class="vlib-wave">${f.peaks.map(h=>`<i style="--h:${Math.max(3,Math.round(h*.3))}px"></i>`).join('')}</div>`:''}`:'';
+ const emptyHtml=`<div class="dz-icon">${icon('up','ic lg')}</div><div class="dz-title">点击或拖拽音频到此处</div>
+   <div class="dz-hint">wav / mp3 / flac / m4a / ogg / opus · 建议 5~15s 干净单人语音<br>原型演示：反复点击可查看合格 / 超长 / 格式错误三种校验状态</div>`;
+ $('#voice-upload-card').innerHTML=`
+  <div class="vlib-card">
+   <div class="vlib-cap">${icon('mic','ic sm')}<h3>上传新音色（3~30 秒参考音频）</h3><span class="spacer"></span><span class="tag">1~30 秒 · 单人声</span></div>
+   <div class="vlib-grid">
+    <div>
+     <div class="vlib-drop ${vlib.drag?'drag':''} ${f&&!f.ok?'invalid':''}" data-act="voice-pick" role="button" tabindex="0" aria-label="选择参考音频">
+      <input type="file" id="voice-file-input" accept=".wav,.mp3,.flac,.m4a,.ogg,.opus" hidden>
+      ${f?fileHtml:emptyHtml}
+     </div>
+     ${f&&!f.ok?`<div class="vlib-err" style="margin-top:8px">${icon('info','ic sm')} ${esc(f.reason)}</div>`:''}
+     ${vlib.error&&f&&f.ok?`<div class="vlib-err" style="margin-top:8px">${esc(vlib.error)}</div>`:''}
+    </div>
+    <div class="vlib-form">
+     <div class="vfield"><label for="voice-new-name">音色名称 <span class="req">*</span></label>
+      <input class="input" id="voice-new-name" maxlength="50" value="${esc(vlib.name)}" placeholder="例如：小雅（温柔女声）"></div>
+     <div class="vfield"><label for="voice-new-text">参考音频文字内容 <span class="req">*</span></label>
+      <textarea class="textarea" id="voice-new-text" maxlength="500" placeholder="逐字填写音频里说的内容，克隆质量的关键">${esc(vlib.prompt)}</textarea></div>
+     <div class="vlib-save">
+      <button class="btn btn-primary" id="voice-save-btn" data-act="voice-save" ${vlibCanSave()?'':'disabled'}>${vlib.busy?'保存中…':'保存音色'}</button>
+      <span class="why" id="voice-save-why">${esc(vlibWhy())}</span></div>
+     <p class="hint">保存后会自动选中该音色、回填参考文本，并回到创作台。</p>
+    </div>
+   </div>
+  </div>`;
+}
 function renderVoiceCards(){
- $('#voice-cards').innerHTML=VOICES.map((v,i)=>`<div class="vcard"><div class="vc-top"><span class="avatar a${i%5+1}">${esc(v.name.slice(0,1))}</span><span><span class="vc-name">${esc(v.name)}</span><span class="vc-meta">${esc(v.meta)}</span></span></div>
-  <div class="mini-wave">${waveBars(24).map(h=>`<i style="--h:${Math.max(4,h*.7)}px"></i>`).join('')}</div>
-  <div class="vc-foot"><span class="tag ${v.text?'pri':''}">${esc(v.tag)}</span><span class="spacer"></span><button class="mini-btn" data-act="preview" data-key="${esc(v.name)}" aria-label="试听">${icon('play','ic sm')}</button><button class="mini-btn" data-act="toast" data-msg="已打开音色编辑（原型演示）" aria-label="编辑">${icon('set','ic sm')}</button></div></div>`).join('');
+ const el=$('#voice-cards');if(!el)return;
+ const cnt=$('#voice-count');if(cnt)cnt.textContent=VOICES.length+' 个音色';
+ const note=$('#voice-list-note');
+ if(note)note.textContent=`共 ${VOICES.length} 个 · ${VOICES.filter(v=>!v.text).length} 个缺参考文本`;
+ if(!VOICES.length){el.innerHTML='<div class="vlib-empty">还没有克隆音色。上传一段 3~30 秒的参考音频开始克隆。</div>';return}
+ el.innerHTML=VOICES.map((v,i)=>{
+  if(vlib.editId===v.id)return `<div class="vcard"><div class="vc-edit">
+   <label for="voice-edit-name">音色名称</label><input class="input" id="voice-edit-name" maxlength="50" value="${esc(vlib.editName)}">
+   <label for="voice-edit-text">参考音频文字内容</label><textarea class="textarea" id="voice-edit-text" maxlength="500">${esc(vlib.editPrompt)}</textarea>
+   <div class="vc-actions"><button class="btn btn-primary" data-act="voice-edit-save" data-key="${v.id}">保存</button>
+    <button class="btn sec" data-act="voice-edit-cancel">取消</button></div></div></div>`;
+  return `<div class="vcard"><div class="vc-top"><span class="avatar a${i%5+1}">${esc(v.name.slice(0,1))}</span>
+   <span><span class="vc-name">${esc(v.name)}</span><span class="vc-meta">${esc(v.meta)}</span></span>
+   <span class="tag vc-badge">${Number(v.duration||0).toFixed(1)}s</span></div>
+   <p class="vc-prompt">${v.text?esc(v.text):'<span style="color:var(--warn)">未填写参考文本，克隆质量会受影响</span>'}</p>
+   <div class="mini-wave">${waveBars(24).map(h=>`<i style="--h:${Math.max(4,h*.7)}px"></i>`).join('')}</div>
+   <div class="vc-actions">
+    <button class="btn sec" data-act="voice-preview" data-key="${v.id}">${icon('play','ic sm')} 试听参考</button>
+    <button class="btn sec" data-act="voice-use" data-key="${v.id}">用于合成</button>
+    <button class="btn sec" data-act="voice-edit" data-key="${v.id}">${icon('set','ic sm')} 编辑</button>
+    ${vlib.confirmDel===v.id?`<button class="btn sec danger" data-act="voice-del" data-key="${v.id}">确认删除</button>`
+      :`<button class="btn sec danger" data-act="voice-del" data-key="${v.id}">删除</button>`}
+   </div>
+   <div class="vc-date">${esc(v.created||'—')} · ${v.sr||24000} Hz</div></div>`;
+ }).join('');
+}
+function renderVoiceLibrary(){renderVoiceUpload();renderVoiceCards()}
+function renderVoiceSide(){
+ const t=$('#out-title');if(!t)return;
+ t.textContent='音色提交记录';
+ const pill=$('#out-pill');if(pill){pill.className='pill';pill.textContent=VOICES.length+' 条'}
+ const rec=$('#out-recent');if(rec)rec.hidden=true;
+ const tip=$('#out-tip');if(tip)tip.textContent='点击任一条可试听参考音频；每次上传成功后都会在这里留下记录。';
+ $('#out-body').innerHTML=`<div class="out-group"><div class="og-head"><span class="og-title">最近提交</span>
+   <span class="og-count">${VOICES.length}</span><span class="spacer"></span>
+   <button class="mini-btn" style="width:28px;height:28px" data-act="voice-refresh" title="刷新">${icon('refresh','ic sm')}</button></div>
+  ${VOICES.length?VOICES.map(v=>`<div class="vside-row" data-act="voice-preview" data-key="${v.id}" title="点击试听参考音频">
+   <span class="dot"></span><span class="vm"><b>${esc(v.name)}</b><span>参考 ${Number(v.duration||0).toFixed(1)}s · ${esc(v.created||'—')}</span></span>
+   <span style="color:var(--text-3)">›</span></div>`).join('')
+   :'<div class="out-empty-sm">还没有音色提交记录。上传参考音频克隆后，这里会记录每次提交。</div>'}</div>`;
+}
+function vlibSave(){
+ if(!vlibCanSave())return;
+ const id='v'+(VOICES.length+1)+'_'+Math.round(Math.random()*1000);
+ VOICES.unshift({id,name:vlib.name.trim(),meta:'新建音色 · 未分类',duration:vlib.file.duration,sr:vlib.file.sr,
+  text:vlib.prompt.trim(),tag:'已校验',created:'刚刚',file:vlib.file.name});
+ const savedName=VOICES[0].name;
+ vlib.file=null;vlib.name='';vlib.prompt='';vlib.busy=false;vlib.error='';vlibDemoIdx=-1;
+ if(model().caps.mine){state.group='mine';state.pick=id;state.refText=VOICES[0].text}
+ renderVoiceLibrary();renderVoiceSide();renderSounds();renderAction();
+ switchView('workbench');
+ toast(`音色「${savedName}」已保存并选中`);
 }
 function renderSystem(){
- $('#model-cards').innerHTML=MODELS.map((m,i)=>`<div class="mcard"><div class="mc-top"><span class="dot" style="box-shadow:none"></span><span class="mc-name">${esc(m.label)}</span><span class="tag ${i===0?'pri':''}">${i===0?'当前加载':'权重就绪'}</span></div><div class="mc-note">${esc(m.note)}</div><div class="mc-foot"><span class="tag">${esc(m.family)}</span><span class="tag">环境自检通过</span><span class="spacer"></span><button class="btn" style="min-height:32px;padding:5px 11px;font-size:12px" data-act="switch-model" data-key="${m.key}">${i===0?'已加载':'加载'}</button></div></div>`).join('');
+ const pct=Math.round(sys.gpu.used/sys.gpu.total*100),ready=MODELS.filter(m=>sysMeta(m.key).available!==false).length;
+ $('#sys-updated').textContent=sys.updated;
+ $('#sys-ov-note').textContent=sysOverviewNote();
+ $('#sys-stats').innerHTML=`
+  <div class="stat"><div class="k">服务状态</div><div class="v" style="color:var(--ok)">${sys.state==='ready'?'就绪':sys.state==='loading'?'加载中':'异常'}</div>
+   <div class="s-kv"><span>服务端口</span><b>${sys.port}</b></div>
+   <div class="s-kv"><span>独立运行环境</span><b>${new Set(MODELS.map(m=>sysMeta(m.key).runtime).filter(r=>r!=='in-process')).size} 套</b></div></div>
+  <div class="stat"><div class="k">GPU / 显存</div><div class="s-model">${esc(sys.gpu.name)}</div>
+   <div class="s-mid">${sys.gpu.used.toFixed(2)} / ${sys.gpu.total} GB <small>（${pct}%）</small></div>
+   <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div></div>
+  <div class="stat"><div class="k">推理队列</div><div class="v">${sys.queue} <small>/ ${sys.queueMax}</small></div>
+   <div class="s-kv"><span>最近一次合成耗时</span><b>${sys.lastInferMs?sys.lastInferMs+' ms':'—'}</b></div>
+   <div class="s-kv"><span>已就绪模型</span><b>${ready} / ${MODELS.length}</b></div></div>
+  <div class="stat"><div class="k">音色与输出</div><div class="v">${sys.voicesCount} <small>个克隆音色</small></div>
+   <div class="s-kv"><span>输出采样率</span><b>${sys.sampleRate||'—'} Hz</b></div></div>`;
+ const cards=MODELS.map(m=>{
+  const meta=sysMeta(m.key),loaded=sys.loaded===m.key,available=meta.available!==false,open=!!sys.expanded[m.key];
+  const tag=loaded?'<span class="tag pri">已加载</span>':available?'<span class="tag">已就绪</span>':'<span class="tag err">未下载</span>';
+  const dr=sys.doctorResult[m.key],busy=!!sys.doctorBusy[m.key];
+  return `<div class="mcard">
+   <div class="mc-top"><span class="dot" style="box-shadow:none;background:${loaded?'var(--primary)':available?'var(--ok)':'var(--danger)'}"></span><span class="mc-name" title="${esc(meta.label||m.label)}">${esc(meta.label||m.label)}</span>${tag}</div>
+   <div class="mc-note">${esc(m.note)}</div>
+   <div class="sys-kv"><span class="k">推理模式</span><span class="v" title="${esc(sysModes(m.key))}">${esc(sysModes(m.key))}</span></div>
+   <div class="sys-kv"><span class="k">权重目录</span><span class="v link ${open?'open':''}" data-act="sys-path" data-key="${m.key}" role="button" tabindex="0" aria-label="展开或收起完整权重路径" title="点击${open?'收起':'展开完整路径'}：${esc(meta.dir||'')}">${esc(meta.dir||'—')}</span><button class="ss-edit" data-act="sys-settings" data-key="${m.key}" title="在设置中修改此模型的权重目录" aria-label="修改权重目录">${icon('set','ic sm')}</button></div>
+   <div class="sys-kv"><span class="k">运行环境</span><span class="v" title="${esc(meta.runtime)}">${meta.runtime==='in-process'?'随服务主环境':esc(meta.runtime)}</span></div>
+   <div class="sys-kv"><span class="k">流式</span><span class="v">${meta.stream==='buffered'?'整段生成后分块下发':'原生逐块推理'}</span></div>
+   ${!available?`<div class="sys-hint">${esc(meta.install_hint||'权重未下载，可运行 scripts/download_models.py')}</div>`:''}
+   ${sysDoctorHtml(dr)}
+   <div class="mc-foot">
+    <button class="btn ${loaded?'':'btn-primary'}" data-act="sys-load" data-key="${m.key}" ${loaded||!available||sys.state==='loading'?'disabled':''}>${loaded?'当前已加载':sys.state==='loading'?'加载中…':'加载此模型'}</button>
+    <button class="btn btn-ghost" data-act="sys-doctor-one" data-key="${m.key}" ${busy?'disabled':''}>${busy?'检测中…':'环境自检'}</button>
+   </div></div>`;
+ }).join('');
+ $('#model-cards').innerHTML=cards;
+ renderSysMini();
+}
+function sysDoctorHtml(dr){
+ if(!dr)return '';
+ const line=(lb,ok,txt)=>`<div class="r"><span class="lb">${lb}</span><span class="${ok?'ok':'bad'}">${esc(txt)}</span></div>`;
+ return `<div class="sys-doct">
+  ${line('权重',dr.weights,dr.weights?'✓ 就绪':'✗ 缺失 '+(dr.missing_files||[]).join(', '))}
+  ${dr.dependencies?line('推理依赖',dr.dependencies.ok,dr.dependencies.ok?'✓ 可导入':'✗ '+(dr.dependencies.detail||'')):''}
+  ${dr.repo?line('index-tts 源码',dr.repo.ok,dr.repo.ok?'✓ 已找到':'✗ '+dr.repo.dir):''}
+  ${dr.error?line('错误',false,dr.error):''}
+ </div>`;
+}
+function renderSysMini(){
+ const el=$('#sys-mini');if(!el)return;
+ el.innerHTML=`<div class="full"><span class="dot" style="box-shadow:none;background:var(--ok);display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px"></span><b>服务${sys.state==='ready'?'就绪':'加载中'}</b></div>
+  <div class="full">${esc(sys.gpu.name)}</div>
+  <div>显存 <b>${sys.gpu.used.toFixed(2)} / ${sys.gpu.total} GB</b></div>
+  <div>排队 <b>${sys.queue} / ${sys.queueMax}</b></div>
+  <div>输出 <b>${sys.sampleRate} Hz</b></div>
+  <div>端口 <b>${sys.port}</b></div>`;
+}
+function sysRunDoctor(k){
+ if(sys.doctorBusy[k])return;
+ sys.doctorBusy[k]=true;renderSystem();
+ setTimeout(()=>sysFinishDoctor(k),420);
+}
+function sysFinishDoctor(k){
+ sys.doctorBusy[k]=false;sys.doctorResult[k]=sysDoctorData(k);renderSystem();
+ toast(sysMeta(k).label+'：权重与运行环境自检通过');
+}
+function sysDoctorAll(){
+ MODELS.forEach(m=>{if(!sys.doctorResult[m.key])sys.doctorResult[m.key]=sysDoctorData(m.key)});
+ renderSystem();
+ toast(MODELS.length+' 个模型权重与运行环境自检通过');
+}
+function sysRefresh(){
+ if(sys.refreshing)return;
+ sys.refreshing=true;sys.updated='刷新中…';
+ const ic=$('#sys-refresh-icon');if(ic)ic.classList.add('spin');
+ renderSystem();
+ setTimeout(()=>sysFinishRefresh(),450);
+}
+function sysFinishRefresh(){
+ sys.refreshing=false;sys.updated='刚刚刷新';
+ const ic=$('#sys-refresh-icon');if(ic)ic.classList.remove('spin');
+ renderSystem();toast('系统状态已刷新');
+}
+function sysLoad(k){
+ if(sys.loaded===k||sys.state==='loading'||sysMeta(k).available===false)return;
+ sys.state='loading';renderSystem();
+ setTimeout(()=>sysFinishLoad(k),520);
+}
+function sysFinishLoad(k){
+ sys.state='ready';sys.loaded=k;sys.sampleRate=24000;
+ setModel(k,false);           // 内部 renderAll() 会重绘系统页与侧栏速览
+ toast('已加载 '+sysMeta(k).label);
 }
 function podSrcReady(){return pod.src==='text'?pod.text.trim().length>=10:pod.extractChars>=10}
 function renderPodStepper(){
@@ -834,8 +1459,7 @@ function renderPodSource(){
  const tabs=[['text','粘贴文本'],['file','上传文件'],['url','网页链接']];
  let body='';
  if(pod.src==='text'){
-  body=`<textarea class="textarea" id="pod-src-text" rows="7" style="font-size:12.5px;min-height:150px" placeholder="粘贴文章、会议记录、学习笔记…（将按主持阵容改写为多轮多人对话）">${esc(pod.text)}</textarea>
-   <div style="display:flex;justify-content:space-between;margin-top:6px"><span class="chip-label">可直接朗读，也可交给大模型改写</span><span class="chip-label">${pod.text.length} / 20000</span></div>`;
+  body=`<textarea class="textarea" id="pod-src-text" style="font-size:12.5px" placeholder="粘贴文章、会议记录、学习笔记…&#10;文章 / 文件 / 链接决定节目内容；可直接朗读，也可按主持阵容改写成多轮多人对话。">${esc(pod.text)}</textarea>`;
  }else if(pod.src==='file'){
   body=`<div class="dropzone" data-act="pod-file"><b>${pod.fileName?esc(pod.fileName):'点击或拖拽文件到这里'}</b>${pod.fileName?(pod.extractChars?`已提取 ${pod.extractChars} 字正文`:'解析中…'):'支持 txt / md / pdf / docx · ≤ 20 MB'}</div>
    ${pod.sourceError?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>${esc(pod.sourceError)}</span></div>`:''}`;
@@ -845,19 +1469,23 @@ function renderPodSource(){
    ${pod.sourceError?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>${esc(pod.sourceError)}</span></div>`:''}`;
  }
  const srcNote=pod.src==='url'||(pod.src==='file'&&pod.fileName&&!pod.fileName.toLowerCase().endsWith('.txt'))
-  ?'网页 / 非 txt 文档需由大模型改写成多人对话稿。':'纯文本可直接朗读，也可以改写成多人对话。';
+  ?'网页 / 非 txt 需大模型改写'
+  :'上传 txt 可直接朗读，其它格式需大模型改写';
+ const counter=pod.src==='text'?`${pod.text.length} / 20000`:(pod.extractChars?`已提取 ${pod.extractChars} 字`:'待导入');
  $('#pod-source').innerHTML=`
-  <div class="pcol-head"><span class="step">1</span><h3>内容源</h3><span class="spacer"></span><button class="btn btn-ghost" style="min-height:30px;padding:4px 9px;font-size:12px" data-act="pod-llm">${icon('set','ic sm')} 大模型</button></div>
+  <div class="pcol-head"><span class="step">1</span><h3>内容源</h3><span class="spacer"></span><span class="tag">${esc(counter)}</span></div>
   <p class="pcol-sub">文章、文件或链接，决定节目讲什么</p>
-  <div class="src-tabs">${tabs.map(([k,n])=>`<button class="${pod.src===k?'active':''}" data-act="pod-src" data-key="${k}">${n}</button>`).join('')}</div>
-  ${body}
-  <div class="llm-strip">${icon('spark','ic sm')}<span class="lm"><b>${esc(pod.llm.model||'未配置')}</b> · ${esc(pod.llm.base||'未设置服务地址')}</span><button class="chip" data-act="pod-llm">配置 / 测试</button></div>
-  <div class="src-actions">
-   <button class="btn btn-primary" data-act="pod-direct" ${podSrcReady()?'':'disabled'}>${icon('play','ic sm')} 直接朗读（单音色 · 无需大模型）</button>
-   <button class="btn sec" data-act="pod-gen" ${podSrcReady()&&!pod.genning?'':'disabled'}>${icon('spark','ic sm')} ${pod.genning?'改写中…':'由大模型改写为多人对话稿'}</button>
+  <div class="src-scroll">
+   <div class="src-tabs">${tabs.map(([k,n])=>`<button class="${pod.src===k?'active':''}" data-act="pod-src" data-key="${k}">${n}</button>`).join('')}</div>
+   ${body}
   </div>
-  ${!podSrcReady()?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>内容源至少需要 10 个字才能成稿。</span></div>`:''}
-  <p class="chip-label" style="margin-top:9px;line-height:1.55">${srcNote}</p>`;
+  <div class="src-actions">
+   <button class="btn btn-primary" data-act="pod-direct" title="直接朗读（单音色 · 无需大模型）" ${podSrcReady()?'':'disabled'}>${icon('play','ic sm')} 直接朗读</button>
+   <button class="btn sec" data-act="pod-gen" title="由大模型改写为多人对话稿" ${podSrcReady()&&!pod.genning?'':'disabled'}>${icon('spark','ic sm')} ${pod.genning?'改写中…':'大模型改写'}</button>
+  </div>
+  ${!podSrcReady()?`<div class="notice warn" style="margin-top:8px">${icon('info','ic sm')}<span>内容源至少需要 10 个字才能成稿。</span></div>`:''}
+  ${pod.src==='text'?'':`<p class="chip-label" style="margin-top:7px">${srcNote}</p>`}
+  <div class="llm-strip" title="仅「由大模型改写为多人对话稿」需要；直接朗读不调用大模型">${icon('set','ic sm')}<span class="lm"><b>大模型配置</b> · ${esc(pod.llm.model||'未配置')} · ${esc(pod.llm.base||'未设置服务地址')}</span><button class="chip" data-act="pod-llm">配置 / 测试</button></div>`;
 }
 function renderPodScript(){
  const rows=pod.lines.map((l,i)=>{
@@ -937,7 +1565,15 @@ function renderPodOutput(){
   <div class="out-tabs">${tabs.map(([k,n])=>`<button class="${pod.outTab===k?'active':''}" data-act="pod-out-tab" data-key="${k}">${n}</button>`).join('')}</div>
   ${body}`;
 }
-const POD_BADGE={draft:['存稿',''],synthesizing:['合成中','busy'],pushing:['推流中','busy'],completed:['已完成','ok'],failed:['失败','err'],stopped:['已停止','err']};
+const POD_BADGE={draft:['存稿',''],synthesizing:['合成中','busy'],pushing:['推流中','busy'],completed:['已完成','ok'],failed:['失败','err'],stopped:['已停止','']};
+/* v1.6 状态配色：只用冷色系主色/青绿 + 中性灰，红色仅留给「失败」。
+   进行中是正常活动态（非警告），已完成是安静归档态，不再使用暖黄/绿。 */
+function podStateColor(s){
+ if(s==='synthesizing')return 'var(--primary)';
+ if(s==='pushing')return 'var(--accent)';
+ if(s==='failed')return 'var(--danger)';
+ return 'var(--text-3)';
+}
 function podTaskText(t){
  if(t.status==='synthesizing')return `${t.progress||0}/${t.linesCount} 句`;
  if(t.status==='pushing'&&t.push)return `${t.push.linesDone}/${t.push.linesTotal} 句 · ${fmt(t.push.elapsed)}/${fmt(t.push.duration)}`;
@@ -961,7 +1597,7 @@ function renderPodEpisodes(){
  $('#out-tip').textContent='任务队列只跟踪已提交合成 / 推流的任务，点击看详情；播客列表包含全部剧集（含存稿），点击载入编辑器。';
  const queueHtml=queue.length?queue.map(t=>{
   const b=POD_BADGE[t.status]||['未知',''];
-  const color=b[1]==='busy'?'var(--warn)':b[1]==='ok'?'var(--ok)':b[1]==='err'?'var(--danger)':'var(--text-3)';
+  const color=podStateColor(t.status);
   const rowCls=b[1]==='busy'?'st-live':b[1]==='err'?'st-err':'';
   const tagCls=b[1]==='busy'?'live':b[1]==='ok'?'ok':b[1]==='err'?'err':'';
   return `<div class="task-row ${rowCls}" data-act="pod-task-detail" data-key="${t.id}" title="点击查看任务详情">
@@ -972,7 +1608,7 @@ function renderPodEpisodes(){
  }).join(''):'<div class="out-empty-sm">暂无任务。开始合成后，这里会实时更新进度。</div>';
  const listHtml=pod.episodes.length?pod.episodes.map(e=>{
   const b=POD_BADGE[e.status]||['未知',''];
-  const color=b[1]==='busy'?'var(--warn)':b[1]==='ok'?'var(--ok)':b[1]==='err'?'var(--danger)':'var(--text-3)';
+  const color=podStateColor(e.status);
   const rowCls=b[1]==='busy'?'st-live':b[1]==='err'?'st-err':'';
   const tagCls=b[1]==='busy'?'live':b[1]==='ok'?'ok':b[1]==='err'?'err':'';
   return `<div class="ep-row ${rowCls}" data-act="pod-ep-load" data-key="${e.id}" title="点击载入到播客编辑器">
@@ -984,7 +1620,7 @@ function renderPodEpisodes(){
  }).join(''):'<div class="out-empty-sm">暂无播客剧集。生成对话稿并保存后，会出现在这里。</div>';
  $('#out-body').innerHTML=`
   <div class="out-group">
-   <div class="og-head"><span class="og-title">任务队列</span>${running?`<span class="og-live">● ${running} 进行中</span>`:''}<span class="spacer"></span>
+   <div class="og-head"><span class="og-title">任务队列</span>${running?`<span class="og-live">${running} 进行中</span>`:''}<span class="spacer"></span>
     <button class="mini-btn" style="width:28px;height:28px" data-act="pod-queue-refresh" title="刷新队列">${icon('refresh','ic sm')}</button></div>
    ${queueHtml}
   </div>
@@ -1019,7 +1655,7 @@ function renderPodDetail(){
  }
  $('#pod-detail-body').innerHTML=`
   <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">
-   <span class="tag ${b[1]==='busy'?'live':b[1]==='ok'?'ok':b[1]==='err'?'err':''}">${b[0]}</span>
+   <span class="tag ${b[1]==='busy'?'live':b[1]==='ok'?'ok':b[1]==='err'?'err':''}"><i class="tag-dot" style="background:${podStateColor(t.status)}"></i>${b[0]}</span>
    <b id="pod-detail-title" style="font-size:15px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</b>
    <button class="mini-btn" data-act="pod-detail-close" aria-label="关闭">${icon('close','ic sm')}</button></div>
   ${mid}
@@ -1065,19 +1701,25 @@ function makeScript(kind){
   pod.editLine=-1;renderPod();toast(kind==='direct'?'已按语句生成朗读稿':'对话稿已按主持阵容改写完成');
  },1100);
 }
-const TITLES={workbench:['创作台','把文字变成声音'],podcast:['播客工坊','多人对话一次成片'],voices:['我的音色','上传一次，处处复用'],library:['作品库','生成记录与参数复用'],system:['系统状态','模型与运行环境']};
+const TITLES={workbench:['创作台','把文字变成声音'],podcast:['播客工坊','多人对话一次成片'],voices:['我的音色','上传一次，处处复用'],library:['作品库','生成记录与参数复用'],system:['系统状态与设置','模型、运行环境与权重目录配置']};
 function switchView(k){
+ if(sys.settings)closeSysSettings();
  state.view=k;$$('.view').forEach(v=>v.hidden=v.dataset.view!==k);
  $$('#nav-primary a, .nav a').forEach(a=>a.classList.toggle('active',a.dataset.key===k));
  $('#page-title').textContent=TITLES[k][0];$('#page-sub').textContent=TITLES[k][1];
- $('#output-panel').hidden=!(k==='workbench'||k==='podcast');
+ $('#output-panel').hidden=!(k==='workbench'||k==='podcast'||k==='voices');
+ const oi=$('#out-icon');if(oi)oi.innerHTML=`<use href="#i-${k==='podcast'?'pod':k==='voices'?'mic':'wave'}"/>`;
  if(k==='podcast'){
   renderPod();renderPodEpisodes();
+ }else if(k==='voices'){
+  renderVoiceLibrary();renderVoiceSide();
  }else if(k==='workbench'){
   $('#out-title').textContent='本次结果';
   $('#out-recent').hidden=false;
   $('#out-tip').textContent='结果会自动保存到「作品库」。切换模型不会影响已生成的音频。';
   renderOutput();renderRecent();
+ }else if(k==='system'){
+  renderSystem();
  }
  $('#content').scrollTop=0;
 }
@@ -1099,7 +1741,7 @@ function setModel(k,fromUser){
  renderAll();
  if(fromUser)toast(`已切换到 ${m.label}`);
 }
-function renderAll(){renderModelMenu();renderCapNotice();renderTabs();renderSounds();renderAdv();renderAction();renderOutput();renderRecent();renderLibrary();renderVoiceCards();renderSystem();renderPod();syncThemeIcon()}
+function renderAll(){renderModelMenu();renderCapNotice();renderTabs();renderSounds();renderAdv();renderAction();renderOutput();renderRecent();renderLibrary();renderVoiceLibrary();renderSystem();renderPod();syncThemeIcon()}
 function syncThemeIcon(){const d=document.documentElement.getAttribute('data-theme')==='dark';$('#theme-icon').innerHTML=`<use href="#i-${d?'sun':'moon'}"/>`}
 
 let genTimer=null,playTimer=null;
@@ -1146,6 +1788,7 @@ function downloadWav(){
 document.addEventListener('click',e=>{
  if(e.target.id==='llm-modal'){pod.llmModal=false;$('#llm-modal').hidden=true;return}
  if(e.target.id==='pod-detail-modal'){pod.detailModal=false;$('#pod-detail-modal').hidden=true;return}
+ if(e.target.id==='sys-settings-modal'){closeSysSettings();return}
  const t=e.target.closest('[data-act]');
  if(!t){if(state.menu){state.menu=false;renderModelMenu()}return}
  const a=t.dataset.act,k=t.dataset.key;
@@ -1156,7 +1799,6 @@ document.addEventListener('click',e=>{
   case 'help':toast('快捷键：Ctrl/⌘ + Enter 生成 · 空格播放/暂停 · Esc 关闭菜单',true);break;
   case 'toggle-menu':state.menu=!state.menu;renderModelMenu();break;
   case 'model':state.menu=false;setModel(k,true);break;
-  case 'switch-model':setModel(k,true);switchView('workbench');break;
   case 'group':state.group=k;state.pick=null;
    if(k==='preset')state.pick=(model().speakers[0]||[])[0]||null;
    if(k==='mine'){state.pick=VOICES[0].id;state.refText=VOICES[0].text}
@@ -1264,7 +1906,43 @@ document.addEventListener('click',e=>{
    pod.episodes=pod.episodes.filter(e=>e.id!==k);
    pod.tasks=pod.tasks.filter(t=>t.episodeId!==k);
    pod.confirmDel=null;renderPodEpisodes();toast('剧集已删除');break}
-  case 'upload':case 'doctor':toast(a==='doctor'?'7 个模型权重与运行环境自检通过':'已打开上传对话框（原型演示）');break;
+  /* ---- 音色库 v1.8 ---- */
+  case 'voice-focus':{const el=$('#voice-new-name');if(el&&el.focus)el.focus();toast('已定位到「上传新音色」表单');break}
+  case 'voice-pick':vlibPick();break;
+  case 'voice-save':vlibSave();break;
+  case 'voice-preview':{const v=VOICES.find(x=>x.id===k);toast(`试听参考音频「${v?v.name:k}」（原型演示）`);break}
+  case 'voice-use':{
+   const v=VOICES.find(x=>x.id===k);if(!v)break;
+   if(model().caps.mine){state.group='mine';state.pick=v.id;state.refText=v.text}
+   switchView('workbench');renderSounds();renderAction();
+   toast(`已选择音色「${v.name}」，参考文本已回填`);break}
+  case 'voice-edit':{
+   const v=VOICES.find(x=>x.id===k);if(!v)break;
+   vlib.editId=k;vlib.editName=v.name;vlib.editPrompt=v.text;vlib.confirmDel=null;
+   renderVoiceCards();break}
+  case 'voice-edit-cancel':vlib.editId=null;renderVoiceCards();break;
+  case 'voice-edit-save':{
+   if(!vlib.editName.trim()){toast('名称不能为空',true);break}
+   if(!vlib.editPrompt.trim()){toast('参考文本不能为空',true);break}
+   const v=VOICES.find(x=>x.id===k);
+   if(v){v.name=vlib.editName.trim();v.text=vlib.editPrompt.trim();v.tag=v.text?'已校验':'缺参考文本'}
+   vlib.editId=null;renderVoiceCards();renderVoiceSide();renderSounds();toast('音色已更新');break}
+  case 'voice-del':{
+   if(vlib.confirmDel!==k){vlib.confirmDel=k;renderVoiceCards();toast('再次点击「确认删除」以移除该音色',true);break}
+   const i=VOICES.findIndex(x=>x.id===k);
+   if(i>=0)VOICES.splice(i,1);
+   if(state.pick===k){state.pick=VOICES.length?VOICES[0].id:null;state.refText=VOICES.length?VOICES[0].text:''}
+   vlib.confirmDel=null;renderVoiceLibrary();renderVoiceSide();renderSounds();toast('音色已删除');break}
+  case 'voice-refresh':renderVoiceLibrary();renderVoiceSide();toast('音色列表已刷新');break;
+  case 'sys-doctor-all':sysDoctorAll();break;
+  case 'sys-refresh':sysRefresh();break;
+  case 'sys-path':sys.expanded[k]=!sys.expanded[k];renderSystem();break;
+  case 'sys-doctor-one':sysRunDoctor(k);break;
+  case 'sys-load':sysLoad(k);break;
+  case 'sys-settings':openSysSettings(k);break;
+  case 'sys-settings-close':closeSysSettings();break;
+  case 'sys-settings-save':saveSysConfig();break;
+  case 'sys-settings-reset':resetSysConfig();break;
  }
 });
 document.addEventListener('input',e=>{
@@ -1279,21 +1957,44 @@ document.addEventListener('input',e=>{
  if(id==='pod-push-url')pod.pushUrl=e.target.value;
  if(id==='pod-line-edit-text')pod.editText=e.target.value;
  if(id==='pod-speed'){pod.speed=parseFloat(e.target.value);const v=$('#pod-speed').parentElement.querySelector('.range-val');if(v)v.textContent=pod.speed.toFixed(2)+'×';renderPodStepper()}
+ if(id==='voice-new-name'){vlib.name=e.target.value;vlibUpdateSave()}
+ if(id==='voice-new-text'){vlib.prompt=e.target.value;vlibUpdateSave()}
+ if(id==='voice-edit-name')vlib.editName=e.target.value;
+ if(id==='voice-edit-text')vlib.editPrompt=e.target.value;
  if(e.target.dataset.spk!==undefined){const i=+e.target.dataset.spk;pod.speakers[i][e.target.dataset.field]=e.target.value;renderPodStepper()}
+});
+/* 音色库拖拽：高亮态 + 落地时按文件名做格式 / 时长校验 */
+document.addEventListener('dragover',e=>{
+ const d=e.target.closest&&e.target.closest('.vlib-drop');if(!d)return;
+ e.preventDefault();if(!vlib.drag){vlib.drag=true;d.classList.add('drag')}
+});
+document.addEventListener('dragleave',e=>{
+ const d=e.target.closest&&e.target.closest('.vlib-drop');
+ if(d&&(!e.relatedTarget||!d.contains(e.relatedTarget))){vlib.drag=false;d.classList.remove('drag')}
+});
+document.addEventListener('drop',e=>{
+ const d=e.target.closest&&e.target.closest('.vlib-drop');if(!d)return;
+ e.preventDefault();vlib.drag=false;
+ const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+ vlibPick(f?f.name:undefined);
 });
 document.addEventListener('change',e=>{
  const t=e.target;
  if(t.dataset.spk!==undefined&&t.dataset.field==='voice'){pod.speakers[+t.dataset.spk].voice=t.value;renderPodScript();renderPodStepper()}
  if(t.dataset.line!==undefined){const s=pod.speakers[+t.value];if(s){pod.lines[+t.dataset.line].role=s.role;pod.lines[+t.dataset.line].name=s.name;renderPodScript()}}
+ if(t.id==='voice-file-input'&&t.files&&t.files[0]){vlibPick(t.files[0].name);t.value=''}
 });
 document.addEventListener('keydown',e=>{
  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();if(state.view==='workbench')generate()}
  if(e.key==='Escape'&&pod.llmModal){pod.llmModal=false;$('#llm-modal').hidden=true}
  if(e.key==='Escape'&&pod.detailModal){pod.detailModal=false;$('#pod-detail-modal').hidden=true}
+ if(e.key==='Escape'&&sys.settings){closeSysSettings()}
  if(e.key==='Escape'&&state.menu){state.menu=false;renderModelMenu()}
+ if((e.key==='Enter'||e.key===' ')&&e.target.closest&&e.target.closest('[data-act="sys-path"]')){
+  e.preventDefault();const pk=e.target.closest('[data-act="sys-path"]').dataset.key;
+  sys.expanded[pk]=!sys.expanded[pk];renderSystem();return}
  if(e.key===' '&&state.view==='workbench'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&!e.target.closest('button')&&state.result){e.preventDefault();togglePlay()}
 });
-$('#upload-zone').addEventListener('click',()=>toast('已打开上传对话框（原型演示）'));
 $('#char-count').textContent=state.text.length+' / 2000';
 renderAll();
 </script>

@@ -111,16 +111,23 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
 <body>
 <div class="wrap">
 <aside class="toc">
- <div class="brand"><div class="mark">V</div><div><b>Voice Studio</b><small>界面设计方案 v1.3</small></div></div>
+ <div class="brand"><div class="mark">V</div><div><b>Voice Studio</b><small>界面设计方案 v1.10</small></div></div>
  <div class="toc-label">方案目录</div>
  <nav id="toc-nav">
   <a href="#s1" class="active">01 现状诊断与目标</a>
   <a href="#s2">02 设计原则</a>
   <a href="#s3">03 信息架构</a>
+  <a href="#s3b">03B 框架与侧栏对齐</a>
+  <a href="#s3c">03C 内容区铺满</a>
   <a href="#s4">04 设计系统</a>
   <a href="#s5">05 核心界面决策</a>
   <a href="#s5b">05B 播客工坊专项</a>
   <a href="#s5c">05C 播客 UI 精修</a>
+  <a href="#s5d">05D 右侧面板配色重构</a>
+  <a href="#s5e">05E 内容源编辑区比例</a>
+  <a href="#s5f">05F 音色库能力补齐</a>
+  <a href="#s5g">05G 系统状态与概览重设计</a>
+  <a href="#s5h">05H 系统状态与设置</a>
   <a href="#s6">06 组件规范</a>
   <a href="#s7">07 状态与反馈</a>
   <a href="#s8">08 模型能力映射</a>
@@ -135,7 +142,7 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
   <div class="eyebrow">UI / UX Design Proposal</div>
   <h1>Voice Studio 界面重构方案</h1>
   <p class="lead">面向多模型语音合成控制台的一次完整重设计：把技术参数藏到背后，让用户只做三件事——输入文字、选一个声音、听结果。方案基于现有 5 个视图与 7 个模型能力实测，可直接映射到当前 API。</p>
-  <div class="hero-meta"><span class="tag pri">7 个模型</span><span class="tag">5 个视图</span><span class="tag">明暗双主题</span><span class="tag acc">WCAG 2.1 AA</span><span class="tag">响应式三档</span><span class="tag">播客能力 1:1 保留</span></div>
+  <div class="hero-meta"><span class="tag pri">7 个模型</span><span class="tag">5 个视图</span><span class="tag">明暗双主题</span><span class="tag acc">WCAG 2.1 AA</span><span class="tag">响应式三档</span><span class="tag">播客能力 1:1 保留</span><span class="tag acc">单色系状态色</span><span class="tag">系统状态 1:1 保留</span><span class="tag acc">权重目录可配置</span></div>
   <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap"><a class="btn" href="prototype.html">打开高保真交互原型 →</a><button class="btn sec" id="theme-btn2">切换主题预览</button></div>
  </div>
 
@@ -187,9 +194,9 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
   <p class="sec-desc">导航按「创作 / 管理」分层，把诊断页降级，把结果页升级。</p>
   <div class="ia">
    <div class="top">顶栏：页面标题 · 当前模型切换器（含状态）· 主题 · 帮助 —— 全局固定</div>
-   <div><b>左导航 228px</b>创作台（默认）<br>播客工坊<br>我的音色<br>作品库<br><span style="color:var(--text-3)">— 管理 —</span><br>系统状态<br><br><span style="color:var(--text-3);font-size:11px">底部仅一句状态，详情进系统状态页</span></div>
+   <div><b>左导航 240px</b>创作台（默认）<br>播客工坊<br>我的音色<br>作品库<br><span style="color:var(--text-3)">— 管理 —</span><br>系统状态与设置<br><br><span style="color:var(--text-3);font-size:11px">底部仅一句状态，详情进系统状态与设置页</span></div>
    <div><b>中：主任务区</b>① 合成文本 + 示例<br>② 声音选择（卡片网格）<br>③ 高级设置（默认折叠）<br>④ 底部吸底操作条<br><br><span style="color:var(--text-3);font-size:11px">单一纵列、逐步披露、主 CTA 始终可见</span></div>
-   <div><b>右：输出面板 336px</b>本次结果 / 波形播放器<br>下载 · 复用 · 保存<br>最近生成 4 条<br><br><span style="color:var(--text-3);font-size:11px">仅创作台显示，结果不离开视线</span></div>
+   <div><b>右：输出面板 320px</b>本次结果 / 波形播放器<br>下载 · 复用 · 保存<br>最近生成 4 条<br><br><span style="color:var(--text-3);font-size:11px">仅创作台显示，结果不离开视线</span></div>
   </div>
   <table>
    <thead><tr><th style="width:150px">视图</th><th style="width:120px">旧名称</th><th>职责变化</th></tr></thead>
@@ -198,9 +205,87 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
     <tr><td><strong>作品库</strong></td><td>历史记录</td><td>升级为一级导航，强调「可复用的产出」；带统计条、分类筛选、参数复用</td></tr>
     <tr><td><strong>我的音色</strong></td><td>音色库</td><td>保持上传能力，补充拖拽区、波形缩略、参考文本完整性状态</td></tr>
     <tr><td><strong>播客工坊</strong></td><td>播客工坊</td><td>原有能力 1:1 保留：三栏 + 全宽成品区；右侧「任务队列」「播客列表」保持两个独立分组，任务详情单独成面板；详见 05B</td></tr>
-    <tr><td><strong>系统状态</strong></td><td>系统状态</td><td>降为次级导航；承载 GPU、队列、7 个模型权重与运行环境自检</td></tr>
+    <tr><td><strong>系统状态与设置</strong></td><td>系统状态</td><td>次级导航；承载 GPU、队列、7 个模型权重、环境自检，以及权重目录与环境解释器配置（05H）</td></tr>
    </tbody>
   </table>
+ </section>
+
+ <section id="s3b">
+  <h2><span class="num">03B</span>全局框架：左右侧栏对齐</h2>
+  <p class="sec-desc">评审反馈「左右侧边栏高低和风格都不太协调」。这是结构问题而非配色问题：只调颜色解决不了，必须重排顶栏与侧栏的父子关系。</p>
+  <div class="grid2">
+   <div class="card"><h3 style="margin-top:0">根因</h3><ul>
+    <li><strong>高低差 64px</strong>：左栏是 100vh 的 sticky 元素，从视口顶端开始；右栏在顶栏下方的工作区内，天生矮一个顶栏。</li>
+    <li><strong>宽度失衡</strong>：228 : 336，右侧比左侧宽近 1.5 倍，视觉重心偏右。</li>
+    <li><strong>顶部语言不一致</strong>：左栏是渐变 logo + 品牌字，右栏是纯文字标题；底部一个是状态块、一个是提示句，样式也不同。</li>
+   </ul></div>
+   <div class="card"><h3 style="margin-top:0">改法</h3><ul>
+    <li>顶栏提升为<strong>全宽基座</strong>：品牌、页面标题、模型切换器、主题与帮助统一放在这一行。</li>
+    <li>下方新增 <code>.frame</code> 横向容器，左栏与工作区（含右栏）作为同级子元素，由 flex <strong>拉伸到完全等高</strong>。</li>
+    <li>左右栏统一背景、统一 20px 内边距、统一 1px 边线，宽度收敛到 240 / 320。</li>
+    <li>两边顶部复用同一套 <code>.panel-caption</code>：主色图标 + 13px/650 标题 + 右侧计数；底部统一 <code>border-top</code> 与 11px 说明文字。</li>
+   </ul></div>
+  </div>
+  <h3>框架前后对比</h3>
+  <table>
+   <thead><tr><th style="width:140px">项</th><th>之前</th><th>现在</th></tr></thead>
+   <tbody>
+    <tr><td>顶栏</td><td>只在中间列，宽 = 内容宽</td><td>全宽 64px，横跨左右栏</td></tr>
+    <tr><td>左栏起点</td><td>视口顶端（0px）</td><td>顶栏下方（64px）</td></tr>
+    <tr><td>右栏起点</td><td>顶栏下方（64px）</td><td>顶栏下方（64px）</td></tr>
+    <tr><td>左右高度</td><td>相差 64px</td><td>完全等高，均由 frame 拉伸</td></tr>
+    <tr><td>宽度</td><td>228 / 336</td><td>240 / 320</td></tr>
+    <tr><td>顶部</td><td>渐变 logo 对纯文字标题</td><td>同一 <code>panel-caption</code> 组件</td></tr>
+    <tr><td>底部</td><td>状态块对提示句</td><td>同款分隔线 + 11px 次要文字</td></tr>
+   </tbody>
+  </table>
+  <div class="note"><b>响应式：</b><code>≥1001px</code> 三栏等高；<code>721–1000px</code> 右栏移到工作区下方；<code>≤720px</code> 左栏变底部 Tab Bar、顶栏只保留 logo 标记与页面标题，frame 预留 62px 底部空间。桌面专属规则写在 <code>min-width</code> 媒体查询里，不会覆盖移动端布局。</div>
+  <ul class="check">
+   <li>左右栏顶边与底边像素对齐，滚动时各自独立，互不拖拽。</li>
+   <li>品牌只出现一次（顶栏），左右栏不再重复。</li>
+   <li>切换视图时右栏标题与图标同步变化，但框架高度不变。</li>
+   <li>移动端底部 Tab Bar 与顶栏仍完整可用，无横向滚动。</li>
+  </ul>
+ </section>
+
+ <section id="s3c">
+  <h2><span class="num">03C</span>内容区铺满：去掉留白，宽高都撑满</h2>
+  <p class="sec-desc">评审用两张截图圈出内容块，要求「红框的内容都铺满整个内容区」。原来内容被 <code>max-width</code> + 居中约束，左右留白；高度按内容自然排列，底部留白。</p>
+  <table>
+   <thead><tr><th style="width:130px">维度</th><th>之前</th><th>现在</th></tr></thead>
+   <tbody>
+    <tr><td>宽度</td><td><code>880 / 1100 / 1400px</code> + <code>margin:0 auto</code>，左右大片留白</td><td>容器 <code>width:100%</code>，只保留 20/22px 内边距</td></tr>
+    <tr><td>高度</td><td>内容自然高度，底部空一大截</td><td><code>.content</code> → <code>.view</code> → <code>.wb/.wrap</code> 全链路 flex column + <code>flex:1</code>，撑满可用高度</td></tr>
+    <tr><td>创作台</td><td>文本区固定高、操作条在中间</td><td>文本面板弹性吃掉剩余高度，操作条贴底；声音卡片桌面改 4 列一行</td></tr>
+    <tr><td>播客</td><td>三栏与成品区按内容排列</td><td>三栏 <code>flex:2.6</code> / 成品区 <code>flex:1</code> 分配高度，卡片边界贴到内容区底边</td></tr>
+   </tbody>
+  </table>
+  <h3>铺满后暴露并修掉的三个真问题</h3>
+  <div class="grid2">
+   <div class="card"><h4>① flex 不收缩导致纵向溢出</h4><p>flex item 默认 <code>min-height:auto</code>，内容撑到 908px 溢出 694px 的视图，<code>高级设置</code> 被挤到视口外，sticky 操作条还盖在它上面。修法：<code>min-height:0</code> + 操作条取消 sticky。</p></div>
+   <div class="card"><h4>② fr 列被内容撑开</h4><p><code>1.02fr 1.18fr .84fr</code> 的 fr 最小值是 auto，实测列宽变成 479 / 224 / 254，对话稿被压成竖排。修法：全部改 <code>minmax(0,Nfr)</code> 并给控件 <code>min-width:0</code>，实测回到 262 / 304 / 216。</p></div>
+   <div class="card"><h4>③ 三栏内容溢出卡片</h4><p>固定高度后阵容栏的文字跑到卡片外。修法：三栏各自内部滚动 + 细滚动条；内容源再拆出 <code>.src-scroll</code>，让「直接朗读 / 由大模型改写」两个关键按钮常驻卡片底部，不随输入区滚走。</p></div>
+   <div class="card"><h4>④ 成品区按钮被切半</h4><p>压缩成品区内边距、Tab 与波形高度，并把高度比例让回 185px，「合成播客成品 / 试听 / 下载 WAV」三个按钮完整可见。</p></div>
+  </div>
+  <h3>浏览器实测（Chrome headless，1440×900）</h3>
+  <table>
+   <thead><tr><th style="width:180px">测量项</th><th>结果</th></tr></thead>
+   <tbody>
+    <tr><td>内容区 / 视图</td><td><code>858×738</code> / <code>814×694</code>（减去 padding）</td></tr>
+    <tr><td>创作台 <code>.wb</code></td><td><code>814×694</code>，与视图完全相等，无溢出</td></tr>
+    <tr><td>创作台操作条</td><td><code>y=702…778</code>，贴内容区底边；高级设置 <code>y=625</code> 可见</td></tr>
+    <tr><td>播客 <code>.wrap</code></td><td><code>814×694</code>，完全铺满</td></tr>
+    <tr><td>播客三栏</td><td>等宽比 <code>262 / 304 / 216</code>，等高 <code>374</code>（最终 356）</td></tr>
+    <tr><td>成品与发布</td><td><code>y=611…778</code>，贴内容区底边</td></tr>
+   </tbody>
+  </table>
+  <ul class="check">
+   <li>五个视图都不再有 <code>max-width</code> 居中留白，卡片左右只留统一内边距。</li>
+   <li>创作台与播客的容器高度等于视图高度，底部无大片空白。</li>
+   <li>关键操作（成稿按钮、生成按钮、成品按钮）无需滚动即可点击。</li>
+   <li>内容多时只在卡片内部滚动，不溢出卡片边界、不遮挡相邻控件。</li>
+   <li><code>≤1000px</code> 与 <code>≤720px</code> 断点取消弹性拉伸，仍是自然高度与单列布局。</li>
+  </ul>
  </section>
 
  <section id="s4">
@@ -317,14 +402,16 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
     <tr><td>Tab 切换生硬、窄屏布局怪</td><td>Tab 加圆角与 hover 底色、160ms 过渡；1180px 明确「内容源 + 对话稿两栏、阵容全宽」，720px 去掉副标题缩进、时间轴内收</td><td>微交互 / 响应式</td></tr>
    </tbody>
   </table>
-  <h3>状态色规范</h3>
+  <h3>状态色规范 <span class="tag">v1.6 修订</span></h3>
+  <div class="note"><b>初版已被 05D 取代：</b>05C 初版把「合成中 / 推流中」标成警告黄、失败整行铺淡红，与全站蓝紫单色系冲突。下表为修订后的现行规范，完整论证见 <a href="#s5d" style="color:inherit;text-decoration:underline">05D</a>。</div>
   <table>
-   <thead><tr><th style="width:190px">状态</th><th style="width:130px">标签</th><th style="width:150px">行底色</th><th>圆点</th></tr></thead>
+   <thead><tr><th style="width:160px">状态</th><th style="width:170px">标签</th><th style="width:100px">行底色</th><th style="width:140px">左侧竖条</th><th>圆点</th></tr></thead>
    <tbody>
-    <tr><td>存稿 <code>draft</code></td><td>中性</td><td>无</td><td>次要色</td></tr>
-    <tr><td>合成中 / 推流中</td><td><code>live</code> 警告色</td><td><code>warn-soft</code> 淡黄</td><td>警告色</td></tr>
-    <tr><td>已完成 <code>completed</code></td><td><code>ok</code> 成功色</td><td>无</td><td>成功色</td></tr>
-    <tr><td>失败 / 已停止</td><td><code>err</code> 危险色</td><td><code>danger-soft</code> 淡红</td><td>危险色</td></tr>
+    <tr><td>存稿 / 已停止</td><td>中性胶囊</td><td>透明</td><td>无</td><td><code>text-3</code> 中性</td></tr>
+    <tr><td>合成中</td><td>中性胶囊</td><td>透明</td><td><code>primary</code> 3px</td><td><code>primary</code> 蓝紫</td></tr>
+    <tr><td>推流中</td><td>中性胶囊</td><td>透明</td><td><code>primary</code> 3px</td><td><code>accent</code> 青绿</td></tr>
+    <tr><td>已完成</td><td>中性胶囊</td><td>透明</td><td>无</td><td><code>text-3</code> 中性</td></tr>
+    <tr><td>失败</td><td>中性胶囊 + <code>danger</code> 文字</td><td>透明</td><td><code>danger</code> 3px</td><td><code>danger</code> 红</td></tr>
    </tbody>
   </table>
   <div class="note warn"><b>回归约束：</b>每次 UI 精修后都要重跑 05B 的能力对照表与验收项——特别是两个独立分组、draft 只进列表、队列点击进入详情、详情面板 9 类信息与 5 个操作。原型已用 DOM 桩做 15 项冒烟（功能 6 项 + UI 7 项 + 恢复 1 项 + 详情 1 项），全部通过。</div>
@@ -334,6 +421,272 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
    <li>所有禁用态都给出可操作的下一步说明。</li>
    <li>明暗主题下语义色对比度均 ≥ 4.5:1，状态不单靠颜色区分。</li>
    <li>启用「减少动态效果」后过渡与波形动画全部停止。</li>
+  </ul>
+ </section>
+
+ <section id="s5d">
+  <h2><span class="num">05D</span>右侧面板配色重构</h2>
+  <p class="sec-desc">针对「任务队列 + 播客列表」区域与整体风格脱节的一次专项重设计。只改语义色的使用方式，功能、数据模型、事件与接口契约全部不变。</p>
+
+  <h3>根因诊断</h3>
+  <table>
+   <thead><tr><th style="width:150px">问题</th><th>表现</th><th>为什么与整体冲突</th></tr></thead>
+   <tbody>
+    <tr><td><strong>语义错误</strong></td><td>「合成中 / 推流中」用 <code>warn</code> 警告黄，整行铺 <code>warn-soft</code> 淡黄底</td><td>进行中是<strong>正常活动态</strong>，不是异常；页面因此看起来像「告警墙」</td></tr>
+    <tr><td><strong>色彩面积失控</strong></td><td>每行同时有彩色整行底 + 彩色实心标签 + 彩色实心圆点，9 行叠加</td><td>主界面靠留白与细线分层，这里靠大面积色块，视觉重量差一个量级</td></tr>
+    <tr><td><strong>色相过多</strong></td><td>黄 / 橙 / 红 / 绿 四种暖色同时出现</td><td>全站只有蓝紫主色 + 中性灰 + 极少量青绿，暖色系无对应锚点</td></tr>
+    <tr><td><strong>框中框</strong></td><td>分组容器自带边框与浅灰底，内部再放彩色行</td><td>左侧导航与内容卡片都是扁平无框语言，右侧像另一套设计系统</td></tr>
+    <tr><td><strong>暗色浑浊</strong></td><td><code>warn-soft</code> 在暗色主题是深棕 <code>#3A2D14</code></td><td>成片深棕块压在深蓝底上，既脏又降低文字对比度</td></tr>
+   </tbody>
+  </table>
+
+  <h3>三条设计原则</h3>
+  <div class="grid3">
+   <div class="card"><h4 style="margin-top:0">① 语义归位</h4><p>进行中 = 主色活动态（与左栏选中态、主按钮同色）；已完成 = 安静中性（归档态无需绿色庆祝）；失败 = 唯一警示色；存稿 = 中性更淡。红色只保留给真正需要用户处理的状态。</p></div>
+   <div class="card"><h4 style="margin-top:0">② 面积收敛到 5% 以下</h4><p>整行底色 → <strong>3px 左侧竖条 + 7px 圆点</strong>；彩色实心标签 → 统一中性胶囊。每行最多一处彩色元素，颜色从「背景」退回「标记」。</p></div>
+   <div class="card"><h4 style="margin-top:0">③ 用形状而非颜色分层</h4><p>分组容器去边框、去底色，只留标题下 1px 分隔线；行与行靠间距与 hover 态区分；进行中用竖条（形状）标识，不靠颜色单通道。</p></div>
+  </div>
+
+  <h3>前后对比</h3>
+  <table>
+   <thead><tr><th style="width:170px">元素</th><th style="width:45%">改前</th><th>改后</th></tr></thead>
+   <tbody>
+    <tr><td>进行中行</td><td><code>warn-soft</code> 淡黄整行底</td><td>透明底 + <code>primary</code> 3px 竖条 + 主色标题文字</td></tr>
+    <tr><td>失败行</td><td><code>danger-soft</code> 淡红整行底</td><td>透明底 + <code>danger</code> 3px 竖条</td></tr>
+    <tr><td>状态标签</td><td>4 种彩色实心底（黄 / 绿 / 红 / 灰）</td><td>统一 <code>surface-3</code> 中性胶囊 + <code>text-2</code>；仅失败用危险色文字</td></tr>
+    <tr><td>语义圆点</td><td>8px 实心高饱和色块</td><td>7px + 2px 语义色环；蓝紫 / 青绿 / 中性灰 / 红</td></tr>
+    <tr><td>分组容器</td><td>边框 + <code>surface-2</code> 底 + 14px 圆角</td><td>无边框透明，仅标题下 1px 分隔线</td></tr>
+    <tr><td>「N 进行中」</td><td>危险红文字 + ● 前缀</td><td><code>primary-soft</code> 主色胶囊</td></tr>
+    <tr><td>顶部计数 / 进度条</td><td>顶部计数 <code>warn-soft</code> 黄底</td><td>顶部计数 <code>primary-soft</code>；进度条统一主色</td></tr>
+    <tr><td>提示条（全站）</td><td><code>warn-soft</code> 整块淡黄底</td><td>统一「中性底 + 3px 语义左条」；仅详情面板的失败原因把左条换成 <code>danger</code></td></tr>
+   </tbody>
+  </table>
+
+  <div class="note"><b>实测数据（无头 Chrome，1440×900）：</b>对右侧面板全部 9 行读取 <code>getComputedStyle</code>——行背景 <code>rgba(0,0,0,0)</code>（全透明，暖色底已彻底消失），标签背景统一 <code>rgb(237,241,249)</code> 中性灰，圆点依次为 <code>rgb(79,91,213)</code> 蓝紫 / <code>rgb(14,158,149)</code> 青绿 / <code>rgb(139,150,173)</code> 中性 / <code>rgb(207,66,71)</code> 红；仅进行中与失败行有竖条。明暗两套主题均已渲染复核，暗色下不再出现深棕色块。</div>
+
+  <h3>验收项</h3>
+  <ul class="check">
+   <li>任务队列与播客列表仍是两个独立分组，draft 只出现在列表，点击行为不串。</li>
+   <li>列表内不再出现任何整行暖色底；暖色仅用于「失败」的小面积标记。</li>
+   <li>状态不单靠颜色区分：标签保留文字，进行中另有竖条与进度条，失败另有原因文案。</li>
+   <li>明暗主题下标签文字对比度 ≥ 4.5:1；暗色主题不出现浑浊深棕块。</li>
+   <li>详情面板的状态标签同步改为中性胶囊 + 语义点，与主列表同一套语言。</li>
+   <li>回归通过：DOM 桩 15 项冒烟（功能 6 + 配色 4 + 映射 1 + 详情 3 + 恢复 1）全部 PASS。</li>
+  </ul>
+ </section>
+
+ <section id="s5e">
+  <h2><span class="num">05E</span>内容源编辑区比例与配置归位</h2>
+  <p class="sec-desc">针对「文本输入区占比太小、大模型配置夹在中间」的一次空间重分配。只调结构与文案位置，三个内容源、两个成稿动作、LLM 配置弹窗与所有事件保持不变。</p>
+
+  <h3>根因</h3>
+  <div class="note"><b>不是控件太矮，是容器超载：</b>无头浏览器实测 <code>.src-scroll</code> 只有 <strong>98px</strong>，里面却排了 Tab(40) + 文本域(110) + 字数行 + 配置条(53) ≈ 220px。结果文本域被裁掉一半、配置条要滚动才能看到，下方又空出一大片——用户看到的「小输入框」其实是滚动区的可视片段。</div>
+
+  <h3>空间重分配</h3>
+  <table>
+   <thead><tr><th style="width:180px">元素</th><th style="width:44%">改前</th><th>改后</th></tr></thead>
+   <tbody>
+    <tr><td>文本编辑区</td><td><code>height:110px</code> 写死，实可见约 58px</td><td><code>flex:1; min-height:0</code>，吃掉滚动区全部剩余高度</td></tr>
+    <tr><td>大模型配置</td><td>夹在输入区与成稿按钮之间，且位于滚动区内</td><td>移到<strong>卡片最底部</strong>，细分隔线分隔的扁平 footer；说明它只服务「大模型改写」路径</td></tr>
+    <tr><td>顶部「大模型」按钮</td><td>标题栏右侧，与配置条重复入口</td><td>合并进底部配置区（CTA 去重，弹窗入口仍为 <code>pod-llm</code>）</td></tr>
+    <tr><td>两个成稿按钮</td><td>竖排共 92px</td><td>并排 36px；文案精简为「直接朗读 / 大模型改写」，完整说明保留在 <code>title</code></td></tr>
+    <tr><td>副标题 + 说明行</td><td>各占一行，共约 50px</td><td>并入输入框 <code>placeholder</code>、按钮 <code>title</code>；文件 / 链接模式仍保留可见约束说明</td></tr>
+    <tr><td>字数统计</td><td>输入框下方独立一行</td><td>移到标题栏右侧中性胶囊，随内容源切换显示字数 / 已提取字数</td></tr>
+    <tr><td>成品区</td><td><code>min-height:185px</code></td><td>沿用 185px 安全高度——试过压到 170px 会让三个按钮溢出 13px，已回退</td></tr>
+   </tbody>
+  </table>
+
+  <h3>实测对比（无头 Chrome，1440×900，文本模式）</h3>
+  <table>
+   <thead><tr><th>指标</th><th>改前</th><th>改后</th></tr></thead>
+   <tbody>
+    <tr><td><code>.src-scroll</code> 高度</td><td>98px（内容 220px，溢出需滚动）</td><td><strong>207px</strong>（内容不再溢出）</td></tr>
+    <tr><td>文本域完整高度 / 实际可见</td><td>110px / 约 58px（被裁）</td><td><strong>161px / 161px</strong>（完整可见，可见面积约 +178%）</td></tr>
+    <tr><td>文本域占内容源栏比例</td><td>约 31%（且被裁）</td><td>约 <strong>45%</strong></td></tr>
+    <tr><td>文本域与按钮重叠</td><td>存在（滚动区溢出）</td><td><code>false</code></td></tr>
+    <tr><td>配置条位置</td><td>滚动区内，需滚动</td><td>卡片内底部 <code>y=543…560</code>（卡片底 594）</td></tr>
+    <tr><td>成品区按钮裁切</td><td>无</td><td><code>false</code>（按钮底 776 &lt; 卡片底 778）</td></tr>
+   </tbody>
+  </table>
+
+  <h3>验收项</h3>
+  <ul class="check">
+   <li>三种内容源（粘贴文本 / 上传文件 / 网页链接）下，编辑区与成稿按钮均不重叠、不溢出。</li>
+   <li>顶部不再出现重复的大模型入口；配置弹窗仍可从底部「配置 / 测试」打开。</li>
+   <li>两个成稿动作的 <code>data-act</code> 与完整说明均未丢失（说明在 <code>title</code> 与 placeholder）。</li>
+   <li>底部「成品与发布」三个按钮与波形完整可见，不因上半区变高而被裁。</li>
+   <li>05B 全部能力、05D 配色规范、队列与列表的分离边界保持不变。</li>
+   <li>回归通过：DOM 桩 15 项冒烟全 PASS；明暗两套主题渲染复核通过。</li>
+  </ul>
+ </section>
+
+ <section id="s5f">
+  <h2><span class="num">05F</span>音色库能力补齐</h2>
+  <p class="sec-desc">按原系统音色库（截图 + <code>index.html</code> 262–338 / <code>app.js</code> 760–880）逐项核对后的 1:1 补齐。原型第一版只保留了「试听」和一个 toast 式「编辑」，共 <strong>2 个功能点</strong>，原实现有 <strong>21 个</strong>——这不是风格差异，是功能缺失。本轮只重组结构，接口契约与能力一个不少。</p>
+
+  <h3>能力对照（21 项）</h3>
+  <table>
+   <thead><tr><th style="width:120px">区域</th><th style="width:44%">原实现</th><th>本版位置与改进</th></tr></thead>
+   <tbody>
+    <tr><td rowspan="7"><strong>上传区<br>校验</strong></td><td>点击 / 拖拽选择音频，<code>accept</code> 限定 6 种格式</td><td>左侧大拖拽区，含 hover 与 <code>dragover</code> 高亮态；保留隐藏 file input</td></tr>
+    <tr><td>格式校验，非法后缀给错误文案</td><td>错误用「中性底 + 语义左条」提示，不用大面积暖色块</td></tr>
+    <tr><td>解码得到时长 / 采样率</td><td>选中后显示文件名、<code>8.4s · 24000 Hz</code></td></tr>
+    <tr><td>1~30 秒校验，<code>✓ 可用</code> / <code>✗ 不可用</code></td><td>同状态文案，失败态拖拽区转语义色描边</td></tr>
+    <tr><td>迷你波形预览（120 峰值柱）</td><td>波形条置于文件信息下方，沿用主色</td></tr>
+    <tr><td>音色名称 / 参考音频文字内容两个必填项</td><td>右侧表单列，必填标记与 placeholder 完整保留</td></tr>
+    <tr><td>保存按钮禁用条件、busy 态、错误提示</td><td>禁用时<strong>写明原因</strong>（先选音频 / 填名称 / 填参考文本），附保存后联动说明</td></tr>
+    <tr><td rowspan="2"><strong>上传<br>联动</strong></td><td>保存成功后清空表单、刷新列表</td><td>同；并同步右侧提交记录与创作台声音列表</td></tr>
+    <tr><td>自动选中新音色、回填参考文本、切回工作台、<code>sft → zero_shot</code></td><td>原型对应 <code>group='mine'</code> / <code>pick</code> / <code>refText</code> 回填，模型不支持克隆时不强制切换</td></tr>
+    <tr><td rowspan="6"><strong>音色<br>卡片</strong></td><td>名称 + 时长徽标</td><td>头像 + 名称 / 副标题分行 + 右上时长胶囊</td></tr>
+    <tr><td>参考音频文字内容</td><td>两行截断展示，缺文本时给可见提示</td></tr>
+    <tr><td>创建时间</td><td>底部细线下的时间 + 采样率，等宽数字</td></tr>
+    <tr><td><strong>试听参考 / 用于合成 / 编辑 / 删除</strong> 四操作</td><td>四个按钮全部补齐；「用于合成」切回创作台并回填；删除改<strong>两步确认</strong>（替代原生 <code>confirm</code>）</td></tr>
+    <tr><td>内联编辑态：名称(50) / 参考文本(500) / 保存 / 取消</td><td>同，另加空值校验提示</td></tr>
+    <tr><td>列表空状态</td><td>网格内空状态卡片 + 右侧记录空状态，各自给引导</td></tr>
+    <tr><td rowspan="2"><strong>右侧<br>记录</strong></td><td>「音色提交记录」分组（计数、刷新、点击试听、相对时间）</td><td>作为<strong>独立分组</strong>放在右侧输出面板，与「任务队列 / 播客列表」互不混用</td></tr>
+    <tr><td>记录为空时的提示</td><td>同；刷新动作单独绑定，不影响其它视图</td></tr>
+   </tbody>
+  </table>
+
+  <h3>结构上的取舍</h3>
+  <div class="grid3">
+   <div class="card"><h4 style="margin-top:0">① 上传卡片化</h4><p>原实现是「一个白卡片里塞左右两栏」；本版沿用左右两栏，但标题行改用全站统一的 <code>panel-caption</code> 语言，错误提示居中收敛，避免和卡片边框形成框中框。</p></div>
+   <div class="card"><h4 style="margin-top:0">② 卡片信息分层</h4><p>头像 / 名称 / 时长 → 参考文本 → 波形 → 四操作 → 时间。原版四操作是两行排布，本版用等分按钮一行放下，窄屏自动折行。</p></div>
+   <div class="card"><h4 style="margin-top:0">③ 右侧面板复用</h4><p>音色库视图也常驻右侧面板，但只承载「提交记录」，与工作台「本次结果」、播客「任务与剧集」互斥切换，切换时标题、图标、计数、提示语全部复原。</p></div>
+  </div>
+
+  <div class="note"><b>原型边界：</b>真实系统用 <code>AudioContext.decodeAudioData</code> 解码音频并计算 120 个峰值；原型不读取真实文件，改为点击拖拽区循环演示「合格 / 超长 35.2s / 不支持格式 .txt / 空态」四种校验结果，拖拽落地时按文件名做真实的后缀与时长规则判定。所有状态、文案与联动路径均与原实现一致。</div>
+
+  <h3>验收项</h3>
+  <ul class="check">
+   <li>上传区 6 种格式、时长与采样率、1~30 秒校验状态、波形、两个必填项、禁用原因均可复现。</li>
+   <li>保存后新增音色、清空表单、自动选中、回填参考文本、切回创作台、刷新提交记录六步联动完整。</li>
+   <li>卡片四操作齐全；编辑态可保存 / 取消并校验空值；删除需两步确认。</li>
+   <li>音色为空时，卡片列表与右侧记录各有独立空状态引导。</li>
+   <li>切到工作台 / 播客工坊再切回，右侧面板标题、图标、计数与内容正确复原。</li>
+   <li>05B / 05D / 05E 的既有能力、配色规范与内容区铺满规则未被破坏。</li>
+   <li>回归通过：DOM 桩 26 项冒烟全 PASS；明暗两套主题渲染复核通过。</li>
+  </ul>
+ </section>
+
+ <section id="s5g">
+  <h2><span class="num">05G</span>系统状态能力补齐与概览重设计</h2>
+  <p class="sec-desc">对照原系统「系统状态」页（<code>index.html</code> 622–670、<code>app.js</code>、<code>/api/health</code> 与 <code>/api/models/{key}/doctor</code>）逐项补齐，并按两轮反馈把重复的 GPU / 服务卡并入概览、重做视觉层级。</p>
+
+  <div class="note"><b>问题：</b>原型第一版只剩 4 个概览数字与 7 张简化卡（名字 + 一句说明 + 两个标签 + 一个加载按钮），丢失了权重目录、运行环境、推理模式、逐卡环境自检结果、GPU 与服务指标、刷新与侧栏速览等能力。</div>
+
+  <h3>能力对照（19 项，1:1 保留）</h3>
+  <table>
+   <thead><tr><th style="width:150px">分组</th><th>原实现能力</th><th style="width:230px">本版位置</th></tr></thead>
+   <tbody>
+    <tr><td><b>模型卡 ×7</b></td><td>完整模型名与版本括注、<code>已加载 / 已就绪 / 未下载</code> 三态标签、推理模式列表、权重目录绝对路径、运行环境解释器、流式策略、未就绪安装提示、<code>加载此模型 / 当前已加载</code> 禁用态</td><td>4 列模型网格，路径可点击展开、<code>title</code> 保留全值</td></tr>
+    <tr><td><b>逐卡自检</b></td><td><code>环境自检</code> 按钮 + <code>检测中…</code> busy 态；结果含权重就绪 / 缺失文件、推理依赖可导入 / 错误详情、index-tts 源码目录、异常信息</td><td>每张卡独立按钮，结果以中性底 + 主色左条内联展开</td></tr>
+    <tr><td><b>GPU / 服务</b></td><td>GPU 型号、显存进度条与用量百分比；推理队列、最近一次合成耗时、克隆音色数、输出采样率</td><td><b>合并进顶部「运行概览」</b>，见下方去重表</td></tr>
+    <tr><td><b>页头与侧栏</b></td><td>刷新状态；左下「系统信息」速览（服务状态、GPU、显存、排队、输出、端口）</td><td>页头刷新按钮 + 全局自检；侧栏 <code>sys-mini</code> 两列速览，与系统页联动</td></tr>
+   </tbody>
+  </table>
+
+  <h3>字段去重：GPU / 服务卡并入概览</h3>
+  <p>两张独立卡被网格拉伸后各空出约 60% 面积，且其中一半字段与顶部概览重复。合并原则是「每个字段只出现一次」：</p>
+  <table>
+   <thead><tr><th style="width:200px">重复字段</th><th style="width:150px">原位置</th><th>合并后</th></tr></thead>
+   <tbody>
+    <tr><td>显存 <code>1.13 / 16 GB（7%）</code> + 进度条</td><td>概览「显存占用」<b>与</b> GPU 卡</td><td>概览第 2 卡「GPU / 显存」，补入原先只在 GPU 卡出现的<b>型号</b></td></tr>
+    <tr><td>推理队列 <code>0 / 16</code></td><td>概览「推理队列」<b>与</b> 服务卡</td><td>概览第 3 卡，补入服务卡的<b>最近一次合成耗时</b>与已就绪模型数</td></tr>
+    <tr><td>输出采样率、克隆音色数</td><td>仅服务卡</td><td>概览第 4 卡「音色与输出」</td></tr>
+    <tr><td>服务端口、独立运行环境数</td><td>仅侧栏速览</td><td>概览第 1 卡，侧栏保留速览（不同层级的同一数据源）</td></tr>
+    <tr><td>「刷新于 刚刚」</td><td>页头已有 <code>#sys-updated</code></td><td><b>删除</b>，避免同屏重复</td></tr>
+   </tbody>
+  </table>
+  <div class="note">合并后网格由 9 张变 7 张（4 列 × 2 行），GPU / 服务两张独立卡及其 <code>.sys-tile</code> 样式全部移除；底部改用一条操作说明收尾，不新造数据卡。</div>
+
+  <h3>视觉重设计：底色、字号、留白</h3>
+  <div class="grid3">
+   <div class="card"><h4 style="margin-top:0">① 概览加底色分层</h4><p>「运行概览」区块用 <code>--primary-soft</code> 淡蓝紫底 + 圆角边框，内部 4 张卡保持 <code>--surface</code> 白底与细阴影；与下方纯白模型网格形成明确分组。暗色下为纯蓝紫 <code>rgb(37,44,88)</code>，不出现浑浊棕黄块。</p></div>
+   <div class="card"><h4 style="margin-top:0">② 字号回到可读区间</h4><p>概览主指标 18 → <b>23px</b>、明细 10.5 → <b>11.5px</b>；模型名 12 → <b>13px</b>、说明与四行元信息 10.5 → <b>11.5px</b>、按钮 11 → <b>12px</b>、状态标签 → <b>11px</b>。</p></div>
+   <div class="card"><h4 style="margin-top:0">③ 消除卡片内部留白</h4><p>网格曾被 <code>flex:1</code> 拉伸到 245px/行，按钮悬在底部、中间空一大块。系统页改 <code>flex:0 0 auto; align-content:start</code>，卡片回到自然高度 <b>192px</b>，按钮紧跟内容。</p></div>
+  </div>
+
+  <h3>浏览器实测（1440 × 900，无头 Chrome）</h3>
+  <table>
+   <thead><tr><th style="width:210px">项</th><th>结果</th></tr></thead>
+   <tbody>
+    <tr><td>布局</td><td>概览 <code>y=159…332</code> → 网格 <code>y=348…743</code> → 页脚 <code>743…776</code>，内容区底 <code>778</code>，<b>bottomGap=2px</b>；4 列 2 行（4 + 3），7 张模型卡，0 张独立数据卡</td></tr>
+    <tr><td>底色</td><td>明 <code>rgb(238,240,255)</code> / 白卡 <code>rgb(255,255,255)</code>；暗 <code>rgb(37,44,88)</code> / 深卡 <code>rgb(18,26,44)</code>，两套均清晰分层</td></tr>
+    <tr><td>计算字号</td><td>主指标 23px、明细 11.5px、模型名 13px、元信息 11.5px、按钮 12px（明暗一致）</td></tr>
+    <tr><td>卡片高度</td><td>拉伸态 235px → 自然态 <b>192px</b>，内部空白显著收敛</td></tr>
+   </tbody>
+  </table>
+
+  <h3>验收项</h3>
+  <ul class="check">
+   <li>7 张模型卡均显示完整模型名、三态标签、推理模式 / 权重目录 / 运行环境 / 流式四行，路径可点击或键盘展开。</li>
+   <li>逐卡环境自检有 busy 态与权重 / 依赖 / 源码 / 错误四类结果；全局自检覆盖 7 个模型。</li>
+   <li>刷新、加载模型（loading → 已加载标签转移、创作台模型同步、停留在系统页）联动完整；未下载态显示安装提示并禁用加载。</li>
+   <li>GPU 与服务独立卡已移除；显存、队列等重复字段在概览区各只出现一次，页头不重复「刷新于」。</li>
+   <li>概览区有底色与「运行概览」标题，明暗主题均干净；字号与卡片留白符合上方实测值。</li>
+   <li>侧栏「系统信息」六项速览随刷新 / 加载同步；05B / 05D / 05E / 05F 的既有能力未被破坏。</li>
+   <li>回归通过：DOM 桩 25 项冒烟全 PASS；JS / HTML 静态检查、DOM id / 事件 / 图标引用零悬空，无遗留死代码。</li>
+  </ul>
+ </section>
+
+ <section id="s5h">
+  <h2><span class="num">05H</span>系统状态与设置：权重目录可配置</h2>
+  <p class="sec-desc">页面从「看状态」升级为「看状态 + 配环境」，标题同步改为<b>系统状态与设置</b>；权重目录不再是只读文本，而是可编辑、可保存、可追溯的配置项。</p>
+
+  <h3>标题与入口</h3>
+  <table>
+   <thead><tr><th style="width:190px">位置</th><th>改动</th></tr></thead>
+   <tbody>
+    <tr><td>侧栏导航 / 页头 H2 / 顶栏标题 / 侧栏提示</td><td>四处统一为「系统状态与设置」；顶栏副标题改为「模型、运行环境与权重目录配置」，页头副标题补充「可在此配置权重目录」</td></tr>
+    <tr><td>页头主操作区</td><td>新增次级按钮「权重目录设置」，与「运行环境自检」并列；不抢主 CTA 权重</td></tr>
+    <tr><td>每张模型卡「权重目录」行</td><td>行尾加齿轮直达按钮，打开设置时自动高亮并聚焦该模型对应的输入框（<code>scrollIntoView block:nearest</code>），避免全局滚动</td></tr>
+    <tr><td>运行概览标题行右侧</td><td>显示当前权重根目录与自定义项数（如「已自定义 1 项」），配置保存后即时反馈</td></tr>
+   </tbody>
+  </table>
+
+  <h3>配置项与后端环境变量映射（11 项）</h3>
+  <table>
+   <thead><tr><th style="width:150px">分组</th><th style="width:230px">字段</th><th>对应环境变量 / 后端字段</th></tr></thead>
+   <tbody>
+    <tr><td><b>全局 ×1</b></td><td>权重根目录</td><td><code>COSYVOICE_MODELS_DIR</code> → <code>model_registry.MODELS_DIR</code></td></tr>
+    <tr><td rowspan="4"><b>模型权重目录 ×7</b></td><td>CosyVoice 3.0 / 2.0</td><td>全局根目录下的默认子目录（<code>Fun-CosyVoice3-0.5B</code> / <code>CosyVoice2-0.5B</code>）</td></tr>
+    <tr><td>IndexTTS 2.0 / 2.5</td><td><code>INDEXTTS2_DIR</code> / <code>INDEXTTS25_DIR</code></td></tr>
+    <tr><td>Qwen3-TTS CustomVoice / Base / VoiceDesign</td><td><code>QWEN3TTS_DIR</code> / <code>QWEN3TTS_BASE_DIR</code> / <code>QWEN3TTS_DESIGN_DIR</code></td></tr>
+    <tr><td>每行状态</td><td>与 <code>public_info().dir</code> 一致；改动后卡片「权重目录」行同步刷新</td></tr>
+    <tr><td><b>运行环境 ×3</b></td><td>index-tts 源码 / IndexTTS 解释器 / Qwen3-TTS 解释器</td><td><code>INDEXTTS_REPO</code> / <code>INDEXTTS_PYTHON</code> / <code>QWEN3TTS_PYTHON</code> → <code>runtime_python()</code> 与 <code>doctor.repo</code></td></tr>
+   </tbody>
+  </table>
+
+  <h3>交互与防错</h3>
+  <div class="grid3">
+   <div class="card"><h4 style="margin-top:0">① 编辑与保存</h4><p>11 个路径输入框，按「全局 / 模型（两列）/ 运行环境（两列）」分组；底部操作栏固定在弹窗底部，内容区独立滚动。保存后写本地配置、更新 <code>SYS_META</code>、重绘系统页并提示「重启服务后生效」。</p></div>
+   <div class="card"><h4 style="margin-top:0">② 恢复默认可撤销</h4><p>「恢复默认」只重置表单值、不修改内存配置；此时点「取消」可完整撤销，点「保存」才真正写入。已自定义的项在弹窗里带「自定义」徽标。</p></div>
+   <div class="card"><h4 style="margin-top:0">③ 关闭与联动</h4><p>支持遮罩点击、Esc、取消按钮关闭；切换视图时自动关闭。保存会同步卡片路径、解释器路径与概览根目录文案，不触碰播客 / 音色库 / 创作台。</p></div>
+  </div>
+
+  <div class="note"><b>原型边界与落地路径：</b>后端 <code>model_registry.py</code> 在模块导入时读取环境变量并固定 <code>dir</code>，目前没有运行时配置接口。真正落地需二选一：① 服务端把配置写入 <code>.env</code> / 启动脚本，重启后生效；② 新增 <code>GET/PUT /api/admin/config</code>，由 <code>model_registry</code> 改为可重载的运行时配置，并在切换模型前校验目录有效性。原型用 <code>localStorage</code> 演示完整交互与联动，不冒充已接通后端。</div>
+
+  <h3>浏览器实测（1440 × 900）</h3>
+  <table>
+   <thead><tr><th style="width:200px">项</th><th>结果</th></tr></thead>
+   <tbody>
+    <tr><td>标题一致性</td><td>顶栏 / H2 / 侧栏导航均为「系统状态与设置」</td></tr>
+    <tr><td>入口</td><td>7 张卡各 1 个齿轮按钮；页头「权重目录设置」按钮；概览显示根目录</td></tr>
+    <tr><td>弹窗</td><td><code>y=40…762</code>（722px），11 行配置、11 个输入框，模型区与环境区均为两列；底部操作栏 <code>691…761</code> 完整可见</td></tr>
+    <tr><td>卡片直达</td><td><code>focusRow=1</code>、<code>focusedInput=indextts25</code>，环境变量标注齐全</td></tr>
+   </tbody>
+  </table>
+
+  <h3>验收项</h3>
+  <ul class="check">
+   <li>四处标题统一为「系统状态与设置」，顶栏与页头副标题说明可配置。</li>
+   <li>页头与 7 张模型卡均可打开设置；从卡片进入时对应行高亮并聚焦。</li>
+   <li>11 个配置项齐全并标注环境变量；两列布局下无截断、无重叠，底部三个按钮始终可见。</li>
+   <li>保存后卡片目录、解释器、概览根目录文案即时更新并重开显示「自定义」；恢复默认可撤销。</li>
+   <li>遮罩点击 / Esc / 取消 / 切换视图均能正确关闭弹窗；05B–05G 的既有能力未被破坏。</li>
+   <li>文档明确后端落地路径与原型边界，不把 localStorage 演示当作已接通服务端配置。</li>
+   <li>回归通过：DOM 桩 22 项冒烟全 PASS；JS / HTML 静态检查、DOM 引用与事件零悬空；明暗两套主题与弹窗态渲染复核。</li>
   </ul>
  </section>
 
@@ -440,7 +793,7 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
   <div class="note"><b>交付物：</b><code>design/prototype.html</code>（可交互高保真原型，零外部依赖，双击即可打开）与 <code>design/ui-design-spec.html</code>（本方案）。原型中的音频为演示用合成音，不代表模型真实音质。</div>
  </section>
 
- <div class="footer">Voice Studio 界面设计方案 v1.3 · 基于 tts 项目 7 模型控制台现状 · 2026-11-12</div>
+ <div class="footer">Voice Studio 界面设计方案 v1.10 · 基于 tts 项目 7 模型控制台现状 · 2026-11-12</div>
 </main>
 </div>
 <script>
