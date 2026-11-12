@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import AsyncIterator, Optional
 
 from .backends import CosyVoiceBackend, ExternalTTSBackend
-from .model_registry import MODEL_KEYS, MODEL_REGISTRY, MODELS_DIR, is_available, public_info
+from .model_registry import MODEL_KEYS, MODEL_REGISTRY, MODELS_DIR, effective_modes, is_available, public_info
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COSYVOICE_ROOT = REPO_ROOT / "CosyVoice"
@@ -233,7 +233,8 @@ class Engine:
         if spec.model != self._key:
             return f"model '{spec.model}' is not loaded (loaded: {self._key})"
         cfg = MODEL_REGISTRY[spec.model]
-        if spec.mode not in cfg["modes"]:
+        modes, spk_modes = effective_modes(spec.model)
+        if spec.mode not in modes:
             return f"mode '{spec.mode}' not supported by {spec.model}"
         if not spec.text.strip():
             return "text is empty"
@@ -241,7 +242,7 @@ class Engine:
             return "text too long (max 2000 chars)"
 
         backend = self._backend
-        if spec.mode in cfg["speaker_modes"]:
+        if spec.mode in spk_modes:
             if not spec.spk_id:
                 return f"{spec.mode} mode requires spk_id"
             available = backend.speakers() if backend else []

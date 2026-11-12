@@ -19,6 +19,10 @@ index-tts/
 # 模型权重 (部署时 scripts/download_models.py 下载, ~15GB 起)
 models/
 
+# 本机配置 (复制 .env.example 得到；只提交样例)
+.env
+!.env.example
+
 # 运行时数据 (用户音频 + 数据库)
 server/data/
 server_run.log

@@ -31,14 +31,22 @@ $env:COSYVOICE_DEFAULT_MODEL = "cosyvoice2"; powershell -ExecutionPolicy Bypass 
 
 ### 方式 D：启动并加载 IndexTTS / Qwen3-TTS
 
-这些模型跑在独立解释器 worker 里，环境变量必须在**同一个 PowerShell 会话**设置：
+这些模型跑在独立解释器 worker 里。**推荐把配置写入仓库根目录 `.env`**（复制 `.env.example`），
+服务启动时自动读取，之后每次启动都生效：
+
+```ini
+INDEXTTS_REPO=D:/work/zcode/tts/index-tts
+INDEXTTS_PYTHON=D:/work/zcode/tts/index-tts/.venv/Scripts/python.exe
+QWEN3TTS_PYTHON=D:/work/zcode/tts/.venv-qwen3/Scripts/python.exe
+```
 
 ```powershell
-$env:INDEXTTS_REPO   = "D:\work\zcode\tts\index-tts"
-$env:INDEXTTS_PYTHON = "D:\work\zcode\tts\index-tts\.venv\Scripts\python.exe"
-$env:QWEN3TTS_PYTHON = "D:\work\zcode\tts\.venv-qwen3\Scripts\python.exe"
 powershell -ExecutionPolicy Bypass -File scripts\start.ps1 -Port 8001 -Model indextts25
 ```
+
+临时覆盖时仍可在**同一个 PowerShell 会话**里用 `$env:XXX = ...`（进程环境变量优先于 `.env`）；
+修改 `.env` 后必须重启服务。用 `curl http://127.0.0.1:8001/api/admin/config` 可查看当前生效的
+权重目录与解释器，逐模型自检用 `GET /api/models/{key}/doctor`。
 
 完整安装步骤与全部环境变量见 [README.md](README.md) 的「可选：接入 IndexTTS 2.0 / 2.5 与 Qwen3-TTS」一节。
 
@@ -104,6 +112,7 @@ taskkill /PID <PID> /F
 
 | 内容 | 路径 |
 |---|---|
+| 本机配置 | `.env`（从 `.env.example` 复制，不入 Git；进程环境变量优先，改完需重启） |
 | 虚拟环境 | `.venv/`（Python 3.10, torch cu121） |
 | 服务代码 | `server/app/`（main.py 入口, engine.py 引擎队列, routes/ 路由） |
 | 模型注册 / 能力 | `server/app/model_registry.py`（权重目录、环境变量、模式与提示） |

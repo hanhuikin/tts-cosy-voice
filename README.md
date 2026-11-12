@@ -97,6 +97,9 @@ $env:QWEN3TTS_PYTHON = "D:\work\zcode\tts\.venv-qwen3\Scripts\python.exe"
 powershell -ExecutionPolicy Bypass -File scripts\start.ps1 -Port 8001 -Model indextts25
 ```
 
+> 上面 3 个 `$env:` 也可以写进仓库根目录 `.env`（复制 `.env.example`），
+> 之后每次启动都会自动生效，不必再在会话里逐个设置；改完记得重启服务。
+
 > 首次运行 IndexTTS 会按需拉取 w2v-bert-2.0 / MaskGCT / CAMPPlus / BigVGAN 到
 > `checkpoints/hf_cache/`；Qwen3-TTS 权重目录内已自带 `speech_tokenizer/`，
 > 额外下载的 Tokenizer 仓库仅供离线备用。下载脚本**直接按文件下载**（ModelScope API +
@@ -109,6 +112,7 @@ powershell -ExecutionPolicy Bypass -File scripts\start.ps1 -Port 8001 -Model ind
 | 变量 | 作用 | 默认值 |
 |---|---|---|
 | `COSYVOICE_MODELS_DIR` | 所有权重根目录 | `<repo>/models` |
+| `COSYVOICE3_DIR` / `COSYVOICE2_DIR` | 单独覆盖两个 CosyVoice 权重目录 | `<根目录>/Fun-CosyVoice3-0.5B` / `CosyVoice2-0.5B` |
 | `INDEXTTS_REPO` | index-tts 源码目录 | `<repo>/index-tts` |
 | `INDEXTTS_PYTHON` / `QWEN3TTS_PYTHON` | worker 解释器 | 服务当前解释器 |
 | `INDEXTTS2_DIR` / `INDEXTTS25_DIR` | 两个 IndexTTS 权重目录 | `models/IndexTTS-2` / `models/IndexTTS-2.5` |
@@ -116,6 +120,16 @@ powershell -ExecutionPolicy Bypass -File scripts\start.ps1 -Port 8001 -Model ind
 | `QWEN3TTS_DTYPE` / `QWEN3TTS_DEVICE` / `QWEN3TTS_ATTN` | 精度 / 设备 / 注意力实现 | `bfloat16` / 自动 / 不指定 |
 | `INDEXTTS2_FP16` / `INDEXTTS25_BF16` | IndexTTS 半精度开关 | `0` / `1` |
 | `COSYVOICE_DEFAULT_MODEL` | 启动预载的模型 key | `cosyvoice3` |
+
+**推荐用 `.env` 持久化配置**：把 [`.env.example`](.env.example) 复制为仓库根目录 `.env`，
+按需填写后重启服务即可；`server/app/env_config.py` 在导入时读取，`model_registry.py`
+据此确定 7 个权重目录与两套 worker 解释器。优先级为「进程环境变量 > `.env`」，
+所以调试时仍可用 `$env:XXX = ...` 临时覆盖。`.env` 已被 `.gitignore` 忽略，不要提交。
+
+`GET /api/admin/config` 可只读查看当前生效的配置（含每个模型的实际 `dir`、解释器与
+权重就绪状态）；`GET /api/models/{key}/doctor` 做逐模型环境自检。配置在导入时固定，
+**修改 `.env` 后必须重启服务**。界面「系统状态与设置」的权重目录弹窗对应这组字段，
+原型用本地存储演示交互，正式接线时由服务端写 `.env` 并触发重启。
 
 系统状态页每个模型卡片都有「环境自检」按钮（等价于 `GET /api/models/{key}/doctor`），
 会检查权重标记文件、解释器路径和 `indextts` / `qwen_tts` 是否可导入，不占用显存。

@@ -111,7 +111,7 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
 <body>
 <div class="wrap">
 <aside class="toc">
- <div class="brand"><div class="mark">V</div><div><b>Voice Studio</b><small>界面设计方案 v1.10</small></div></div>
+ <div class="brand"><div class="mark">V</div><div><b>Voice Studio</b><small>界面设计方案 v1.11</small></div></div>
  <div class="toc-label">方案目录</div>
  <nav id="toc-nav">
   <a href="#s1" class="active">01 现状诊断与目标</a>
@@ -650,7 +650,7 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
    <thead><tr><th style="width:150px">分组</th><th style="width:230px">字段</th><th>对应环境变量 / 后端字段</th></tr></thead>
    <tbody>
     <tr><td><b>全局 ×1</b></td><td>权重根目录</td><td><code>COSYVOICE_MODELS_DIR</code> → <code>model_registry.MODELS_DIR</code></td></tr>
-    <tr><td rowspan="4"><b>模型权重目录 ×7</b></td><td>CosyVoice 3.0 / 2.0</td><td>全局根目录下的默认子目录（<code>Fun-CosyVoice3-0.5B</code> / <code>CosyVoice2-0.5B</code>）</td></tr>
+    <tr><td rowspan="4"><b>模型权重目录 ×7</b></td><td>CosyVoice 3.0 / 2.0</td><td>默认取全局根目录子目录（<code>Fun-CosyVoice3-0.5B</code> / <code>CosyVoice2-0.5B</code>）；后端已支持 <code>COSYVOICE3_DIR</code> / <code>COSYVOICE2_DIR</code> 单独覆盖</td></tr>
     <tr><td>IndexTTS 2.0 / 2.5</td><td><code>INDEXTTS2_DIR</code> / <code>INDEXTTS25_DIR</code></td></tr>
     <tr><td>Qwen3-TTS CustomVoice / Base / VoiceDesign</td><td><code>QWEN3TTS_DIR</code> / <code>QWEN3TTS_BASE_DIR</code> / <code>QWEN3TTS_DESIGN_DIR</code></td></tr>
     <tr><td>每行状态</td><td>与 <code>public_info().dir</code> 一致；改动后卡片「权重目录」行同步刷新</td></tr>
@@ -665,7 +665,7 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
    <div class="card"><h4 style="margin-top:0">③ 关闭与联动</h4><p>支持遮罩点击、Esc、取消按钮关闭；切换视图时自动关闭。保存会同步卡片路径、解释器路径与概览根目录文案，不触碰播客 / 音色库 / 创作台。</p></div>
   </div>
 
-  <div class="note"><b>原型边界与落地路径：</b>后端 <code>model_registry.py</code> 在模块导入时读取环境变量并固定 <code>dir</code>，目前没有运行时配置接口。真正落地需二选一：① 服务端把配置写入 <code>.env</code> / 启动脚本，重启后生效；② 新增 <code>GET/PUT /api/admin/config</code>，由 <code>model_registry</code> 改为可重载的运行时配置，并在切换模型前校验目录有效性。原型用 <code>localStorage</code> 演示完整交互与联动，不冒充已接通后端。</div>
+  <div class="note"><b>后端落地状态（v1.11）：</b>① 新增 <code>server/app/env_config.py</code>，服务启动时读取仓库根目录 <code>.env</code>（进程环境变量优先），<code>model_registry.py</code> 据此确定 7 个权重目录（新增 <code>COSYVOICE3_DIR</code> / <code>COSYVOICE2_DIR</code> 覆盖）与两套 worker 解释器；② 新增只读 <code>GET /api/admin/config</code>，返回当前生效配置、每个模型的实际 <code>dir</code> / 解释器 / 权重就绪状态，界面可从这里读取真实值；③ 配置在模块导入时固定，<b>修改 <code>.env</code> 后必须重启服务</b>。<br><b>仍待接通：</b>弹窗「保存配置」需要服务端写入 <code>.env</code>（或提供受鉴权的 <code>PUT /api/admin/config</code>）并触发重启；为避免开放未鉴权的路径写操作，当前只提供读取接口。原型继续用 <code>localStorage</code> 演示完整交互与联动，不冒充已接通写入。</div>
 
   <h3>浏览器实测（1440 × 900）</h3>
   <table>
@@ -685,7 +685,7 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
    <li>11 个配置项齐全并标注环境变量；两列布局下无截断、无重叠，底部三个按钮始终可见。</li>
    <li>保存后卡片目录、解释器、概览根目录文案即时更新并重开显示「自定义」；恢复默认可撤销。</li>
    <li>遮罩点击 / Esc / 取消 / 切换视图均能正确关闭弹窗；05B–05G 的既有能力未被破坏。</li>
-   <li>文档明确后端落地路径与原型边界，不把 localStorage 演示当作已接通服务端配置。</li>
+   <li>文档明确后端已实现的 .env 加载与只读配置接口、仍需服务端写入并重启的边界，不把 localStorage 演示当作已接通服务端配置。</li>
    <li>回归通过：DOM 桩 22 项冒烟全 PASS；JS / HTML 静态检查、DOM 引用与事件零悬空；明暗两套主题与弹窗态渲染复核。</li>
   </ul>
  </section>
@@ -793,7 +793,7 @@ ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px
   <div class="note"><b>交付物：</b><code>design/prototype.html</code>（可交互高保真原型，零外部依赖，双击即可打开）与 <code>design/ui-design-spec.html</code>（本方案）。原型中的音频为演示用合成音，不代表模型真实音质。</div>
  </section>
 
- <div class="footer">Voice Studio 界面设计方案 v1.10 · 基于 tts 项目 7 模型控制台现状 · 2026-11-12</div>
+ <div class="footer">Voice Studio 界面设计方案 v1.11 · 基于 tts 项目 7 模型控制台现状 · 2026-11-12</div>
 </main>
 </div>
 <script>

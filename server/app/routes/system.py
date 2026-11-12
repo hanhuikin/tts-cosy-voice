@@ -30,6 +30,27 @@ def models():
     return {"models": engine.models_info()}
 
 
+@router.get("/admin/config")
+def admin_config():
+    """「系统状态与设置」读取当前生效的权重目录 / 运行环境 (只读)。
+
+    配置由进程环境变量或仓库根目录 .env 提供, model_registry 在导入时固定,
+    因此修改后必须重启服务; 这里不提供写入接口, 避免开放未鉴权的路径写操作。
+    """
+    from ..env_config import describe
+
+    data = describe()
+    data["models"] = {
+        key: {
+            "dir": str(cfg["dir"]),
+            "available": is_available(key),
+            "runtime": "in-process" if cfg["backend"] == "inprocess" else runtime_python(key),
+        }
+        for key, cfg in MODEL_REGISTRY.items()
+    }
+    return data
+
+
 @router.get("/models/{key}/doctor")
 def model_doctor(key: str):
     """诊断某个本地模型的权重 / 解释器 / 依赖是否就绪 (不加载模型、不占显存)。"""

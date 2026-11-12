@@ -3,8 +3,11 @@
 本模块不依赖 torch 或任何推理库, 可在服务启动时安全导入。
 新增一个本地模型只需在这里加一项配置, 并在 tts_worker.py 里实现对应分支。
 
-环境变量 (服务启动时读取一次, 修改后需重启服务):
+配置来源: 进程环境变量 > 仓库根目录 .env (由 env_config.load_dotenv 在导入时加载)
+          两者都在服务启动时读取一次, 修改后需重启服务。
+环境变量:
     COSYVOICE_MODELS_DIR   所有本地模型权重的根目录, 默认 <repo>/models
+    COSYVOICE3_DIR / COSYVOICE2_DIR  单独覆盖两个 CosyVoice 权重目录
     INDEXTTS_REPO          index-tts 源码仓库路径, 默认 <repo>/index-tts
     INDEXTTS_PYTHON        运行 IndexTTS 的解释器, 默认当前服务解释器
     QWEN3TTS_PYTHON        运行 Qwen3-TTS 的解释器, 默认当前服务解释器
@@ -19,6 +22,10 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+
+from .env_config import load_dotenv
+
+load_dotenv()  # 必须先于下面所有路径计算; 进程里已设置的变量优先
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MODELS_DIR = Path(os.environ.get("COSYVOICE_MODELS_DIR", REPO_ROOT / "models"))
@@ -74,7 +81,7 @@ def _common(label: str, dir_path: Path, family: str, backend: str,
 MODEL_REGISTRY: dict[str, dict] = {
     # ---------------- CosyVoice (进程内, 原有逻辑) ----------------
     "cosyvoice3": _common(
-        "CosyVoice 3.0 (0.5B)", MODELS_DIR / "Fun-CosyVoice3-0.5B", "cosyvoice", "inprocess",
+        "CosyVoice 3.0 (0.5B)", _dir("COSYVOICE3_DIR", "Fun-CosyVoice3-0.5B"), "cosyvoice", "inprocess",
         ["sft", "zero_shot", "cross_lingual", "instruct"],
         assistant_prefix="You are a helpful assistant.",
         default_instructs=["请用四川话说这句话。", "请用广东话表达。",
@@ -83,7 +90,7 @@ MODEL_REGISTRY: dict[str, dict] = {
         install_hint="python scripts/download_models.py --models cosyvoice3",
     ),
     "cosyvoice2": _common(
-        "CosyVoice 2.0 (0.5B)", MODELS_DIR / "CosyVoice2-0.5B", "cosyvoice", "inprocess",
+        "CosyVoice 2.0 (0.5B)", _dir("COSYVOICE2_DIR", "CosyVoice2-0.5B"), "cosyvoice", "inprocess",
         ["sft", "zero_shot", "cross_lingual", "instruct"],
         default_instructs=["用四川话说这句话", "用开心的语气说", "用慢一点的语速说"],
         speed_mode="cosyvoice", stream_mode="native", markers=["llm.pt"],
@@ -155,16 +162,49 @@ MODEL_KEYS = tuple(MODEL_REGISTRY)
 
 
 def runtime_python(key: str) -> str:
-    """返回该模型 worker 使用的解释器路径。"""
+    """返回该模型 worker 使用的解释器路径。
+
+    优先级: 环境变量 > 约定位置的专用 venv > 主解释器。
+    约定位置: <index-tts 仓库>/.venv (IndexTTS)、<repo>/.venv-qwen3 (Qwen3-TTS),
+    与 STARTUP.md 方式 D 的手工配置一致, 避免忘设环境变量时回退到主 venv
+    导致「No module named indextts/qwen_tts」。
+    """
     cfg = MODEL_REGISTRY[key]
     env_name = "INDEXTTS_PYTHON" if cfg["family"] == "indextts" else "QWEN3TTS_PYTHON"
-    return os.environ.get(env_name, sys.executable)
+    env = os.environ.get(env_name)
+    if env:
+        return env
+    if cfg["family"] == "indextts":
+        candidates = [INDEXTTS_REPO / ".venv" / "Scripts" / "python.exe",
+                      INDEXTTS_REPO / ".venv" / "bin" / "python"]
+    else:
+        candidates = [REPO_ROOT / ".venv-qwen3" / "Scripts" / "python.exe",
+                      REPO_ROOT / ".venv-qwen3" / "bin" / "python"]
+    for c in candidates:
+        if c.exists():
+            return str(c)
+    return sys.executable
 
 
 def is_available(key: str) -> bool:
     """权重目录是否就绪 (以关键标记文件判断, 不触发任何下载)。"""
     cfg = MODEL_REGISTRY[key]
     return all((cfg["dir"] / marker).exists() for marker in cfg["markers"])
+
+
+def effective_modes(key: str) -> tuple[list[str], list[str]]:
+    """按功能返回实际可用的 (modes, speaker_modes)。
+
+    CosyVoice 系列的内置音色存放在模型目录的 spk2info.pt (官方权重不附带,
+    仅在注册克隆音色后生成), 因此 sft 是否可用以该文件是否存在为准,
+    而不是静态声明; 其余家族 (如 Qwen3-TTS 内置说话人) 不受影响。
+    """
+    cfg = MODEL_REGISTRY[key]
+    modes, spk_modes = cfg["modes"], cfg["speaker_modes"]
+    if cfg["family"] == "cosyvoice" and not (cfg["dir"] / "spk2info.pt").exists():
+        modes = [m for m in modes if m != "sft"]
+        spk_modes = [m for m in spk_modes if m != "sft"]
+    return modes, spk_modes
 
 
 def worker_load_config(key: str) -> dict:
@@ -198,18 +238,19 @@ def worker_load_config(key: str) -> dict:
 def public_info(key: str, loaded: bool = False) -> dict:
     """给 /api/health、/api/models 与前端使用的模型描述。"""
     cfg = MODEL_REGISTRY[key]
+    modes, spk_modes = effective_modes(key)
     return {
         "key": key,
         "label": cfg["label"],
         "family": cfg["family"],
         "backend": cfg["backend"],
-        "modes": cfg["modes"],
+        "modes": modes,
         "available": is_available(key),
         "loaded": loaded,
         "default_instructs": cfg["default_instructs"],
         "instruct_kind": cfg["instruct_kind"],
         "reference_modes": cfg["reference_modes"],
-        "speaker_modes": cfg["speaker_modes"],
+        "speaker_modes": spk_modes,
         "requires_prompt_text": cfg["requires_prompt_text"],
         "stream_mode": cfg["stream_mode"],
         "stream_speed_supported": not (key == "cosyvoice2"),

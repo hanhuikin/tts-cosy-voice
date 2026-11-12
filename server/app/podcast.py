@@ -154,10 +154,16 @@ def resolve_line_request(line: dict, speakers: list[dict]) -> TTSRequest:
         idx = next((i for i, s in enumerate(speakers) if s is spk), 0)
         mode, spk_id = "sft", available[idx % len(available)]
 
+    speed = float(line.get("speed", 1.0))
+    # 原生流式模型 (如 CosyVoice 3) 边合成边逐块下发; 缓冲型模型 (IndexTTS/Qwen3-TTS)
+    # 保持按句粒度整段下发 —— 若写死 stream=False, 一整句合成完之前前端收不到任何字节,
+    # 表现为「流式播放没有波形、没有声音」
+    stream = cfg["stream_mode"] == "native" and not (
+        model == "cosyvoice2" and abs(speed - 1.0) > 1e-6)
     req = TTSRequest(
         text=line["text"], model=model, mode=mode, spk_id=spk_id,
         voice_id=voice_id if clone_mode else None,
-        speed=float(line.get("speed", 1.0)), stream=False,
+        speed=speed, stream=stream,
     )
     if clone_mode:
         req.prompt_wav = voice["file"]

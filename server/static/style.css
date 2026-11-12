@@ -696,3 +696,11 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 .content>.view{overflow-y:auto}
 #wb-text-panel{flex:1 0 auto;min-height:230px}
 #wb-text-panel .textarea{min-height:160px}
+/* ===== v2.0 滚动条全站统一为对话稿样式(thin; scrollbar-*为继承属性, 视图/面板/弹窗一并生效),
+   播客成品区固定: 「成品与发布」不再内部滚动, 高度随内容自适应,
+   剩余高度全部让给三栏(列内滚动), 视图级滚动只在极矮窗口兜底 ===== */
+body{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.pod-grid3{flex:1}
+#pod-output{flex:0 0 auto;height:auto;overflow:visible}
+/* 修正: inline 元素上 overflow/ellipsis 不生效, 长标题把右侧栏/列表撑出横向滚动条 */
+.recent .r-name,.list-row .lr-title{display:block}

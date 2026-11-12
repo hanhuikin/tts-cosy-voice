@@ -903,7 +903,7 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
     <h3 id="sys-settings-title">权重目录与运行环境</h3>
     <p class="msub">对应服务启动时的环境变量。保存到本地配置后重启服务生效；留空会沿用默认目录。</p>
     <div id="sys-settings-body"></div>
-    <p class="sys-env-hint">落地说明：后端由 <code>COSYVOICE_MODELS_DIR</code> 与各模型 <code>*_DIR</code> 环境变量在启动时读取；界面配置需由服务端写入 <code>.env</code> 或新增 <code>/api/admin/config</code> 接口后重启。原型用 localStorage 演示完整交互。</p>
+    <p class="sys-env-hint">落地说明：后端启动时读取仓库根目录 <code>.env</code>（进程环境变量优先），字段与 <code>env_config.CONFIG_KEYS</code> 一致；<code>GET /api/admin/config</code> 可查看生效值。修改后需重启服务，「保存配置」仍需服务端写入支持。原型用 localStorage 演示完整交互。</p>
     <div class="ss-actions">
       <button class="btn sec" data-act="sys-settings-reset">恢复默认</button><span style="flex:1"></span>
       <button class="btn sec" data-act="sys-settings-close">取消</button>
@@ -952,8 +952,8 @@ function sysDoctorData(k){
 }
 /* ── 05H 权重目录配置：字段与后端启动环境变量一一对应 ── */
 const SYS_DIR_ENV={
- cosyvoice3:'COSYVOICE_MODELS_DIR',
- cosyvoice2:'COSYVOICE_MODELS_DIR',
+ cosyvoice3:'COSYVOICE3_DIR',
+ cosyvoice2:'COSYVOICE2_DIR',
  indextts2:'INDEXTTS2_DIR',indextts25:'INDEXTTS25_DIR',
  qwen3tts:'QWEN3TTS_DIR',qwen3tts_base:'QWEN3TTS_BASE_DIR',qwen3tts_design:'QWEN3TTS_DESIGN_DIR'
 };

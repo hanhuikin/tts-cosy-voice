@@ -52,32 +52,40 @@ class Player{
       duration:0,position:0,firstMs:null,sampleRate:null});
     this.onTick();
   }
+  /* 在用户手势的同一拍创建/唤醒 AudioContext: 等到首包(5~12s 后)再创建时,
+     浏览器可能已判定激活过期而把 ctx 挂在 suspended —— 表现为波形不动、没有声音 */
+  ensureCtx(){
+    if(!this.ctx){
+      this.ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:this.sampleRate});
+      this.nextTime=this.ctx.currentTime+this.PREBUFFER;this.startTime=this.nextTime;
+      playerState.sampleRate=this.sampleRate;
+    }
+    if(this.ctx.state==='suspended')this.ctx.resume().catch(()=>{});
+    return this.ctx;
+  }
   async startStream(resp,title,taskId){
     this.reset();this.mode='stream';
     Object.assign(playerState,{active:true,streaming:true,title,taskId});
+    this.ensureCtx();   // 同步创建: 与点击手势同一拍, 规避自动播放策略
     const reader=resp.body.getReader();this.aborter=reader;
     let buf=new Uint8Array(0),headerParsed=false,gotAudio=false;
     const t0=performance.now();
-    const ensureCtx=()=>{
-      if(!this.ctx){
-        this.ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:this.sampleRate});
-        this.nextTime=this.ctx.currentTime+this.PREBUFFER;this.startTime=this.nextTime;
-        playerState.sampleRate=this.sampleRate;
-      }
-    };
     const pushPcm=u8=>{
       this.parts.push(u8);
       const samples=u8.byteLength>>1;
-      ensureCtx();
-      const audioBuf=this.ctx.createBuffer(1,samples,this.ctx.sampleRate);
+      const ctx=this.ensureCtx();
+      const audioBuf=ctx.createBuffer(1,samples,ctx.sampleRate);
       const ch=audioBuf.getChannelData(0);
       const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
       for(let i=0;i<samples;i++)ch[i]=dv.getInt16(i*2,true)/32768;
-      const src=this.ctx.createBufferSource();src.buffer=audioBuf;src.connect(this.ctx.destination);
-      this.nextTime=Math.max(this.nextTime,this.ctx.currentTime+this.PREBUFFER);
+      const src=ctx.createBufferSource();src.buffer=audioBuf;src.connect(ctx.destination);
+      if(!gotAudio){   // 首包才起算时间轴并启动 rAF, 等待首包的几秒不计入播放进度
+        gotAudio=true;playerState.firstMs=Math.round(performance.now()-t0);
+        this.startTime=ctx.currentTime+this.PREBUFFER;this.nextTime=this.startTime;this.startRaf();
+      }
+      this.nextTime=Math.max(this.nextTime,ctx.currentTime+this.PREBUFFER);
       src.start(this.nextTime);this.nextTime+=audioBuf.duration;
       this.totalSamples+=samples;
-      if(!gotAudio){gotAudio=true;playerState.firstMs=Math.round(performance.now()-t0)}
       const step=Math.max(1,Math.floor(samples/12));
       const i16=new Int16Array(u8.buffer,u8.byteOffset,samples);
       for(let s=0;s<samples;s+=step){let peak=0;
@@ -94,16 +102,21 @@ class Player{
         if(!headerParsed){
           if(buf.length<44)continue;
           this.header=buf.slice(0,44);
-          this.sampleRate=new DataView(this.header.buffer).getUint32(24,true);
-          buf=buf.slice(44);headerParsed=true;this.startRaf();
+          const rate=new DataView(this.header.buffer).getUint32(24,true);
+          if(rate&&rate!==this.sampleRate){   // 与预建 ctx 采样率不一致且尚无音频: 重建
+            this.sampleRate=rate;
+            if(!gotAudio&&this.ctx){try{this.ctx.close()}catch(e){}this.ctx=null}
+          }
+          buf=buf.slice(44);headerParsed=true;
         }
         const evenLen=buf.length-(buf.length%2);
         if(evenLen>0){pushPcm(buf.slice(0,evenLen));buf=buf.slice(evenLen)}
       }
-      if(headerParsed&&this.totalSamples>0)this.finishStream();
-      else toast('流式响应异常: 未收到音频数据',true);
+      if(headerParsed&&this.totalSamples>0){this.finishStream();return true}
+      toast('流式响应异常: 未收到音频数据',true);this.reset();return false;
     }catch(e){
-      if(e.name!=='AbortError')toast('流式播放中断: '+e.message,true);
+      if(e.name!=='AbortError'){console.error('[stream]',e);toast('流式播放中断: '+e.message,true,8000)}
+      this.reset();return false;
     }
   }
   finishStream(){
@@ -158,9 +171,9 @@ class Player{
   startRaf(){
     const loop=()=>{
       if(!playerState.active){this.stopRaf();return}
-      if(this.mode==='stream'){
+      if(this.mode==='stream'&&this.ctx){   // ctx 创建前不得读 currentTime, 否则整条 rAF 链崩掉
         playerState.position=Math.max(0,this.ctx.currentTime-this.startTime);
-        playerState.playing=!!this.ctx&&this.ctx.state==='running';
+        playerState.playing=this.ctx.state==='running';
       }
       this.onTick();
       this.rafId=requestAnimationFrame(loop);
@@ -172,7 +185,7 @@ class Player{
 let player=null;
 function onPlayerTick(){
   if(state.view==='workbench'&&state.result)syncPlayer();
-  if(state.view==='podcast'&&pod.outTab==='final')updatePodWaveLive();
+  if(state.view==='podcast'&&(pod.outTab==='final'||pod.outTab==='stream'))updatePodWaveLive();
 }
 
 /* ================= API ================= */
@@ -434,6 +447,12 @@ function renderAdv(){
 }
 
 /* ================= 操作条 ================= */
+/* 已选音色自带参考文本时自动回填 (刷新/切模型后 pick 恢复但 refText 为空) */
+function ensureRefText(){
+  if(state.group!=='mine'||state.refText.trim())return;
+  const v=voices.find(x=>x.id===state.pick);
+  if(v&&v.prompt_text)state.refText=v.prompt_text;
+}
 function blocker(){
   if(state.busy)return'正在生成…';
   if(health.state==='loading')return'模型加载中…';
@@ -448,6 +467,7 @@ function blocker(){
   return'';
 }
 function renderAction(){
+  ensureRefText();
   const b=blocker();const m=model();const c=caps();
   const dur=Math.max(1.2,Math.round(state.text.trim().length/5.2*10)/10);
   const langName=state.lang?(visibleLangs().find(l=>l[0]===state.lang)||['',''])[1]:'';
@@ -928,11 +948,22 @@ function renderPodOutput(){
         :`<div class="times"><span id="pod-t-cur">${podPlayingEp()?fmt(playerState.position):'0:00'}</span><span>${done&&pod.episode&&pod.episode.duration?fmt(pod.episode.duration):'—'}</span></div>`}
      </div></div></div>`;
   }else if(pod.outTab==='stream'){
-    body=`<p style="font-size:13px;margin:0 0 4px"><strong>逐句合成，边生成边播放</strong></p>
+    const done=playerState.active&&!playerState.streaming&&playerState.duration>0;
+    body=`<div class="push-grid"><div>
+     <p style="font-size:13px;margin:0 0 4px"><strong>逐句合成，边生成边播放</strong></p>
      <p style="font-size:12px;color:var(--text-3);margin:0">2.5 秒预缓冲后开始播放，适合先听效果再决定是否导出成品；完成后同样自动保存。</p>
      <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-primary" data-act="pod-stream" ${pod.lines.length&&!pod.busyStream&&!pod.busyFinal?'':'disabled'}>${pod.busyStream?'流式合成中…':'流式合成并播放'}</button>
      <span class="tag">2.5s 预缓冲</span><span class="tag">非流式成品仍可下载</span></div>
-     ${pod.busyStream&&playerState.firstMs?`<p class="chip-label" style="margin-top:10px">首包 ${playerState.firstMs} ms · 正在播放 ${fmt(playerState.position)}</p>`:''}`;
+     ${pod.busyStream?`<div class="notice" style="margin-top:10px">${icon('info','ic sm')}<span id="pod-stream-notice-text">${playerState.firstMs?`正在播放 · 首包 ${playerState.firstMs} ms`
+        :caps().stream?`正在合成首句，${esc(model()?model().label:'当前模型')} 逐块下发，首包到达即开始播放`
+        :`等待首包…（${esc(model()?model().label:'当前模型')} 为整段缓冲型，首句合成完才开始下发）`}</span></div>`
+       :done?`<div class="notice" style="margin-top:10px">${icon('info','ic sm')}<span>播放完成，成品已自动归档；可切到「成品合成」下载 WAV。</span></div>`:''}
+    </div><div>
+     <div class="result-card"><p class="result-title">${pod.busyStream?'流式播放中':(done?'流式播放完成 · 已归档':'尚未开始流式播放')}</p>
+      <div class="result-meta" id="pod-stream-meta">${pod.lines.length} 轮 · 24 kHz WAV${playerState.firstMs?` · 首包 ${playerState.firstMs} ms`:''}${pod.busyStream&&!playerState.firstMs?' · 等待首包…':''}</div>
+      <div class="wave ${playerState.playing?'playing':''}" style="height:44px" id="pod-stream-wave"><div class="wave-progress" id="pod-stream-wave-progress"></div>${peaksToBars(34).map(h=>`<span class="bar" style="--h:${Math.max(6,Math.round(h*.7))}px"></span>`).join('')}</div>
+      <div class="times"><span id="pod-stream-t-cur">${fmt(playerState.position)}</span><span id="pod-stream-t-dur">${pod.busyStream&&!playerState.duration?'合成中…':(playerState.duration?fmt(playerState.duration):'—')}</span></div>
+     </div></div></div>`;
   }else{
     const protos=['rtmp','srt','rtsp','hls'];
     const ph={rtmp:'rtmp://服务器:1935/app/推流码',srt:'srt://服务器:9000?streamid=xxx',rtsp:'rtsp://服务器:8554/流名'}[pod.protocol];
@@ -971,6 +1002,28 @@ function updatePodWaveLive(){
   const wp=$('#pod-wave-progress');if(wp)wp.style.setProperty('--p',(playerState.duration?Math.min(100,playerState.position/playerState.duration*100):0)+'%');
   const cur=$('#pod-t-cur');if(cur)cur.textContent=fmt(playerState.position);
   const wave=$('#pod-wave');if(wave)wave.classList.toggle('playing',playerState.playing);
+  /* 流式播放 Tab: 波形随收到的 PCM 实时生长 */
+  const sw=$('#pod-stream-wave');
+  if(sw){
+    sw.classList.toggle('playing',playerState.playing);
+    const swp=$('#pod-stream-wave-progress');
+    if(swp)swp.style.setProperty('--p',(playerState.duration?Math.min(100,playerState.position/playerState.duration*100):0)+'%');
+    const bars=sw.querySelectorAll('.bar');
+    const peaks=(player&&player.peaks)||[];
+    if(bars.length&&peaks.length){
+      bars.forEach((b,i)=>{
+        const v=peaks[Math.min(peaks.length-1,Math.floor(i/bars.length*peaks.length))]||0;
+        b.style.setProperty('--h',Math.max(6,Math.round(Math.min(1,v)*31))+'px');
+      });
+    }
+    const sc=$('#pod-stream-t-cur');if(sc)sc.textContent=fmt(playerState.position);
+    const sd=$('#pod-stream-t-dur');
+    if(sd)sd.textContent=playerState.streaming&&!playerState.duration?'合成中…':(playerState.duration?fmt(playerState.duration):'—');
+    const sm=$('#pod-stream-meta');
+    if(sm)sm.innerHTML=`${pod.lines.length} 轮 · 24 kHz WAV${playerState.firstMs?` · 首包 ${playerState.firstMs} ms`:''}${playerState.streaming&&!playerState.firstMs?' · 等待首包…':''}`;
+    const nt=$('#pod-stream-notice-text');
+    if(nt&&playerState.firstMs)nt.textContent=`正在播放 · 首包 ${playerState.firstMs} ms`;
+  }
 }
 
 /* POD_BADGE: draft 存稿 / busy 合成中·推流中 / ok 已完成 / err 失败 (v1.6 单色系) */
@@ -1168,10 +1221,11 @@ async function genScript(){
     const j=await(await api('/api/podcast/parse-script',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({raw,speakers:speakersBrief})})).json();
-    pod.lines=j.lines;pod.genRaw='';
+    // 先复位 genning 再渲染, 否则面板会停在「大模型改写中…」直到下次刷新
+    pod.lines=j.lines;pod.genRaw='';pod.genning=false;
     renderPod();toast(`对话稿已按主持阵容改写完成: ${j.lines.length} 轮`);
   }catch(e){
-    pod.genRaw='';pod.lines=[];renderPod();
+    pod.genRaw='';pod.lines=[];pod.genning=false;renderPod();
     toast('对话稿生成失败: '+e.message,true,6000);
   }finally{pod.genning=false;}
 }
@@ -1245,7 +1299,7 @@ async function synthPodFinal(){
 }
 async function synthPodStream(){
   if(!pod.lines.length||pod.busyFinal||pod.busyStream)return;
-  pod.busyStream=true;pod.busySince=Date.now();renderPod();
+  pod.busyStream=true;pod.busySince=Date.now();pod.outTab='stream';renderPod();
   try{
     await saveEpisode(true);
     const resp=await fetch(`/api/podcast/episodes/${pod.episode.id}/synthesize`,{
@@ -1255,13 +1309,16 @@ async function synthPodStream(){
       try{msg=(await resp.json()).detail||msg}catch(e){}
       throw new Error(msg);
     }
-    await player.startStream(resp,'播客流式 · '+(pod.episode.title||''),null);
-    pod.episode=await(await api(`/api/podcast/episodes/${pod.episode.id}`)).json();
-    await loadEpisodes();
-    renderPod();
-    toast('流式播放完成，成品已自动保存');
+    const ok=await player.startStream(resp,'播客流式 · '+((pod.episode&&pod.episode.title)||''),null);
+    if(pod.episode){
+      pod.episode=await(await api(`/api/podcast/episodes/${pod.episode.id}`)).json();
+      await loadEpisodes();
+    }
+    renderPod();renderPodEpisodes();
+    if(ok)toast('流式播放完成，成品已自动保存');
   }catch(e){
     toast('流式合成失败: '+(e.message||''),true,6000);
+    player.abortStream();
   }finally{pod.busyStream=false;renderPod();}
 }
 /* ---- 播客: 推流 ---- */
@@ -1632,6 +1689,11 @@ async function loadVoices(){
     const host=pod.speakers.find(s=>s.role==='host');
     if(host&&!host.voice_id&&voices.length)host.voice_id=voices[0].id;
     if(firstGuest&&!firstGuest.voice_id&&voices.length>1)firstGuest.voice_id=voices[1].id;
+    // 首次渲染时 voices 尚为空, 已恢复的选中音色会缺参考文本, 载入后补齐
+    if(state.group==='mine'&&state.pick&&!state.refText.trim()){
+      const v=voices.find(x=>x.id===state.pick);
+      if(v&&v.prompt_text)state.refText=v.prompt_text;
+    }
   }catch(e){}
 }
 
@@ -1909,6 +1971,7 @@ setInterval(()=>pollPod(false),2000);
 setInterval(()=>{if(state.view==='workbench'||state.view==='library')loadTasks()},3000);
 renderAll();
 function renderAll(){
+  ensureRefText();
   renderModelMenu();renderCapNotice();renderTabs();renderSounds();renderAdv();renderAction();
   renderOutput();renderRecent();renderVoiceLibrary();renderSystem();renderPod();syncThemeIcon();
 }
