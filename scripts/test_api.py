@@ -99,7 +99,11 @@ def _():
     for m in ms:
         assert m["modes"] and set(m["modes"]) <= {"sft", "zero_shot", "cross_lingual", "instruct"}, m
         if m["family"] == "cosyvoice":
-            assert set(m["modes"]) == {"sft", "zero_shot", "cross_lingual", "instruct"}
+            # 能力门控: sft 仅在权重目录存在 spk2info.pt(内置音色) 时可用
+            assert {"zero_shot", "cross_lingual", "instruct"} <= set(m["modes"]), m
+            has_builtin = (Path(m["dir"]) / "spk2info.pt").exists()
+            assert ("sft" in m["modes"]) == has_builtin, \
+                f"{m['key']} sft={('sft' in m['modes'])} spk2info={has_builtin}"
     return f"{len(ms)} models registered"
 
 
@@ -303,6 +307,12 @@ def _():
 
 @case("VAL-09", "sft 说话人不存在 -> 400")
 def _():
+    h = requests.get(f"{BASE}/api/health").json()
+    m = next((x for x in h["models"] if x["key"] == h["model"]), {})
+    if "sft" not in (m.get("speaker_modes") or []):
+        # 能力门控后 CosyVoice 无内置音色, sft 在更早的门控处被拒;
+        # 白名单校验由具备 sft 能力的模型(qwen3tts)覆盖, 见 test_model_matrix.py
+        return "skip (当前模型无内置音色, sft 已按能力门控)"
     r = _tts(spk_id="不存在的音色")
     assert r.status_code == 400, r.text
     assert "not available" in r.json()["detail"]
@@ -377,17 +387,18 @@ def _():
     return f"{dur:.1f}s"
 
 
-@case("GEN-05", "变速合成 speed=1.5 (时长缩短)")
+@case("GEN-05", "变速合成 (0.7x 明显长于 1.8x)")
 def _():
+    # 单次合成的韵律时长本身有 ±15% 抖动, 用 0.7x / 1.8x 拉开差距, 阈值取 0.55
     vid = globals()["TEST_VOICE_ID"]
     text = "这是一段用于测试语速功能的对照文本，我们检查它的时长变化。"
-    r1 = _tts(text=text, mode="zero_shot", voice_id=vid, spk_id=None, speed=1.0)
-    r15 = _tts(text=text, mode="zero_shot", voice_id=vid, spk_id=None, speed=1.5)
-    assert r1.ok and r15.ok
-    d1 = parse_wav(r1.content)[2]
-    d15 = parse_wav(r15.content)[2]
-    assert d15 < d1 * 0.85, f"speed=1.5 未明显缩短: 1.0x={d1:.1f}s 1.5x={d15:.1f}s"
-    return f"1.0x={d1:.1f}s -> 1.5x={d15:.1f}s ({d15/d1*100:.0f}%)"
+    r07 = _tts(text=text, mode="zero_shot", voice_id=vid, spk_id=None, speed=0.7)
+    r18 = _tts(text=text, mode="zero_shot", voice_id=vid, spk_id=None, speed=1.8)
+    assert r07.ok and r18.ok
+    d07 = parse_wav(r07.content)[2]
+    d18 = parse_wav(r18.content)[2]
+    assert d18 < d07 * 0.55, f"语速未生效: 0.7x={d07:.1f}s 1.8x={d18:.1f}s"
+    return f"0.7x={d07:.1f}s -> 1.8x={d18:.1f}s ({d18/d07*100:.0f}%)"
 
 
 @case("GEN-06", "多句长文本顺序合成 (流式不断流)")
@@ -554,15 +565,24 @@ def _():
 
 @case("POD-02", "LLM 配置保存/读取脱敏")
 def _():
-    r = requests.put(f"{BASE}/api/llm/config", json={
-        "base_url": "https://api.deepseek.com/v1", "api_key": "sk-test-1234567890abcdef",
-        "model": "deepseek-chat"})
-    assert r.ok, r.text
-    cfg = r.json()
-    assert "api_key" not in cfg, "响应不得包含原始 key"
-    assert cfg["api_key_masked"].startswith("sk-t"), cfg["api_key_masked"]
-    got = requests.get(f"{BASE}/api/llm/config").json()
-    assert got["base_url"] == "https://api.deepseek.com/v1"
+    # 该用例会写入测试 key, 结束后必须还原真实配置: 直接备份配置文件(与服务同机)
+    cfg_path = REPO / "server" / "data" / "llm_config.json"
+    backup = cfg_path.read_text(encoding="utf-8") if cfg_path.exists() else None
+    try:
+        r = requests.put(f"{BASE}/api/llm/config", json={
+            "base_url": "https://api.deepseek.com/v1", "api_key": "sk-test-1234567890abcdef",
+            "model": "deepseek-chat"})
+        assert r.ok, r.text
+        cfg = r.json()
+        assert "api_key" not in cfg, "响应不得包含原始 key"
+        assert cfg["api_key_masked"].startswith("sk-t"), cfg["api_key_masked"]
+        got = requests.get(f"{BASE}/api/llm/config").json()
+        assert got["base_url"] == "https://api.deepseek.com/v1"
+    finally:
+        if backup is not None:
+            cfg_path.write_text(backup, encoding="utf-8")
+        else:
+            cfg_path.unlink(missing_ok=True)
     globals()["LLM_CFG_OK"] = True
     return f"masked={cfg['api_key_masked']}"
 

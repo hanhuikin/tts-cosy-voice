@@ -99,24 +99,30 @@ def _stream_response(job, task_id: str, sample_rate: int) -> StreamingResponse:
     async def gen():
         nonlocal total_bytes
         yield wav_header(sample_rate, ESTIMATED_MAX_SECONDS * sample_rate)
-        status, error = "ok", None
-        async for kind, payload in engine.drain(job):
-            if kind == "chunk":
-                parts.append(payload)
-                total_bytes += len(payload)
-                if state["first_ms"] is None:
-                    state["first_ms"] = int((time.time() - t0) * 1000)
-                yield payload
-            elif kind == "error":
-                status, error = "failed", payload
-                break
-        duration = pcm_duration_seconds(total_bytes, sample_rate)
-        infer_ms = int((time.time() - t0) * 1000)
-        out_file = TASKS_DIR / f"{task_id}.wav" if parts else None
-        if status == "ok" and parts:
-            out_file.write_bytes(pcm_to_wav(parts, sample_rate))
-        storage.finish_task(task_id, out_file, duration if parts else None,
-                            sample_rate, status, error, infer_ms, state["first_ms"])
+        # 默认视为「客户端中途断开」: 生成器被取消/关闭时不会走到循环后,
+        # 若把收尾写在循环之后, 任务会永远停在 running (播放器关页面即可复现)
+        status, error = "failed", "client disconnected"
+        try:
+            async for kind, payload in engine.drain(job):
+                if kind == "chunk":
+                    parts.append(payload)
+                    total_bytes += len(payload)
+                    if state["first_ms"] is None:
+                        state["first_ms"] = int((time.time() - t0) * 1000)
+                    yield payload
+                elif kind == "error":
+                    status, error = "failed", payload
+                    break
+            else:
+                status, error = "ok", None
+        finally:
+            duration = pcm_duration_seconds(total_bytes, sample_rate)
+            infer_ms = int((time.time() - t0) * 1000)
+            out_file = TASKS_DIR / f"{task_id}.wav" if parts else None
+            if status == "ok" and parts:
+                out_file.write_bytes(pcm_to_wav(parts, sample_rate))
+            storage.finish_task(task_id, out_file, duration if parts else None,
+                                sample_rate, status, error, infer_ms, state["first_ms"])
 
     return StreamingResponse(
         gen(),

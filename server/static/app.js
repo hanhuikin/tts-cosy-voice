@@ -1680,6 +1680,21 @@ function setModel(k,fromUser){
   if(fromUser)toast(`已切换到 ${m?m.label:k}`);
 }
 
+/* 顶栏选择模型 = 真实加载: 只改前端状态会让界面与引擎不一致,
+   之后所有合成都会以「model not ready」失败 */
+function switchModel(k,fromUser){
+  const m=(health.models||[]).find(x=>x.key===k);
+  setModel(k,fromUser);
+  if(!m||health.model===k)return;
+  if(m.available===false){
+    toast(`${m.label} 权重尚未就绪，请先下载权重或在系统页设置目录`,true,6000);return}
+  if(health.state==='loading'){
+    toast('另一个模型正在加载，请等它就绪后再切换',true,5000);return}
+  api('/api/admin/model',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:k})})
+    .then(()=>toast(`开始加载 ${m.label}，首次约需 20~60 秒…`,false,5000))
+    .catch(e=>toast('切换失败: '+e.message,true,6000));
+}
 /* ================= 数据加载 ================= */
 async function loadVoices(){
   try{
@@ -1713,7 +1728,7 @@ document.addEventListener('click',e=>{
     syncThemeIcon();break}
    case 'help':toast('快捷键：Ctrl/⌘ + Enter 生成 · 空格播放/暂停 · Esc 关闭菜单',true);break;
    case 'toggle-menu':state.menu=!state.menu;renderModelMenu();break;
-   case 'model':setModel(k,true);break;
+   case 'model':switchModel(k,true);break;
    case 'side-refresh':{
     if(state.view==='workbench'){loadTasks();toast('已刷新')}
     else if(state.view==='podcast'){pollPod(true);toast('任务队列已刷新')}
