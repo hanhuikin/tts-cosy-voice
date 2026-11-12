@@ -2,6 +2,8 @@
 
 基于 [QwenAudio/CosyVoice](https://github.com/QwenAudio/CosyVoice)（CosyVoice 3.0）构建的 FastAPI 语音合成服务，带 Web 控制台（合成工作台 / 音色库 / 历史记录 / 系统状态）。
 
+> **日常启动 / 停止 / 排错速查 → [STARTUP.md](STARTUP.md)**（本文只管首次部署）
+
 ## 功能
 
 - **四种合成模式**：预置音色（sft）、声音克隆（zero_shot）、跨语言（cross_lingual）、指令控制（instruct，方言/语速/情绪）
