@@ -391,6 +391,9 @@ createApp({
       { code: 'fr', name: '法语' },
       { code: 'es', name: '西班牙语' },
       { code: 'ru', name: '俄语' },
+      { code: 'it', name: '意大利语' },
+      { code: 'pt', name: '葡萄牙语' },
+      { code: 'ar', name: '阿拉伯语' },
     ];
     const sampleTexts = [
       { label: '中文问候', text: '你好，我是通义生成式语音大模型，请问有什么可以帮您的吗？' },
@@ -414,7 +417,8 @@ createApp({
       return `${m}:${ss.padStart(4, '0')}`;
     };
     const modeName = (k) => (modeDefs.find(m => m.key === k) || {}).name || k;
-    const modelLabel = (k) => k === 'cosyvoice3' ? 'CosyVoice 3.0' : 'CosyVoice 2.0';
+    const modelLabel = (k) => (health.models.find(m => m.key === k) || {}).label
+      || (k === 'cosyvoice2' ? 'CosyVoice 2.0' : (k || '—'));
     // 历史显示: 剥离开头语言标签 (它是控制标记, 不属于朗读内容)
     const displayTaskText = (t) => (t || '').replace(/^(?:<\|[a-z]{2}\|>\s*)+/, '');
     const voiceOrSpk = (t) => {
@@ -432,29 +436,58 @@ createApp({
     const vramPct = computed(() => (health.gpu && health.gpu.vram_total_gb)
       ? Math.round(health.gpu.vram_used_gb / health.gpu.vram_total_gb * 100) : 0);
     const availableModels = computed(() => health.models.filter(m => m.available));
-    // 当前模型没有内置说话人时隐藏「预置音色」Tab (避免死入口)
-    const visibleModeDefs = computed(() => health.speakers.length
-      ? modeDefs
-      : modeDefs.filter(m => m.key !== 'sft'));
-    const currentDefaults = computed(() => {
-      const m = health.models.find(m => m.key === form.model);
-      return (m && m.default_instructs) || [];
+    // 模型能力表驱动 UI: 不同模型支持不同模式 / 是否需要参考音频与说话人
+    // 兼容旧版 /api/health (缺少新字段时按 CosyVoice 的默认能力回退)
+    const currentModel = computed(() => {
+      const m = health.models.find(x => x.key === form.model);
+      if (!m) return null;
+      const modes = m.modes || ['sft', 'zero_shot', 'cross_lingual', 'instruct'];
+      return {
+        ...m,
+        modes,
+        family: m.family || 'cosyvoice',
+        reference_modes: m.reference_modes || modes.filter(k => k !== 'sft'),
+        speaker_modes: m.speaker_modes || (modes.includes('sft') ? ['sft'] : []),
+        requires_prompt_text: m.requires_prompt_text !== false,
+        instruct_kind: m.instruct_kind || 'cosyvoice',
+        lang_codes: m.lang_codes || [],
+        stream_mode: m.stream_mode || 'native',
+      };
     });
-    const canSynth = computed(() => !busy.value && health.state === 'ready' && form.text.trim() && (
-      form.mode === 'sft' ? !!form.spk_id : !!form.voice_id && (form.mode !== 'zero_shot' || form.prompt_text.trim())
-    ));
+    const visibleModeDefs = computed(() => {
+      const modes = currentModel.value ? currentModel.value.modes : modeDefs.map(m => m.key);
+      return modeDefs.filter(m => modes.includes(m.key));
+    });
+    const currentDefaults = computed(() => (currentModel.value && currentModel.value.default_instructs) || []);
+    const needsRef = computed(() => (currentModel.value?.reference_modes || []).includes(form.mode));
+    const needsSpk = computed(() => (currentModel.value?.speaker_modes || []).includes(form.mode));
+    const needsPromptText = computed(() => form.mode === 'zero_shot'
+      && currentModel.value?.requires_prompt_text !== false);
+    const needsInstruct = computed(() => form.mode === 'instruct'
+      && currentModel.value?.instruct_kind === 'design');
+    const visibleLangs = computed(() => {
+      const codes = currentModel.value?.lang_codes || [];
+      return codes.length ? langs.filter(l => codes.includes(l.code)) : langs;
+    });
+    const streamHint = computed(() => currentModel.value?.stream_mode === 'buffered'
+      ? '该模型为整段生成后分块下发（首包延迟较高）' : '边合成边播放（生成跟不上会有停顿）');
+    const canSynth = computed(() => !busy.value && health.state === 'ready' && form.text.trim()
+      && (!needsRef.value || !!form.voice_id)
+      && (!needsSpk.value || !!form.spk_id)
+      && (!needsPromptText.value || !!form.prompt_text.trim())
+      && (!needsInstruct.value || !!form.instruct_text.trim()));
     // 合成按钮禁用原因 (显示给用户)
     const synthBlocker = computed(() => {
       if (health.state === 'loading') return '模型加载中…';
       if (health.state !== 'ready') return '模型未就绪';
       if (!form.text.trim()) return '请输入合成文本';
-      if (form.mode === 'sft') {
-        if (!health.speakers.length) return '当前模型没有内置说话人，请改用「声音克隆」';
+      if (needsSpk.value) {
+        if (!health.speakers.length) return '当前模型没有内置说话人';
         if (!form.spk_id) return '请选择说话人';
-      } else {
-        if (!form.voice_id) return '请选择克隆音色';
-        if (form.mode === 'zero_shot' && !form.prompt_text.trim()) return '请填写参考音频的文字内容';
       }
+      if (needsRef.value && !form.voice_id) return '请选择克隆音色';
+      if (needsPromptText.value && !form.prompt_text.trim()) return '请填写参考音频的文字内容';
+      if (needsInstruct.value && !form.instruct_text.trim()) return '请填写声音描述';
       return '';
     });
     const canUpload = computed(() => !upload.busy && upload.file && upload.duration >= 1 && upload.duration <= 30
@@ -467,6 +500,24 @@ createApp({
       const v = voices.value.find(x => x.id === vid);
       if (v && v.prompt_text) form.prompt_text = v.prompt_text;
     });
+    // 切换模型 / 模式时, 把表单收敛到该模型声明的能力范围内
+    watch(() => form.model, (k) => {
+      const m = health.models.find(x => x.key === k);
+      if (!m) return;
+      if (!m.modes.includes(form.mode)) form.mode = m.modes[0] || 'zero_shot';
+      form.lang = '';
+      syncSpeakerSelection();
+    });
+    watch(() => form.mode, () => syncSpeakerSelection());
+    function syncSpeakerSelection() {
+      const m = currentModel.value;
+      if (!m) return;
+      if (!m.speaker_modes.includes(form.mode)) {
+        form.spk_id = '';
+      } else if (health.speakers.length && !health.speakers.includes(form.spk_id)) {
+        form.spk_id = health.speakers[0];
+      }
+    }
 
     function updateBanner() {
       if (health.state === 'loading') {
@@ -474,7 +525,7 @@ createApp({
       } else if (health.state === 'error') {
         banner.value = { type: 'error', icon: '⚠️', text: '模型加载失败：' + (health.error || '未知错误'), closable: true };
       } else if (health.state === 'idle') {
-        banner.value = { type: 'warn', icon: '📦', text: '未加载任何模型，请先运行 scripts/download_models.py 下载权重', closable: true };
+        banner.value = { type: 'warn', icon: '📦', text: '未加载任何模型，请到「系统状态」选择并加载一个本地模型', closable: true };
       } else {
         banner.value = null;
       }
@@ -506,9 +557,14 @@ createApp({
         const firstAvail = st.models.find(m => m.available);
         if (firstAvail) form.model = firstAvail.key;
       }
-      // 当前模型没有内置说话人时, 从「预置音色」自动切到「声音克隆」
-      if (health.state === 'ready' && form.mode === 'sft' && health.speakers.length === 0) {
-        form.mode = 'zero_shot';
+      // 模型就绪后, 把模式 / 说话人修正到当前模型支持的范围内
+      if (health.state === 'ready' && health.models.length) {
+        const m = health.models.find(x => x.key === form.model);
+        if (m) {
+          if (!m.modes.includes(form.mode)) form.mode = m.modes[0] || 'zero_shot';
+          if (m.speaker_modes.includes(form.mode) && health.speakers.length
+              && !health.speakers.includes(form.spk_id)) form.spk_id = health.speakers[0];
+        }
       }
       updateBanner();
     }
@@ -535,7 +591,7 @@ createApp({
                           model_label: d.label ?? health.model_label,
                           sample_rate: d.sample_rate ?? health.sample_rate,
                           speakers: d.speakers ?? health.speakers, error: d.error });
-            if (d.state === 'ready') { loadTasks(); }
+            if (d.state === 'ready' && d.model) { form.model = d.model; loadTasks(); }
           } else if (d.type === 'queue') {
             health.queue_len = d.queue_len;
           }
@@ -601,8 +657,8 @@ createApp({
       const payload = {
         text, model: form.model, mode: form.mode, speed: form.speed, stream: form.stream,
       };
-      if (form.mode === 'sft') payload.spk_id = form.spk_id;
-      else payload.voice_id = form.voice_id;
+      if (needsSpk.value) payload.spk_id = form.spk_id;
+      if (needsRef.value) payload.voice_id = form.voice_id;
       if (form.mode === 'zero_shot') payload.prompt_text = form.prompt_text;
       if (form.mode === 'instruct') payload.instruct_text = form.instruct_text;
 
@@ -1202,12 +1258,28 @@ createApp({
         await api('/api/admin/model', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: key }),
         });
+        // 工作台跟随实际加载的模型, 避免合成时 model 与引擎不一致
+        form.model = key;
         updateBanner();
         toast('开始加载模型…', 'info');
       } catch (e) { toast('切换失败: ' + e.message, 'error'); }
     }
     const modelTagClass = (m) => m.loaded ? 'ok' : (m.available ? '' : 'warn');
-    const modelTagText = (m) => m.loaded ? '已加载' : (m.available ? '已下载' : '未下载');
+    const modelTagText = (m) => m.loaded ? '已加载' : (m.available ? '权重就绪' : '未安装');
+    // 环境自检: 权重 / 独立解释器 / 推理依赖是否齐全 (不占用显存)
+    const doctorBusy = reactive({});
+    const doctorResult = reactive({});
+    async function checkModel(key) {
+      doctorBusy[key] = true;
+      try {
+        const r = await (await api(`/api/models/${key}/doctor`)).json();
+        Object.assign(doctorResult, { [key]: r });
+      } catch (e) {
+        Object.assign(doctorResult, { [key]: { error: e.message } });
+      } finally {
+        doctorBusy[key] = false;
+      }
+    }
 
     // ---------- 快捷键 / 生命周期 ----------
     // ---------- 主题切换 (localStorage 记忆, 未设置时跟随系统, 首帧由 head 内联脚本应用) ----------
@@ -1257,7 +1329,8 @@ createApp({
     const appVm = {
       view, views, health, form, busy, busyText, workbenchError, lastResult,
       voices, tasks, taskFilter, toasts, banner, upload, uploadDrag, player: playerState,
-      modeDefs, langs, sampleTexts,
+      modeDefs, langs, sampleTexts, visibleLangs, streamHint,
+      currentModel, needsRef, needsSpk, needsPromptText, needsInstruct,
       stateClass, stateText, gpuText, vramPct, port, theme, toggleTheme, availableModels, visibleModeDefs, currentDefaults,
       canSynth, synthBlocker, canUpload, filteredTasks, currentVoice,
       fmt, modeName, modelLabel, voiceOrSpk, displayTaskText,
@@ -1276,7 +1349,7 @@ createApp({
       startEditLine, saveLine, delLine, addLine, syncLineRole, saveEpisode, loadEpisode,
       synthPod, synthPodStream, playPodcast, downloadEpisode, removeEpisode, startPush, stopPush,
       openQueueDetail, pollPod, playEpisode, loadFromQueue, removeFromQueue,
-      switchModel, modelTagClass, modelTagText,
+      switchModel, modelTagClass, modelTagText, doctorBusy, doctorResult, checkModel,
     };
     return appVm;
   },

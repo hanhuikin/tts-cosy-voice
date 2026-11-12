@@ -5,18 +5,28 @@ __pycache__/
 *.pyo
 .pytest_cache/
 
-# 上游仓库 (部署时 git clone --recursive, 见 README)
+# 上游仓库 (部署时 git clone, 见 README)
 CosyVoice/
+index-tts/
 
-# 模型权重 (部署时 scripts/download_models.py 下载, ~15GB)
+# 独立虚拟环境 (IndexTTS / Qwen3-TTS worker)
+.venv-qwen3/
+
+# 离线 wheel 与 uv 备用缓存 (部署时生成, 体积较大)
+.wheels/
+.uv-cache-indextts/
+
+# 模型权重 (部署时 scripts/download_models.py 下载, ~15GB 起)
 models/
 
 # 运行时数据 (用户音频 + 数据库)
 server/data/
+server_run.log
 
 # IDE / 系统
 .idea/
 .vscode/
 .zcode/
+.workbuddy/
 Thumbs.db
 .DS_Store

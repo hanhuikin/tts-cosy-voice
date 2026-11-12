@@ -1,54 +1,31 @@
-"""CosyVoice 推理引擎封装。
+"""TTS 推理引擎封装。
 
 职责:
-- 管理 AutoModel 生命周期: 双模型互斥加载、后台线程加载、状态广播
-- 统一四种合成模式到 AutoModel 调用 (含 CosyVoice3 的 prompt 前缀规则)
+- 管理模型生命周期: 多模型互斥加载、后台线程加载、状态广播 (模型配置见 model_registry.py)
+- 把不同推理后端 (CosyVoice / IndexTTS / Qwen3-TTS) 统一为 int16 PCM 分块
 - 单 worker GPU 任务队列, 防止并发推理 OOM
-- 流式输出: 推理线程 -> asyncio.Queue 桥接, int16 PCM 分块
+- 流式输出: 推理线程 -> asyncio.Queue 桥接
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import sys
 import threading
 import time
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator, Optional
 
+from .backends import CosyVoiceBackend, ExternalTTSBackend
+from .model_registry import MODEL_KEYS, MODEL_REGISTRY, MODELS_DIR, is_available, public_info
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COSYVOICE_ROOT = REPO_ROOT / "CosyVoice"
-# 模型权重目录: 默认 <repo>/models/, 可用环境变量 COSYVOICE_MODELS_DIR 覆盖
-MODELS_DIR = Path(os.environ.get("COSYVOICE_MODELS_DIR", REPO_ROOT / "models"))
 
 logger = logging.getLogger("cosyvoice-server.engine")
 
 QUEUE_MAX = 16  # 排队上限, 超出返回 429
-
-MODEL_REGISTRY: dict[str, dict] = {
-    "cosyvoice3": {
-        "label": "CosyVoice 3.0 (0.5B)",
-        "dir": MODELS_DIR / "Fun-CosyVoice3-0.5B",
-        "modes": ["sft", "zero_shot", "cross_lingual", "instruct"],
-        "assistant_prefix": "You are a helpful assistant.",
-        "default_instructs": [
-            "请用四川话说这句话。",
-            "请用广东话表达。",
-            "请用尽可能快的语速说一句话。",
-            "请用开心的情绪说。",
-        ],
-    },
-    "cosyvoice2": {
-        "label": "CosyVoice 2.0 (0.5B)",
-        "dir": MODELS_DIR / "CosyVoice2-0.5B",
-        "modes": ["sft", "zero_shot", "cross_lingual", "instruct"],
-        "assistant_prefix": "",
-        "default_instructs": ["用四川话说这句话", "用开心的语气说", "用慢一点的语速说"],
-    },
-}
 
 
 def setup_sys_path() -> None:
@@ -120,7 +97,7 @@ class EventBus:
 class Engine:
     def __init__(self) -> None:
         self.events = EventBus()
-        self._model = None
+        self._backend: Optional[object] = None
         self._key: Optional[str] = None
         self._state = "idle"  # idle | loading | ready | error
         self._error: Optional[str] = None
@@ -137,12 +114,16 @@ class Engine:
     def status(self) -> dict:
         import torch
 
+        backend = self._backend if self._state == "ready" else None
         info = {
             "state": self._state,
             "model": self._key,
             "model_label": MODEL_REGISTRY[self._key]["label"] if self._key else None,
-            "sample_rate": getattr(self._model, "sample_rate", None) if self._model else None,
-            "speakers": self._model.list_available_spks() if (self._model and self._state == "ready") else [],
+            "family": MODEL_REGISTRY[self._key]["family"] if self._key else None,
+            "backend": MODEL_REGISTRY[self._key]["backend"] if self._key else None,
+            "stream_mode": MODEL_REGISTRY[self._key]["stream_mode"] if self._key else None,
+            "sample_rate": getattr(backend, "sample_rate", None) if backend else None,
+            "speakers": backend.speakers() if backend else [],
             "queue_len": self.task_queue.qsize() if self.task_queue else 0,
             "queue_max": QUEUE_MAX,
             "last_infer_ms": self._last_infer_ms,
@@ -165,19 +146,8 @@ class Engine:
         return info
 
     def models_info(self) -> list[dict]:
-        out = []
-        for key, cfg in MODEL_REGISTRY.items():
-            out.append(
-                {
-                    "key": key,
-                    "label": cfg["label"],
-                    "modes": cfg["modes"],
-                    "available": (cfg["dir"] / "llm.pt").exists(),
-                    "loaded": self._key == key and self._state == "ready",
-                    "default_instructs": cfg["default_instructs"],
-                }
-            )
-        return out
+        return [public_info(key, loaded=(self._key == key and self._state == "ready"))
+                for key in MODEL_KEYS]
 
     def _broadcast(self, **event) -> None:
         if self._loop and self._loop.is_running():
@@ -196,39 +166,65 @@ class Engine:
         self._loop = loop
         with self._load_lock:
             self._state, self._error, self._key = "loading", None, key
-            self._broadcast(type="engine", state="loading", model=key, label=MODEL_REGISTRY[key]["label"])
+            cfg = MODEL_REGISTRY[key]
+            self._broadcast(type="engine", state="loading", model=key, label=cfg["label"])
             t0 = time.time()
             try:
-                import torch  # noqa: F401  (cosyvoice 内部依赖)
-                from cosyvoice.cli.cosyvoice import AutoModel
+                import torch  # noqa: F401
 
-                apply_upstream_patches()
-
-                # 释放旧模型显存, 避免双模型驻留
-                self._model = None
+                # 释放旧模型: 外部 worker 进程退出后其显存自动归还
+                if self._backend is not None:
+                    self._backend.close()
+                self._backend = None
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-                cfg = MODEL_REGISTRY[key]
-                model_dir = cfg["dir"]
-                if not model_dir.exists():
-                    # 未预下载时回退: AutoModel 会走 modelscope snapshot_download
-                    repo_ids = {"cosyvoice3": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512", "cosyvoice2": "iic/CosyVoice2-0.5B"}
-                    model_dir = repo_ids[key]
-                self._model = AutoModel(model_dir=str(model_dir), fp16=True)
+                if cfg["backend"] == "inprocess":
+                    self._backend = self._load_cosyvoice(key, cfg)
+                else:
+                    if not is_available(key):
+                        raise RuntimeError(
+                            f"权重目录未就绪: {cfg['dir']} (缺少 {', '.join(cfg['markers'])})。"
+                            f"\n{cfg['install_hint']}"
+                        )
+                    backend = ExternalTTSBackend(key, cfg)
+                    backend.load()
+                    self._backend = backend
                 self._state = "ready"
                 logger.info("model %s loaded in %.1fs, sample_rate=%s, speakers=%s",
-                            key, time.time() - t0, self._model.sample_rate, self._model.list_available_spks())
+                            key, time.time() - t0, self._backend.sample_rate,
+                            self._backend.speakers())
             except Exception as e:  # pragma: no cover
                 logger.exception("model load failed")
-                self._model = None
+                if self._backend is not None:
+                    try:
+                        self._backend.close()
+                    except Exception:
+                        pass
+                self._backend = None
                 self._key = None
                 self._state, self._error = "error", f"{type(e).__name__}: {e}"
-            self._broadcast(type="engine", state=self._state, model=self._key,
-                            label=MODEL_REGISTRY[key]["label"],
-                            sample_rate=getattr(self._model, "sample_rate", None),
-                            speakers=self._model.list_available_spks() if self._model else [],
-                            error=self._error, load_ms=int((time.time() - t0) * 1000))
+            backend = self._backend
+            self._broadcast(
+                type="engine", state=self._state, model=self._key, label=cfg["label"],
+                sample_rate=getattr(backend, "sample_rate", None),
+                speakers=backend.speakers() if backend else [],
+                error=self._error, load_ms=int((time.time() - t0) * 1000),
+            )
+
+    @staticmethod
+    def _load_cosyvoice(key: str, cfg: dict) -> CosyVoiceBackend:
+        from cosyvoice.cli.cosyvoice import AutoModel
+
+        apply_upstream_patches()
+        model_dir = cfg["dir"]
+        if not model_dir.exists():
+            # 未预下载时回退: AutoModel 会走 modelscope snapshot_download
+            model_dir = {
+                "cosyvoice3": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512",
+                "cosyvoice2": "iic/CosyVoice2-0.5B",
+            }[key]
+        return CosyVoiceBackend(AutoModel(model_dir=str(model_dir), fp16=True), key, cfg)
 
     # ---------- 请求校验 ----------
     def validate(self, spec: TTSRequest) -> Optional[str]:
@@ -243,56 +239,36 @@ class Engine:
             return "text is empty"
         if len(spec.text) > 2000:
             return "text too long (max 2000 chars)"
-        if spec.mode == "sft":
+
+        backend = self._backend
+        if spec.mode in cfg["speaker_modes"]:
             if not spec.spk_id:
-                return "sft mode requires spk_id"
-            if spec.spk_id not in (self._model.list_available_spks() if self._model else []):
-                return f"speaker '{spec.spk_id}' not available"
-        else:
+                return f"{spec.mode} mode requires spk_id"
+            available = backend.speakers() if backend else []
+            if spec.spk_id not in available:
+                # Qwen3-TTS SDK 返回小写 id, 兼容文档/历史里的大写写法并就地归一化
+                match = next((s for s in available
+                              if s.casefold() == (spec.spk_id or "").casefold()), None)
+                if match:
+                    spec.spk_id = match
+                else:
+                    return (f"speaker '{spec.spk_id}' not available "
+                            f"(available: {', '.join(available) or 'none'})")
+        if spec.mode in cfg["reference_modes"]:
             if not spec.prompt_wav:
                 return f"{spec.mode} mode requires a reference voice (voice_id or prompt_wav)"
-            if spec.mode in ("zero_shot",) and not (spec.prompt_text or "").strip():
+            if cfg["requires_prompt_text"] and spec.mode == "zero_shot" \
+                    and not (spec.prompt_text or "").strip():
                 return "zero_shot mode requires prompt_text (the transcript of the reference audio)"
+        if cfg["instruct_kind"] == "design" and not (spec.instruct_text or "").strip():
+            return "voice design mode requires instruct_text (声音描述)"
         if spec.stream and abs(spec.speed - 1.0) > 1e-6 and spec.model == "cosyvoice2":
             return "cosyvoice2 streaming speed not supported (use non-stream or cosyvoice3)"
         return None
 
     # ---------- 合成 ----------
-    def _build_generator(self, spec: TTSRequest):
-        """映射请求到 AutoModel 推理生成器 (含 v3 prompt 前缀规则)。
-
-        stream 标志透传给模型: 上游仅在非流式分支应用 speed 参数,
-        流式分支变速不生效 (token2wav 最终块调用不传 speed)。
-        """
-        m, cfg = self._model, MODEL_REGISTRY[self._key]
-        prefix = cfg["assistant_prefix"]
-        # v3 流式语速由 cosyvoice_patch 支持; v2 流式保持 1.0 (validate 已拦截)
-        speed = spec.speed if (not spec.stream or self._key == "cosyvoice3") else 1.0
-        if spec.mode == "sft":
-            return m.inference_sft(spec.text, spec.spk_id, stream=spec.stream, speed=speed)
-        if spec.mode == "zero_shot":
-            prompt_text = spec.prompt_text or ""
-            if self._key == "cosyvoice3":
-                prompt_text = f"{prefix}<|endofprompt|>{prompt_text}"
-            return m.inference_zero_shot(spec.text, prompt_text, spec.prompt_wav, stream=spec.stream, speed=speed)
-        if spec.mode == "cross_lingual":
-            text = spec.text
-            if self._key == "cosyvoice3":
-                text = f"{prefix}<|endofprompt|>{text}"
-            return m.inference_cross_lingual(text, spec.prompt_wav, stream=spec.stream, speed=speed)
-        if spec.mode == "instruct":
-            instruct = spec.instruct_text or ""
-            if self._key == "cosyvoice3":
-                instruct = f"{prefix} {instruct}<|endofprompt|>"
-            elif "<|endofprompt|>" not in instruct:
-                instruct = f"{instruct}<|endofprompt|>"
-            return m.inference_instruct2(spec.text, instruct, spec.prompt_wav, stream=spec.stream, speed=speed)
-        raise ValueError(f"unsupported mode: {spec.mode}")
-
     def _infer_worker(self, job: Job) -> None:
         """在工作线程中执行推理, 分块经 call_soon_threadsafe 送回事件循环。"""
-        import torch
-
         def put(item: tuple) -> None:
             job.loop.call_soon_threadsafe(job.out_q.put_nowait, item)
 
@@ -303,12 +279,8 @@ class Engine:
                 return
             t0 = time.time()
             first = True
-            for chunk in self._build_generator(job.spec):
-                speech = chunk["tts_speech"]
-                pcm = (
-                    speech.squeeze(0).clamp(-1.0, 1.0).mul(32767.0).to(torch.int16).cpu().numpy().tobytes()
-                )
-                job.sample_rate = self._model.sample_rate
+            for pcm in self._backend.synthesize(job.spec):
+                job.sample_rate = getattr(self._backend, "sample_rate", None) or job.sample_rate
                 now = time.time()
                 if first:
                     job.first_chunk_at = now

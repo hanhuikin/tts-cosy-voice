@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Studio · 界面原型</title>
+<script>
+(function(){try{var t=localStorage.getItem('vs-theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t)}catch(e){}})();
+</script>
+<style>
+:root{--r-card:16px;--r-ctl:10px;--r-pill:999px;--sp:4px;--ease:cubic-bezier(.22,.8,.3,1)}
+:root[data-theme="light"]{
+  --bg:#F4F6FC;--surface:#FFFFFF;--surface-2:#F8F9FD;--surface-3:#EDF1F9;
+  --line:#E4E9F3;--line-2:#D3DBEA;--text:#151B2E;--text-2:#58637B;--text-3:#8B96AD;
+  --primary:#4F5BD5;--primary-2:#6C63E8;--primary-soft:#EEF0FF;--primary-ink:#FFFFFF;
+  --accent:#0E9E95;--accent-soft:#E2F6F3;--ok:#12805C;--ok-soft:#E4F5EE;
+  --warn:#B07015;--warn-soft:#FFF3DC;--danger:#CF4247;--danger-soft:#FDECEC;
+  --shadow:0 1px 2px rgba(21,27,46,.04),0 10px 30px rgba(21,27,46,.06);
+  --shadow-sm:0 1px 3px rgba(21,27,46,.06);
+}
+:root[data-theme="dark"]{
+  --bg:#0B1020;--surface:#121A2C;--surface-2:#161F33;--surface-3:#1D2840;
+  --line:#253048;--line-2:#33405C;--text:#EAEEF9;--text-2:#9BA7C0;--text-3:#6E7C98;
+  --primary:#838DFF;--primary-2:#A08BFF;--primary-soft:#252C58;--primary-ink:#0B1020;
+  --accent:#39D3C5;--accent-soft:#123B3B;--ok:#4FD1A5;--ok-soft:#12362C;
+  --warn:#F0B75A;--warn-soft:#3A2D14;--danger:#F08287;--danger-soft:#3B1D24;
+  --shadow:0 1px 2px rgba(0,0,0,.2),0 12px 32px rgba(0,0,0,.28);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.24);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:Inter,"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:6px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ic.sm{width:15px;height:15px}
+.ic.lg{width:22px;height:22px}
+
+/* 布局 */
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:228px;flex:0 0 228px;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:20px 12px 16px;z-index:20}
+.brand{display:flex;align-items:center;gap:11px;padding:2px 10px 24px}
+.brand-mark{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--primary),var(--accent));box-shadow:0 4px 12px rgba(79,91,213,.28)}
+.brand-name{font-size:15px;font-weight:700;letter-spacing:.2px;line-height:1.2}
+.brand-sub{font-size:11px;color:var(--text-3);line-height:1.3}
+.nav-label{font-size:11px;letter-spacing:.8px;color:var(--text-3);padding:14px 12px 6px;font-weight:600}
+.nav{display:flex;flex-direction:column;gap:3px}
+.nav a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:var(--r-ctl);color:var(--text-2);font-weight:500;cursor:pointer;min-height:44px;transition:background .16s var(--ease),color .16s var(--ease)}
+.nav a:hover{background:var(--surface-3);color:var(--text)}
+.nav a.active{background:var(--primary-soft);color:var(--primary);font-weight:600}
+.nav a .ic{opacity:.9}
+.nav-badge{margin-left:auto;font-size:11px;background:var(--surface-3);color:var(--text-3);padding:1px 7px;border-radius:var(--r-pill);font-variant-numeric:tabular-nums}
+.side-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:14px}
+.status-line{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:12px;color:var(--text-2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft);flex:none}
+.side-note{padding:0 12px;font-size:11px;color:var(--text-3)}
+.shell{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{height:64px;flex:0 0 64px;display:flex;align-items:center;gap:14px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--line);z-index:15}
+.page-title{font-size:16px;font-weight:650;margin:0;letter-spacing:.1px}
+.page-sub{font-size:12px;color:var(--text-3);margin-left:10px;font-weight:400}
+.top-spacer{flex:1}
+.model-wrap{position:relative}
+.model-btn{display:flex;align-items:center;gap:9px;padding:7px 11px 7px 9px;border:1px solid var(--line);background:var(--surface-2);border-radius:var(--r-pill);min-height:40px;transition:border-color .16s,box-shadow .16s}
+.model-btn:hover{border-color:var(--line-2);box-shadow:var(--shadow-sm)}
+.model-btn .lbl{font-size:12px;color:var(--text-3)}
+.model-btn .val{font-size:13px;font-weight:600}
+.model-btn .ic{width:14px;height:14px;color:var(--text-3)}
+.menu{position:absolute;right:0;top:calc(100% + 8px);width:296px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px;z-index:60}
+.menu[hidden]{display:none}
+.menu-head{font-size:11px;color:var(--text-3);padding:8px 10px 6px;letter-spacing:.4px}
+.menu-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border-radius:9px;min-height:44px}
+.menu-item:hover{background:var(--surface-3)}
+.menu-item .mi-main{flex:1;min-width:0}
+.menu-item .mi-name{font-size:13px;font-weight:600;display:block}
+.menu-item .mi-note{font-size:11px;color:var(--text-3);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu-item .mi-check{color:var(--primary)}
+.icon-btn{width:38px;height:38px;border-radius:var(--r-ctl);display:grid;place-items:center;color:var(--text-2);border:1px solid transparent}
+.icon-btn:hover{background:var(--surface-3);color:var(--text)}
+.workspace{flex:1;min-height:0;display:flex;overflow:hidden}
+.content{flex:1;min-width:0;overflow-y:auto;padding:26px 30px 48px;scroll-behavior:smooth}
+.output{width:336px;flex:0 0 336px;border-left:1px solid var(--line);background:var(--surface);overflow-y:auto;padding:20px 20px 40px}
+.output[hidden]{display:none}
+.view[hidden]{display:none}
+.wb{max-width:880px;margin:0 auto}
+
+/* 通用组件 */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow-sm);padding:20px 22px;margin-bottom:18px}
+.panel.flush{padding:0;overflow:hidden}
+.panel-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.step{width:22px;height:22px;border-radius:7px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.panel-title{font-size:15px;font-weight:650;margin:0}
+.panel-desc{font-size:12px;color:var(--text-3);margin-left:2px}
+.panel-hint{margin-left:auto;font-size:12px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.textarea{width:100%;min-height:132px;resize:vertical;padding:13px 14px;border:1px solid var(--line);border-radius:var(--r-ctl);background:var(--surface-2);line-height:1.75;transition:border-color .16s,box-shadow .16s}
+.textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.textarea::placeholder,.input::placeholder{color:var(--text-3)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.chip{padding:5px 11px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--surface-2);font-size:12px;color:var(--text-2);min-height:30px;transition:all .16s var(--ease)}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.chip.active{background:var(--primary-soft);border-color:var(--primary);color:var(--primary);font-weight:600}
+.chip.ghost{border-style:dashed;background:transparent}
+.chip-label{font-size:12px;color:var(--text-3);margin-right:2px}
+.tabs{display:flex;gap:4px;padding:4px;background:var(--surface-3);border-radius:var(--r-pill);width:fit-content;margin-bottom:16px}
+.tab{padding:7px 16px;border-radius:var(--r-pill);font-size:13px;font-weight:500;color:var(--text-2);min-height:36px;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{background:var(--surface);color:var(--text);font-weight:600;box-shadow:var(--shadow-sm)}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.sound{position:relative;text-align:left;padding:14px;border:1px solid var(--line);border-radius:13px;background:var(--surface-2);min-height:104px;transition:all .18s var(--ease);display:flex;flex-direction:column;gap:9px}
+.sound:hover{border-color:var(--primary);transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.sound.active{border-color:var(--primary);background:var(--primary-soft);box-shadow:0 0 0 1px var(--primary) inset}
+.sound-top{display:flex;align-items:center;gap:10px}
+.avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff;flex:none;background:linear-gradient(135deg,var(--primary),var(--accent))}
+.avatar.a2{background:linear-gradient(135deg,#E08B5A,#D0556B)}
+.avatar.a3{background:linear-gradient(135deg,#3F8FD6,#5B63C9)}
+.avatar.a4{background:linear-gradient(135deg,#2FA98B,#3E7FC1)}
+.avatar.a5{background:linear-gradient(135deg,#8B63C9,#C25D9B)}
+.sound-name{font-size:13px;font-weight:650;line-height:1.3}
+.sound-meta{font-size:11px;color:var(--text-3);line-height:1.4}
+.sound-check{position:absolute;top:11px;right:11px;width:18px;height:18px;border-radius:50%;background:var(--primary);color:var(--primary-ink);display:grid;place-items:center}
+.sound-check .ic{width:12px;height:12px;stroke-width:2.6}
+.sound-play{margin-left:auto;color:var(--text-3);width:26px;height:26px;border-radius:50%;display:grid;place-items:center}
+.sound-play:hover{background:var(--surface-3);color:var(--primary)}
+.empty-inline{padding:14px;border:1px dashed var(--line-2);border-radius:12px;font-size:12px;color:var(--text-3);text-align:center;grid-column:1/-1}
+.field{margin-top:14px}
+.field-label{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:7px}
+.field-label .opt{font-weight:400;color:var(--text-3)}
+.input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:var(--r-ctl);background:var(--surface-2);min-height:40px}
+.input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+details.adv{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);margin-bottom:18px;box-shadow:var(--shadow-sm)}
+details.adv summary{display:flex;align-items:center;gap:10px;padding:15px 20px;cursor:pointer;list-style:none;font-size:14px;font-weight:600;min-height:52px}
+details.adv summary::-webkit-details-marker{display:none}
+details.adv summary .ic{color:var(--text-3);transition:transform .2s}
+details.adv[open] summary .ic.caret{transform:rotate(180deg)}
+.adv-body{padding:2px 20px 20px;border-top:1px solid var(--line)}
+.adv-row{display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+.adv-row:last-child{border-bottom:none}
+.adv-name{width:118px;flex:none;font-size:13px}
+.adv-name small{display:block;font-size:11px;color:var(--text-3);font-weight:400}
+.adv-ctl{flex:1;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
+.range-val{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;width:42px;text-align:right}
+.toggle{width:44px;height:26px;border-radius:var(--r-pill);background:var(--line-2);position:relative;transition:background .18s;flex:none}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .18s var(--ease)}
+.toggle.on{background:var(--primary)}
+.toggle.on::after{transform:translateX(18px)}
+.actionbar{position:sticky;bottom:0;z-index:8;display:flex;align-items:center;gap:16px;padding:14px 18px;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);margin-top:4px}
+.action-info{flex:1;min-width:0;font-size:12px;color:var(--text-3);line-height:1.5}
+.action-info strong{display:block;font-size:13px;color:var(--text);font-weight:600}
+.action-info .warn-txt{color:var(--warn)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 16px;border-radius:var(--r-ctl);font-size:13px;font-weight:600;min-height:40px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);transition:all .16s var(--ease);white-space:nowrap}
+.btn:hover{border-color:var(--line-2);background:var(--surface-3)}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:var(--primary-ink);padding:11px 22px;min-height:46px;box-shadow:0 4px 14px rgba(79,91,213,.25)}
+.btn-primary:hover{background:var(--primary-2);border-color:var(--primary-2);transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-lg{font-size:14px}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--text-2)}
+.btn-ghost:hover{background:var(--surface-3)}
+.kbd{font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace;padding:2px 6px;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;color:var(--text-3)}
+.notice{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:var(--r-ctl);background:var(--primary-soft);color:var(--primary);font-size:12px;line-height:1.55;margin-bottom:16px}
+.notice .ic{flex:none;margin-top:2px}
+.notice.warn{background:var(--warn-soft);color:var(--warn)}
+
+/* 输出面板 */
+.out-head{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.out-head h3{margin:0;font-size:14px;font-weight:650}
+.pill{font-size:11px;padding:2px 9px;border-radius:var(--r-pill);background:var(--surface-3);color:var(--text-2);font-weight:600}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.busy{background:var(--warn-soft);color:var(--warn)}
+.out-empty{text-align:center;padding:34px 12px 30px;border:1px dashed var(--line-2);border-radius:14px;background:var(--surface-2)}
+.out-empty .wave-static{display:flex;align-items:center;justify-content:center;gap:3px;height:44px;margin-bottom:14px}
+.out-empty .wave-static i{display:block;width:3px;border-radius:3px;background:var(--line-2);height:var(--h)}
+.out-empty p{margin:0 0 4px;font-size:13px;font-weight:600}
+.out-empty span{font-size:12px;color:var(--text-3)}
+.result-card{border:1px solid var(--line);border-radius:14px;padding:16px;background:var(--surface-2)}
+.result-title{font-size:13px;font-weight:650;line-height:1.4;margin:0 0 2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.result-meta{font-size:11px;color:var(--text-3);margin-bottom:14px}
+.wave{display:flex;align-items:center;gap:2px;height:52px;margin-bottom:8px;position:relative;overflow:hidden}
+.wave .bar{flex:1;min-width:2px;border-radius:2px;background:var(--line-2);height:var(--h);transition:background .2s,transform .2s;transform-origin:center}
+.wave .bar.done{background:var(--primary)}
+.wave.playing .bar{animation:wv 1s ease-in-out infinite alternate;animation-delay:var(--d)}
+@keyframes wv{from{transform:scaleY(.72)}to{transform:scaleY(1.12)}}
+.wave-progress{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,var(--primary-soft),transparent);opacity:.35;width:var(--p,0%)}
+.times{display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums;margin-bottom:12px}
+.player-ctrl{display:flex;align-items:center;gap:9px}
+.play-main{width:40px;height:40px;border-radius:50%;background:var(--primary);color:var(--primary-ink);display:grid;place-items:center;flex:none}
+.play-main:hover{background:var(--primary-2)}
+.mini-btn{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--text-2);border:1px solid var(--line)}
+.mini-btn:hover{background:var(--surface-3);color:var(--primary)}
+.out-section{margin-top:24px}
+.out-section h4{font-size:12px;font-weight:650;color:var(--text-2);margin:0 0 10px;display:flex;align-items:center;gap:6px}
+.recent{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;min-height:52px}
+.recent:hover{background:var(--surface-3)}
+.recent .r-main{flex:1;min-width:0}
+.recent .r-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recent .r-meta{font-size:11px;color:var(--text-3)}
+.recent .r-dur{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.out-tip{font-size:11px;color:var(--text-3);margin-top:18px;padding-top:14px;border-top:1px solid var(--line);line-height:1.6}
+.progress-track{height:5px;border-radius:5px;background:var(--surface-3);overflow:hidden;margin:10px 0 4px}
+.progress-fill{height:100%;width:0;background:var(--primary);border-radius:5px;transition:width .3s linear}
+
+/* 其它视图 */
+.view-head{display:flex;align-items:flex-end;gap:14px;margin-bottom:20px;max-width:1100px;margin-left:auto;margin-right:auto}
+.view-head h2{margin:0;font-size:21px;font-weight:700;letter-spacing:.2px}
+.view-head p{margin:2px 0 0;font-size:12px;color:var(--text-3)}
+.view-head .spacer{flex:1}
+.stat-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px;max-width:1100px;margin-left:auto;margin-right:auto}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 17px}
+.stat .k{font-size:11px;color:var(--text-3)}
+.stat .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.35}
+.stat .v small{font-size:12px;font-weight:500;color:var(--text-3)}
+.wrap{max-width:1100px;margin:0 auto}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;box-shadow:var(--shadow-sm)}
+.list-row{display:flex;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid var(--line);min-height:64px}
+.list-row:last-child{border-bottom:none}
+.list-row:hover{background:var(--surface-2)}
+.list-row .lr-main{flex:1;min-width:0}
+.list-row .lr-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-row .lr-meta{font-size:11px;color:var(--text-3)}
+.tag{font-size:11px;padding:3px 9px;border-radius:var(--r-pill);background:var(--surface-3);color:var(--text-2);white-space:nowrap}
+.tag.pri{background:var(--primary-soft);color:var(--primary)}
+.tag.acc{background:var(--accent-soft);color:var(--accent)}
+.upload{border:1.5px dashed var(--line-2);border-radius:14px;padding:28px;text-align:center;background:var(--surface-2);margin-bottom:18px}
+.upload .up-icon{width:44px;height:44px;border-radius:13px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;margin:0 auto 12px}
+.upload p{margin:0 0 3px;font-size:13px;font-weight:600}
+.upload span{font-size:12px;color:var(--text-3)}
+.voice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.vcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;box-shadow:var(--shadow-sm)}
+.vcard .vc-top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.vcard .vc-name{font-size:13px;font-weight:650}
+.vcard .vc-meta{font-size:11px;color:var(--text-3)}
+.vcard .vc-foot{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.vcard .vc-foot .spacer{flex:1}
+.mini-wave{display:flex;align-items:center;gap:2px;height:22px;margin:10px 0}
+.mini-wave i{flex:1;background:var(--primary);opacity:.35;border-radius:2px;height:var(--h)}
+.pod-grid{display:grid;grid-template-columns:1.15fr .85fr 1fr;gap:14px}
+.pod-col{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:16px;min-height:330px}
+.pod-col h3{margin:0 0 4px;font-size:14px;font-weight:650}
+.pod-col .sub{font-size:11px;color:var(--text-3);margin-bottom:14px}
+.script-line{display:flex;gap:9px;padding:8px 9px;border-radius:9px;font-size:12px;margin-bottom:5px;background:var(--surface-2)}
+.script-line .who{font-weight:650;color:var(--primary);flex:none;width:44px}
+.role-row{display:flex;align-items:center;gap:9px;padding:9px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
+.role-row .avatar{width:28px;height:28px;font-size:11px}
+.role-row .rn{flex:1;font-size:12px;font-weight:600}
+.model-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px 16px}
+.mcard .mc-top{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.mcard .mc-name{font-size:13px;font-weight:650;flex:1}
+.mcard .mc-note{font-size:11px;color:var(--text-3);line-height:1.55;margin-bottom:12px}
+.mcard .mc-foot{display:flex;align-items:center;gap:8px}
+.mcard .mc-foot .spacer{flex:1}
+.bar-track{height:6px;border-radius:6px;background:var(--surface-3);overflow:hidden;margin-top:6px}
+.bar-fill{height:100%;background:var(--primary);border-radius:6px}
+.toast-stack{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column;gap:9px;z-index:100;pointer-events:none}
+.toast{display:flex;align-items:center;gap:9px;padding:11px 15px;background:var(--surface);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);font-size:12px;font-weight:500;max-width:340px;animation:tin .24s var(--ease)}
+.toast .ic{color:var(--ok)}
+.toast.warn .ic{color:var(--warn)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+@media(max-width:1180px){.output{width:300px;flex-basis:300px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pod-grid{grid-template-columns:1fr 1fr}.pod-col:last-child{grid-column:1/-1}}
+@media(max-width:1000px){.workspace{flex-direction:column;overflow-y:auto}.content{overflow:visible;padding-bottom:20px}.output{width:auto;flex:none;border-left:none;border-top:1px solid var(--line);max-height:none}.actionbar{position:static}.sidebar{width:196px;flex-basis:196px}.model-cards{grid-template-columns:1fr}}
+@media(max-width:720px){
+  .app{flex-direction:column}.shell{padding-bottom:62px}
+  .sidebar{position:fixed;bottom:0;left:0;right:0;top:auto;width:auto;height:62px;flex:none;flex-direction:row;padding:0 6px;border-right:none;border-top:1px solid var(--line);box-shadow:0 -4px 18px rgba(0,0,0,.06);z-index:50}
+  .brand,.nav-label,.side-foot,.nav-badge{display:none}
+  .nav{flex-direction:row;flex:1;justify-content:space-around;gap:0}
+  .nav a{flex-direction:column;gap:2px;font-size:10px;padding:6px 4px;min-height:56px;justify-content:center;border-radius:8px}
+  .nav a .ic{width:19px;height:19px}
+  .topbar{padding:0 14px;gap:8px;height:58px;flex-basis:58px}
+  .page-sub,.model-btn .lbl{display:none}
+  .page-title{font-size:15px}
+  .content{padding:16px 14px 24px}
+  .grid,.voice-grid,.stat-row,.model-cards,.pod-grid{grid-template-columns:1fr 1fr}
+  .stat-row{grid-template-columns:1fr 1fr}
+  .pod-grid{grid-template-columns:1fr}
+  .pod-col:last-child{grid-column:auto}
+  .panel{padding:16px}
+  .adv-row{flex-direction:column;align-items:flex-start;gap:8px}
+  .adv-name{width:auto}
+  .actionbar{flex-wrap:wrap}
+  .action-info{flex-basis:100%}
+  .btn-primary{flex:1}
+  .toast-stack{right:12px;left:12px;bottom:72px}
+  .toast{max-width:none}
+}
+@media(max-width:460px){.grid,.voice-grid,.model-cards{grid-template-columns:1fr}}
+/* 播客工坊 */
+.pod-stepper{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:16px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.pstep{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-3);white-space:nowrap}
+.pstep .pn{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--surface-3);color:var(--text-3);flex:none}
+.pstep.done{color:var(--text-2)}.pstep.done .pn{background:var(--ok-soft);color:var(--ok)}
+.pstep.active{color:var(--primary);font-weight:650}.pstep.active .pn{background:var(--primary);color:var(--primary-ink)}
+.pstep-line{flex:1;min-width:10px;height:1px;background:var(--line-2)}
+.pod-grid3{display:grid;grid-template-columns:1fr 1.08fr .92fr;gap:14px;align-items:start}
+.pcol{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:16px;box-shadow:var(--shadow-sm)}
+.pcol-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.pcol-head h3{margin:0;font-size:14px;font-weight:650}
+.pcol-head .spacer{flex:1}
+.pcol-sub{font-size:11px;color:var(--text-3);margin:0 0 12px}
+.src-tabs{display:flex;gap:4px;padding:4px;background:var(--surface-3);border-radius:var(--r-pill);margin-bottom:12px}
+.src-tabs button{flex:1;padding:6px 8px;border-radius:var(--r-pill);font-size:12px;color:var(--text-2);min-height:32px}
+.src-tabs button.active{background:var(--surface);color:var(--text);font-weight:650;box-shadow:var(--shadow-sm)}
+.dropzone{border:1.5px dashed var(--line-2);border-radius:12px;padding:24px 12px;text-align:center;background:var(--surface-2);cursor:pointer;font-size:12px;color:var(--text-3)}
+.dropzone:hover{border-color:var(--primary);color:var(--primary)}
+.dropzone b{display:block;color:var(--text);font-size:13px;margin-bottom:3px}
+.llm-strip{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);margin-top:12px;font-size:11px;color:var(--text-3)}
+.llm-strip .lm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.llm-strip .lm b{color:var(--text-2)}
+.src-actions{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.src-actions .btn{width:100%;justify-content:center}
+.dlg-list{max-height:430px;overflow-y:auto;padding-right:4px}
+.dlg{display:flex;gap:9px;margin-bottom:10px}
+.dlg .avatar{width:30px;height:30px;font-size:11px;flex:none}
+.dlg-body{flex:1;min-width:0}
+.dlg-who{display:flex;align-items:center;gap:7px;margin-bottom:5px;flex-wrap:wrap}
+.dlg-who .nm{font-size:12px;font-weight:650}
+.dlg-who select{padding:2px 6px;border:1px solid var(--line);border-radius:7px;background:var(--surface-2);font-size:11px;max-width:158px}
+.dlg-who .spacer{flex:1}
+.bubble{background:var(--surface-2);border:1px solid var(--line);border-radius:4px 11px 11px 11px;padding:9px 11px;font-size:12.5px;line-height:1.65;cursor:text}
+.dlg.guest .bubble{background:var(--accent-soft);border-color:transparent}
+.dlg-edit textarea{width:100%;min-height:72px;padding:8px 10px;border:1px solid var(--primary);border-radius:9px;background:var(--surface-2);font-size:12.5px;resize:vertical}
+.spk-card{border:1px solid var(--line);border-radius:12px;padding:11px;margin-bottom:10px;background:var(--surface-2)}
+.spk-card .sc-head{display:flex;align-items:center;gap:7px;margin-bottom:9px}
+.spk-card .sc-head b{font-size:12px;flex:1}
+.spk-row{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}
+.spk-row input,.spk-row select{width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:12px;min-height:34px}
+.spk-card textarea{width:100%;min-height:50px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:11.5px;resize:vertical}
+.out-zone{margin-top:14px}
+.out-tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.out-tabs button{padding:9px 14px;font-size:13px;color:var(--text-2);border-bottom:2px solid transparent;margin-bottom:-1px;min-height:40px}
+.out-tabs button.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:650}
+.push-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.proto-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+.push-status{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;background:var(--surface-2);font-size:12px;margin-top:10px;flex-wrap:wrap}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 3px var(--danger-soft);animation:pulse2 1.2s infinite;flex:none}
+@keyframes pulse2{50%{opacity:.35}}
+.kv{display:flex;gap:10px;font-size:12px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.kv .k{width:88px;flex:none;color:var(--text-3)}.kv .v{color:var(--text-2)}
+.out-group{border:1px solid var(--line);border-radius:13px;background:var(--surface-2);padding:12px;margin-bottom:14px}
+.og-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.og-title{font-size:13px;font-weight:650}
+.og-count{font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.og-live{font-size:11px;color:var(--danger);font-weight:650}
+.og-head .spacer{flex:1}
+.task-row{display:flex;align-items:flex-start;gap:9px;padding:9px 8px;border-radius:10px;cursor:pointer;min-height:56px}
+.task-row:hover{background:var(--surface-3)}
+.task-row .tm{flex:1;min-width:0}
+.task-row .tm b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.task-row .tm span{font-size:11px;color:var(--text-3)}
+.qbar{height:4px;border-radius:4px;background:var(--surface-3);overflow:hidden;margin-top:6px}
+.qbar-fill{height:100%;background:var(--primary);border-radius:4px;transition:width .3s}
+.out-empty-sm{padding:18px 10px;text-align:center;border:1px dashed var(--line-2);border-radius:10px;font-size:12px;color:var(--text-3)}
+.detail-grid{display:grid;grid-template-columns:96px 1fr;gap:7px 10px;font-size:12px;margin:12px 0}
+.detail-grid .dk{color:var(--text-3)}
+.detail-grid .dv{color:var(--text-2);word-break:break-all}
+.ep-row{display:flex;align-items:center;gap:9px;padding:9px 8px;border-radius:10px;cursor:pointer;min-height:54px}
+.ep-row:hover{background:var(--surface-3)}
+.ep-row .em{flex:1;min-width:0}
+.ep-row .em b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ep-row .em span{font-size:11px;color:var(--text-3)}
+.modal-mask{position:fixed;inset:0;background:rgba(8,12,24,.55);display:grid;place-items:center;z-index:120;padding:20px}
+.modal-mask[hidden]{display:none}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;width:min(480px,100%);box-shadow:var(--shadow);max-height:86vh;overflow-y:auto}
+.modal h3{margin:0 0 4px;font-size:16px}
+.modal .msub{font-size:12px;color:var(--text-3);margin-bottom:16px}
+.modal .mfield{margin-bottom:11px}
+.modal .mfield label{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px}
+.modal .mfield input,.modal .mfield textarea{width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);font-size:13px}
+@media(max-width:1180px){.pod-grid3{grid-template-columns:1fr 1fr}.pod-grid3 .pcol:last-child{grid-column:1/-1}.push-grid{grid-template-columns:1fr}}
+@media(max-width:720px){.pod-grid3{grid-template-columns:1fr}.pod-grid3 .pcol:last-child{grid-column:auto}.pod-stepper{gap:5px}.pstep span:last-child{display:none}.pstep-line{min-width:5px}.spk-row{grid-template-columns:1fr}.out-tabs{overflow-x:auto}.out-tabs button{white-space:nowrap}}
+/* ===== 播客工坊 UI 精修 v1.3：只调视觉层级，功能零改动 ===== */
+.pod-grid3{grid-template-columns:1.02fr 1.18fr .84fr;gap:16px}
+.pcol{border-radius:16px;padding:18px;transition:border-color .2s var(--ease),box-shadow .2s var(--ease)}
+.pcol.stage-active{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft),var(--shadow-sm)}
+.pcol.stage-active .pcol-head h3{color:var(--primary)}
+.pcol-head{gap:10px}
+.pcol-head .step{width:24px;height:24px;border-radius:8px;font-size:11px}
+.pcol.stage-active .pcol-head .step{background:var(--primary);color:var(--primary-ink)}
+.pcol-sub{padding-left:34px;line-height:1.5}
+.src-tabs button{transition:background .18s var(--ease),color .18s var(--ease)}
+.src-tabs button:not(.active):hover{color:var(--text)}
+.llm-strip{padding:10px 12px;border-radius:11px}
+.src-actions .btn{min-height:42px;font-size:13px}
+.src-actions .btn.sec{background:var(--surface)}
+.dlg-list{padding-left:14px;border-left:1px dashed var(--line-2);margin-left:14px}
+.dlg{position:relative;margin-bottom:14px}
+.dlg::before{content:"";position:absolute;left:-20px;top:13px;width:9px;height:9px;border-radius:50%;background:var(--surface);border:2px solid var(--primary)}
+.dlg.guest::before{border-color:var(--accent)}
+.dlg .avatar{box-shadow:0 0 0 2px var(--surface)}
+.bubble{transition:border-color .16s var(--ease),background .16s var(--ease)}
+.bubble:hover{border-color:var(--primary)}
+.dlg.guest .bubble:hover{border-color:var(--accent)}
+.dlg-edit textarea:focus{outline:none;box-shadow:0 0 0 3px var(--primary-soft)}
+.spk-card{padding:12px;transition:border-color .18s var(--ease)}
+.spk-card:hover{border-color:var(--line-2)}
+.spk-row input:focus,.spk-row select:focus,.spk-card textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.out-zone{padding:20px}
+.out-tabs{gap:2px}
+.out-tabs button{border-radius:8px 8px 0 0;transition:color .16s var(--ease),background .16s var(--ease)}
+.out-tabs button:not(.active):hover{background:var(--surface-2);color:var(--text)}
+.out-group{padding:13px;border-radius:14px;margin-bottom:16px}
+.og-head{padding-bottom:9px;margin-bottom:10px;border-bottom:1px solid var(--line)}
+.og-count{background:var(--surface-3);padding:1px 8px;border-radius:999px}
+.task-row,.ep-row{padding:10px;border-radius:11px;margin-bottom:3px;transition:background .16s var(--ease)}
+.task-row.st-live,.ep-row.st-live{background:var(--warn-soft)}
+.task-row.st-err,.ep-row.st-err{background:var(--danger-soft)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.warn,.tag.live{background:var(--warn-soft);color:var(--warn)}
+.tag.err{background:var(--danger-soft);color:var(--danger)}
+.times,.range-val,.og-count,.task-row .tm span,.ep-row .em span,.stat .v,.llm-strip .lm{font-variant-numeric:tabular-nums}
+.modal{border-radius:20px;padding:24px}
+.modal .detail-grid{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0}
+@media(max-width:1180px){.pod-grid3{grid-template-columns:1fr 1fr}#pod-cast-col{grid-column:1/-1}}
+@media(max-width:720px){.pod-grid3{grid-template-columns:1fr}#pod-cast-col{grid-column:auto}.pcol{padding:16px}.pcol-sub{padding-left:0}.dlg-list{margin-left:8px;padding-left:12px}.out-zone{padding:16px}.out-tabs{overflow-x:auto}.out-tabs button{white-space:nowrap}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<svg style="display:none" aria-hidden="true">
+<symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h2m3-5v10m4-14v18m4-14v10m4-7v4m2-2h0"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8"/></symbol>
+<symbol id="i-lib" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v16"/></symbol>
+<symbol id="i-pod" viewBox="0 0 24 24"><circle cx="12" cy="11" r="7"/><path d="M12 18v3m-3 0h6M9 11h.01M15 11h.01"/></symbol>
+<symbol id="i-set" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1-2.8 2.8-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21h-4v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1-2.8-2.8.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3v-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1 2.8-2.8.1.1a1.6 1.6 0 0 0 1.8.3 1.6 1.6 0 0 0 1-1.5V3h4v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1 2.8 2.8-.1.1a1.6 1.6 0 0 0-.3 1.8 1.6 1.6 0 0 0 1.5 1H21v4h-.1a1.6 1.6 0 0 0-1.5 1z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5 19 12 7 19.5z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M7 4h3v16H7zM14 4h3v16h-3z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 20h16"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6M20 5v6h-6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 17V5m-4 4 4-4 4 4M4 20h16"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg class="ic lg"><use href="#i-wave"/></svg></div>
+      <div><div class="brand-name">Voice Studio</div><div class="brand-sub">语音创作控制台</div></div>
+    </div>
+    <div class="nav-label">创作</div>
+    <nav class="nav" id="nav-primary" aria-label="主导航">
+      <a data-act="view" data-key="workbench" class="active"><svg class="ic"><use href="#i-home"/></svg>创作台</a>
+      <a data-act="view" data-key="podcast"><svg class="ic"><use href="#i-pod"/></svg>播客工坊</a>
+      <a data-act="view" data-key="voices"><svg class="ic"><use href="#i-mic"/></svg>我的音色</a>
+      <a data-act="view" data-key="library"><svg class="ic"><use href="#i-lib"/></svg>作品库<span class="nav-badge" id="nav-count">4</span></a>
+    </nav>
+    <div class="nav-label">管理</div>
+    <nav class="nav" aria-label="次级导航">
+      <a data-act="view" data-key="system"><svg class="ic"><use href="#i-set"/></svg>系统状态</a>
+    </nav>
+    <div class="side-foot">
+      <div class="status-line"><span class="dot"></span><span>服务就绪 · 7 个模型可用</span></div>
+      <div class="side-note">GPU 显存与队列详情见「系统状态」</div>
+    </div>
+  </aside>
+
+  <div class="shell">
+    <header class="topbar">
+      <h1 class="page-title" id="page-title">创作台</h1>
+      <span class="page-sub" id="page-sub">把文字变成声音</span>
+      <div class="top-spacer"></div>
+      <div class="model-wrap">
+        <button class="model-btn" id="model-btn" data-act="toggle-menu" aria-haspopup="listbox" aria-expanded="false">
+          <span class="dot"></span><span class="lbl">当前模型</span><span class="val" id="model-name">CosyVoice 3.0</span>
+          <svg class="ic"><use href="#i-chev"/></svg>
+        </button>
+        <div class="menu" id="model-menu" role="listbox" hidden></div>
+      </div>
+      <button class="icon-btn" data-act="theme" title="切换明暗主题" aria-label="切换明暗主题"><svg class="ic" id="theme-icon"><use href="#i-moon"/></svg></button>
+      <button class="icon-btn" data-act="help" title="快捷键说明" aria-label="快捷键说明"><svg class="ic"><use href="#i-info"/></svg></button>
+    </header>
+
+    <div class="workspace">
+      <main class="content" id="content">
+
+        <!-- 创作台 -->
+        <section class="view" data-view="workbench">
+          <div class="wb">
+            <div class="notice" id="cap-notice"><svg class="ic sm"><use href="#i-spark"/></svg><span id="cap-text"></span></div>
+
+            <div class="panel">
+              <div class="panel-head"><span class="step">1</span><h2 class="panel-title">要合成的内容</h2><span class="panel-desc">支持中英日韩与方言</span><span class="panel-hint" id="char-count">0 / 2000</span></div>
+              <textarea class="textarea" id="text-input" maxlength="2000" placeholder="在这里输入或粘贴要转成语音的文字…" aria-label="合成文本"></textarea>
+              <div class="chips" id="sample-chips">
+                <span class="chip-label">试试：</span>
+                <button class="chip" data-act="sample" data-i="0">产品发布词</button>
+                <button class="chip" data-act="sample" data-i="1">播客开场</button>
+                <button class="chip" data-act="sample" data-i="2">英文短句</button>
+                <button class="chip ghost" data-act="clear-text">清空</button>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head"><span class="step">2</span><h2 class="panel-title">用谁的声音</h2><span class="panel-desc">选一个声音即可，其余参数交给默认设置</span></div>
+              <div class="tabs" id="group-tabs" role="tablist"></div>
+              <div class="grid" id="sound-grid"></div>
+              <div id="extra-fields"></div>
+            </div>
+
+            <details class="adv" id="adv">
+              <summary><svg class="ic"><use href="#i-set"/></svg>高级设置<svg class="ic caret" style="margin-left:auto"><use href="#i-chev"/></svg></summary>
+              <div class="adv-body" id="adv-body"></div>
+            </details>
+
+            <div class="actionbar">
+              <div class="action-info" id="action-info"></div>
+              <button class="btn btn-primary btn-lg" id="gen-btn" data-act="generate"><svg class="ic"><use href="#i-wave"/></svg><span id="gen-label">生成语音</span></button>
+              <span class="kbd">Ctrl + ↵</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 播客工坊：保留原有全部能力，按 内容源 → 阵容 → 对话稿 → 成品 重组 -->
+        <section class="view" data-view="podcast" hidden>
+          <div class="wrap" style="max-width:1400px">
+            <div class="view-head" style="max-width:none">
+              <div><h2>播客工坊</h2><p>文章 / 文件 / 链接 → 多人对话稿 → 成品与直播推流</p></div>
+              <div class="spacer"></div>
+              <button class="btn" data-act="pod-save"><svg class="ic sm"><use href="#i-down"/></svg>保存剧集</button>
+              <button class="btn btn-primary" data-act="pod-synth"><svg class="ic sm"><use href="#i-wave"/></svg>合成播客成品</button>
+            </div>
+            <div class="pod-stepper" id="pod-stepper"></div>
+            <div class="pod-grid3">
+              <div class="pcol" id="pod-source"></div>
+              <div class="pcol" id="pod-script-col"></div>
+              <div class="pcol" id="pod-cast-col"></div>
+            </div>
+            <div class="pcol out-zone" id="pod-output"></div>
+          </div>
+        </section>
+
+        <!-- 我的音色 -->
+        <section class="view" data-view="voices" hidden>
+          <div class="wrap">
+            <div class="view-head"><div><h2>我的音色</h2><p>上传 3~30 秒干净人声，之后在任何模型里复用</p></div><div class="spacer"></div><button class="btn btn-primary" data-act="upload"><svg class="ic sm"><use href="#i-up"/></svg>新建音色</button></div>
+            <div class="upload" id="upload-zone"><div class="up-icon"><svg class="ic lg"><use href="#i-up"/></svg></div><p>把音频拖到这里，或点击选择文件</p><span>WAV / MP3 · 3~30 秒 · 单人、无背景音乐效果最好</span></div>
+            <div class="voice-grid" id="voice-cards"></div>
+          </div>
+        </section>
+
+        <!-- 作品库 -->
+        <section class="view" data-view="library" hidden>
+          <div class="wrap">
+            <div class="view-head"><div><h2>作品库</h2><p>每次生成自动归档，参数可一键复用</p></div><div class="spacer"></div><button class="btn" data-act="toast" data-msg="已刷新作品库"><svg class="ic sm"><use href="#i-refresh"/></svg>刷新</button></div>
+            <div class="stat-row" id="lib-stats"></div>
+            <div class="chips" style="margin-bottom:14px" id="lib-filters"></div>
+            <div class="list" id="lib-list"></div>
+          </div>
+        </section>
+
+        <!-- 系统状态 -->
+        <section class="view" data-view="system" hidden>
+          <div class="wrap">
+            <div class="view-head"><div><h2>系统状态</h2><p>模型权重、运行环境与资源占用一目了然</p></div><div class="spacer"></div><button class="btn btn-primary" data-act="doctor"><svg class="ic sm"><use href="#i-cpu"/></svg>运行环境自检</button></div>
+            <div class="stat-row">
+              <div class="stat"><div class="k">服务状态</div><div class="v" style="color:var(--ok);font-size:18px">就绪</div></div>
+              <div class="stat"><div class="k">已就绪模型</div><div class="v">7 <small>/ 7</small></div></div>
+              <div class="stat"><div class="k">显存占用</div><div class="v">6.4 <small>/ 16 GB</small></div><div class="bar-track"><div class="bar-fill" style="width:40%"></div></div></div>
+              <div class="stat"><div class="k">推理队列</div><div class="v">0 <small>/ 16</small></div></div>
+            </div>
+            <div class="model-cards" id="model-cards"></div>
+          </div>
+        </section>
+      </main>
+
+      <aside class="output" id="output-panel" aria-label="输出与播放">
+        <div class="out-head"><h3 id="out-title">本次结果</h3><span class="pill" id="out-pill">待生成</span><div style="flex:1"></div><button class="icon-btn" data-act="toast" data-msg="输出面板已刷新" title="刷新"><svg class="ic sm"><use href="#i-refresh"/></svg></button></div>
+        <div id="out-body"></div>
+        <div class="out-section" id="out-recent"><h4><svg class="ic sm"><use href="#i-clock"/></svg>最近生成</h4><div id="recent-list"></div></div>
+        <div class="out-tip" id="out-tip">结果会自动保存到「作品库」。切换模型不会影响已生成的音频。</div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="llm-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="llm-title">
+    <h3 id="llm-title">大模型配置</h3>
+    <p class="msub">用于把内容源改写为多人对话稿；「直接朗读」不需要大模型。</p>
+    <div class="mfield"><label for="llm-base">服务地址 Base URL</label><input id="llm-base" placeholder="https://api.example.com/v1"></div>
+    <div class="mfield"><label for="llm-key">API Key</label><input id="llm-key" type="password" placeholder="留空表示不修改"></div>
+    <div class="mfield"><label for="llm-model">模型名称</label><input id="llm-model" placeholder="例如 qwen-plus"></div>
+    <div class="mfield"><label for="llm-temp">温度 / 对话轮数提示</label><div style="display:flex;gap:8px"><input id="llm-temp" type="number" step="0.1" min="0" max="2" style="flex:1"><input id="llm-rounds" style="flex:1" placeholder="10~16"></div></div>
+    <div class="mfield"><label for="llm-style">风格提示词</label><textarea id="llm-style" rows="2" placeholder="例如：口语化、有来有回、每轮不超过 80 字"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><button class="btn sec" data-act="pod-llm-test">测试连通</button><span style="flex:1"></span><button class="btn sec" data-act="pod-llm-close">取消</button><button class="btn" data-act="pod-llm-save">保存配置</button></div>
+    <p id="llm-test-result" style="font-size:12px;color:var(--ok);margin:10px 0 0"></p>
+  </div>
+</div>
+
+<div class="modal-mask" id="pod-detail-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pod-detail-title">
+    <div id="pod-detail-body"></div>
+  </div>
+</div>
+<div class="toast-stack" id="toasts" aria-live="polite"></div>
+
+<script>
+const MODELS=[
+ {key:'cosyvoice3',label:'CosyVoice 3.0',family:'CosyVoice',tag:'全能',note:'预置音色 · 声音克隆 · 方言与语种指令',caps:{preset:1,mine:1,design:0,lang:1,instruct:1,stream:1,cloneText:0},speakers:[['zh_f','知性女声','普通话 · 温暖'],['zh_m','沉稳男声','普通话 · 播报'],['ja_f','樱子','日语 · 清亮'],['yue_f','阿晴','粤语 · 自然']]},
+ {key:'cosyvoice2',label:'CosyVoice 2.0',family:'CosyVoice',tag:'轻量',note:'预置音色 · 声音克隆，资源占用更低',caps:{preset:1,mine:1,design:0,lang:0,instruct:0,stream:1,cloneText:0},speakers:[['zh_f2','中文女声','普通话'],['zh_m2','中文男声','普通话']]},
+ {key:'indextts2',label:'IndexTTS 2.0',family:'IndexTTS',tag:'情感',note:'参考音频克隆，免填参考文本',caps:{preset:0,mine:1,design:0,lang:0,instruct:0,stream:0,cloneText:0},speakers:[]},
+ {key:'indextts25',label:'IndexTTS 2.5',family:'IndexTTS',tag:'多语种',note:'克隆 + 中英日韩语种标签 + 原生变速',caps:{preset:0,mine:1,design:0,lang:1,instruct:0,stream:0,cloneText:0},speakers:[]},
+ {key:'qwen3tts',label:'Qwen3-TTS 预置音色',family:'Qwen3-TTS',tag:'风格',note:'9 个内置说话人 + 自然语言风格指令',caps:{preset:1,mine:0,design:0,lang:1,instruct:1,stream:0,cloneText:0},speakers:[['vivian','Vivian','中文女声 · 明亮'],['serena','Serena','中文女声 · 温柔'],['ryan','Ryan','英语男声 · 活力'],['dylan','Dylan','中文男声 · 沉稳'],['aiden','Aiden','英语男声 · 播报'],['ono_anna','Ono Anna','日语女声']]},
+ {key:'qwen3tts_base',label:'Qwen3-TTS 声音克隆',family:'Qwen3-TTS',tag:'克隆',note:'需要参考音频及其文字内容',caps:{preset:0,mine:1,design:0,lang:1,instruct:0,stream:0,cloneText:1},speakers:[]},
+ {key:'qwen3tts_design',label:'Qwen3-TTS 声音设计',family:'Qwen3-TTS',tag:'创造',note:'用一句话描述，凭空设计新音色',caps:{preset:0,mine:0,design:1,lang:1,instruct:1,stream:0,cloneText:0},speakers:[]}
+];
+const VOICES=[
+ {id:'v1',name:'小满',meta:'女声 · 亲切 · 8.4s',text:'你好，欢迎使用语音合成服务。',tag:'已校验'},
+ {id:'v2',name:'老陈',meta:'男声 · 沉稳 · 12.1s',text:'今天我们来聊一聊人工智能。',tag:'已校验'},
+ {id:'v3',name:'Narrator',meta:'英语 · 播报 · 6.8s',text:'Welcome to our daily podcast.',tag:'已校验'},
+ {id:'v4',name:'阿哲',meta:'男声 · 自然 · 9.6s',text:'',tag:'缺参考文本'}
+];
+const SAMPLES=[
+ {label:'产品发布词',text:'大家好，欢迎来到今天的发布会。我们花了整整一年时间，把一件复杂的事情做得足够简单。现在，让我们一起看看它。'},
+ {label:'播客开场',text:'欢迎收听新一期的节目。我是主播，今天想和你聊聊，为什么好的工具总是让人感觉不到它的存在。'},
+ {label:'英文短句',text:'Welcome aboard. It is great to have you here. Let us get started.'}
+];
+const GROUPS=[['preset','预置音色'],['mine','我的音色'],['design','声音设计']];
+const LANGS=[['zh','中文'],['en','English'],['ja','日本語'],['ko','한국어'],['yue','粤语']];
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const icon=(id,cls='ic')=>`<svg class="${cls}"><use href="#i-${id}"/></svg>`;
+const state={view:'workbench',model:'cosyvoice3',group:'preset',pick:'zh_f',text:SAMPLES[0].text,designText:'',refText:VOICES[0].text,
+ speed:1,lang:'',stream:false,instruct:'',busy:false,result:null,playing:false,pos:0,menu:false,
+ library:[
+  {id:'t1',title:'发布会开场 · 第一段',model:'CosyVoice 3.0',voice:'知性女声',dur:8.2,kind:'预置音色',time:'今天 11:24'},
+  {id:'t2',title:'播客片头旁白',model:'IndexTTS 2.5',voice:'老陈',dur:14.6,kind:'我的音色',time:'今天 10:08'},
+  {id:'t3',title:'英文欢迎语',model:'Qwen3-TTS 预置音色',voice:'Ryan',dur:3.1,kind:'预置音色',time:'昨天 18:42'},
+  {id:'t4',title:'纪录片旁白试稿',model:'Qwen3-TTS 声音设计',voice:'沉稳中年男声',dur:11.3,kind:'声音设计',time:'昨天 16:05'}
+ ],filter:'全部',bars:[]};
+state.bars=Array.from({length:40},(_,i)=>18+Math.round(Math.abs(Math.sin(i*1.7)*Math.cos(i*.43))*32));
+
+const pod={
+ src:'text',text:'我们常说一个产品「好用」，其实很少有人能说清好用在哪里。这一期想聊聊：复杂度到底被谁承担了。以语音合成为例，几年前要调十几个参数才能得到一段能听的音频，现在只需要选一个声音、点一下生成。技术并没有变简单，只是把选择收敛成了一句人话。',url:'',fileName:'',extractChars:0,extracting:false,sourceError:'',
+ lines:[
+  {role:'host',name:'阿远',text:'欢迎收听新一期的节目。今天想聊一个听起来简单、做起来很难的问题：为什么好工具总让人感觉不到它的存在？'},
+  {role:'guest',name:'张老师',text:'这个问题特别好。我觉得关键在于，工具把复杂度留给了自己，把确定性留给了用户。'},
+  {role:'host',name:'阿远',text:'能举个具体的例子吗？比如我们每天都在用的语音合成。'},
+  {role:'guest',name:'张老师',text:'当然。以前要调十几个参数才能出一段能听的音频，现在选一个声音、点一下就够了。'}
+ ],
+ speakers:[
+  {role:'host',name:'阿远',desc:'资深科技主播，擅长用生活化的比喻讲清技术原理',voice:'v1'},
+  {role:'guest',name:'张老师',desc:'AI 研究员，专注语音合成，观点犀利、爱抬杠',voice:'v2'}
+ ],
+ speed:1,genning:false,editLine:-1,editText:'',
+ outTab:'final',protocol:'rtmp',pushOn:false,pushUrl:'',pushing:false,pushStatus:'',
+ synthBusy:false,synthProgress:0,synthDone:false,duration:null,streamBusy:false,
+ episodes:[
+  {id:'e1',title:'第 12 期 · 好工具为什么不存在',status:'completed',lines:16,duration:284.6,time:'今天 11:20'},
+  {id:'e2',title:'第 13 期 · 语音合成这一年',status:'synthesizing',lines:12,duration:null,time:'今天 13:42'},
+  {id:'e3',title:'直播 · 产品发布预热',status:'pushing',lines:8,duration:null,time:'昨天 20:15'},
+  {id:'e4',title:'第 14 期 · 脚本初稿',status:'draft',lines:10,duration:null,time:'昨天 16:08'},
+  {id:'e5',title:'直播 · 周三加更',status:'failed',lines:9,duration:null,time:'昨天 21:03'}
+ ],
+ tasks:[
+  {id:'q1',episodeId:'e2',title:'第 13 期 · 语音合成这一年',status:'synthesizing',progress:7,linesCount:12,source:'粘贴文本',time:'今天 13:42'},
+  {id:'q2',episodeId:'e3',title:'直播 · 产品发布预热',status:'pushing',linesCount:16,source:'网页 URL',
+   push:{protocol:'rtmp',url:'rtmp://127.0.0.1:1935/live/demo',mode:'live',elapsed:134,duration:305,linesDone:7,linesTotal:16},time:'昨天 20:15'},
+  {id:'q3',episodeId:'e1',title:'第 12 期 · 好工具为什么不存在',status:'completed',duration:284.6,linesCount:16,source:'粘贴文本',time:'今天 11:20'},
+  {id:'q4',episodeId:'e5',title:'直播 · 周三加更',status:'failed',error:'ffmpeg 推流连接超时',linesCount:9,source:'上传文件',time:'昨天 21:03'}
+ ],
+ detailId:null,detailModal:false,confirmDel:null,
+ llm:{base:'https://dashscope.aliyuncs.com/compatible-mode/v1',model:'qwen-plus',temp:0.7,rounds:'10~16',style:'口语化、有来有回、每轮不超过 80 字'},
+ llmModal:false,llmTest:''
+};
+function podCharCount(){return pod.lines.reduce((n,l)=>n+l.text.length,0)}
+function podEstimate(){const sec=Math.round(podCharCount()/4.3/Math.max(.5,pod.speed));return `${Math.floor(sec/60)} 分 ${sec%60} 秒`}
+function voiceOptions(sel){return VOICES.map(v=>`<option value="${v.id}" ${v.id===sel?'selected':''}>${esc(v.name)}</option>`).join('')}
+function speakerNames(){return pod.speakers.map(s=>s.name||(s.role==='host'?'主播':'嘉宾'))}
+
+function model(){return MODELS.find(m=>m.key===state.model)}
+function toast(msg,warn){const el=document.createElement('div');el.className='toast'+(warn?' warn':'');el.innerHTML=icon(warn?'info':'check','ic sm')+'<span>'+esc(msg)+'</span>';$('#toasts').appendChild(el);setTimeout(()=>{el.style.opacity='0';el.style.transform='translateY(6px)';setTimeout(()=>el.remove(),220)},2800)}
+function waveBars(n){return Array.from({length:n},(_,i)=>state.bars[i%state.bars.length])}
+
+function renderModelMenu(){
+ $('#model-name').textContent=model().label;
+ $('#model-btn').setAttribute('aria-expanded',state.menu);
+ $('#model-menu').hidden=!state.menu;
+ $('#model-menu').innerHTML='<div class="menu-head">选择推理模型 · 7 个已就绪</div>'+MODELS.map(m=>`
+  <button class="menu-item" data-act="model" data-key="${m.key}" role="option" aria-selected="${m.key===state.model}">
+   <span class="dot" style="box-shadow:none"></span><span class="mi-main"><span class="mi-name">${esc(m.label)}</span><span class="mi-note">${esc(m.note)}</span></span>
+   ${m.key===state.model?icon('check','ic sm mi-check'):''}</button>`).join('');
+}
+function renderCapNotice(){
+ const m=model();const parts=[];
+ if(m.caps.preset)parts.push('预置音色');if(m.caps.mine)parts.push('声音克隆');if(m.caps.design)parts.push('声音设计');
+ $('#cap-text').innerHTML=`<strong>${esc(m.label)}</strong> 当前可用：${parts.join(' · ')}。切换模型时，界面会自动只显示该模型支持的方式。`;
+}
+function renderTabs(){
+ const m=model();
+ $('#group-tabs').innerHTML=GROUPS.filter(([k])=>m.caps[k]).map(([k,n])=>`<button class="tab ${state.group===k?'active':''}" role="tab" aria-selected="${state.group===k}" data-act="group" data-key="${k}">${n}</button>`).join('');
+}
+function renderSounds(){
+ const m=model();let html='';
+ if(state.group==='preset'){
+  html=m.speakers.map(([id,name,meta],i)=>`
+   <button class="sound ${state.pick===id?'active':''}" data-act="pick" data-key="${id}">
+    ${state.pick===id?`<span class="sound-check">${icon('check')}</span>`:''}
+    <span class="sound-top"><span class="avatar a${i%5+1}">${esc(name.slice(0,1))}</span><span><span class="sound-name">${esc(name)}</span><span class="sound-meta">${esc(meta)}</span></span></span>
+    <span class="sound-meta" style="display:flex;align-items:center">内置音色<span class="sound-play" data-act="preview" data-key="${esc(name)}" title="试听">${icon('play','ic sm')}</span></span>
+   </button>`).join('')||'<div class="empty-inline">该模型没有内置说话人</div>';
+ }else if(state.group==='mine'){
+  html=VOICES.map((v,i)=>`
+   <button class="sound ${state.pick===v.id?'active':''}" data-act="pick" data-key="${v.id}">
+    ${state.pick===v.id?`<span class="sound-check">${icon('check')}</span>`:''}
+    <span class="sound-top"><span class="avatar a${i%5+1}">${esc(v.name.slice(0,1))}</span><span><span class="sound-name">${esc(v.name)}</span><span class="sound-meta">${esc(v.meta)}</span></span></span>
+    <span class="sound-meta" style="display:flex;align-items:center">${v.text?'参考文本已填':'<span style="color:var(--warn)">缺参考文本</span>'}<span class="sound-play" data-act="preview" data-key="${esc(v.name)}" title="试听">${icon('play','ic sm')}</span></span>
+   </button>`).join('');
+ }else{
+  html=`<button class="sound ${state.pick==='design'?'active':''}" data-act="pick" data-key="design" style="grid-column:1/-1;min-height:88px">
+   ${state.pick==='design'?`<span class="sound-check">${icon('check')}</span>`:''}
+   <span class="sound-top"><span class="avatar a5">${icon('spark','ic sm')}</span><span><span class="sound-name">用一句话描述一个新声音</span><span class="sound-meta">不需要上传音频，模型会按描述生成音色</span></span></span></button>`;
+ }
+ $('#sound-grid').innerHTML=html;
+ renderExtra();
+}
+function renderExtra(){
+ const m=model();let html='';
+ if(state.group==='design'&&state.pick==='design'){
+  html+=`<div class="field"><label class="field-label" for="design-input">声音描述 <span class="opt">必填 · 描述性别、年龄、音调、情绪或使用场景</span></label>
+   <textarea class="textarea" id="design-input" rows="2" style="min-height:76px" placeholder="例如：沉稳的中年男声，语速偏慢，适合纪录片旁白">${esc(state.designText)}</textarea>
+   <div class="chips">${['沉稳的中年男声，适合纪录片旁白','活泼的年轻女声，适合短视频','温柔的睡前故事女声'].map(t=>`<button class="chip" data-act="design-preset" data-t="${esc(t)}">${esc(t.slice(0,10))}…</button>`).join('')}</div></div>`;
+ }
+ if(state.group==='mine'&&state.pick){
+  const v=VOICES.find(x=>x.id===state.pick);
+  html+=`<div class="field"><label class="field-label" for="ref-input">参考音频文字内容 <span class="opt">${m.caps.cloneText?'必填 · 当前模型需要':'选填 · 当前模型可自动识别'}</span></label>
+   <input class="input" id="ref-input" value="${esc(state.refText)}" placeholder="参考音频里说的那句话…">
+   <div class="chips"><span class="chip-label">${v&&v.text?'已自动回填':'此音色尚未录入参考文本'}</span>${v&&!v.text?`<button class="chip" data-act="toast" data-msg="已打开音色编辑（原型演示）">去补录</button>`:''}</div></div>`;
+ }
+ $('#extra-fields').innerHTML=html;
+}
+function renderAdv(){
+ const m=model();const rows=[];
+ rows.push(`<div class="adv-row"><div class="adv-name">语速<small>0.5× ~ 2.0×</small></div><div class="adv-ctl"><input type="range" id="speed-range" min="0.5" max="2" step="0.05" value="${state.speed}" aria-label="语速"><span class="range-val" id="speed-val">${state.speed.toFixed(2)}×</span></div></div>`);
+ if(m.caps.lang)rows.push(`<div class="adv-row"><div class="adv-name">目标语言<small>选中后自动加语种标签</small></div><div class="adv-ctl">${LANGS.map(([c,n])=>`<button class="chip ${state.lang===c?'active':''}" data-act="lang" data-key="${c}">${n}</button>`).join('')}<button class="chip ghost" data-act="lang" data-key="">不限</button></div></div>`);
+ if(m.caps.instruct)rows.push(`<div class="adv-row"><div class="adv-name">风格指令<small>可留空</small></div><div class="adv-ctl"><input class="input" id="instruct-input" value="${esc(state.instruct)}" placeholder="例如：用四川话说这句话 / 用特别愤怒的语气"></div></div>`);
+ rows.push(`<div class="adv-row"><div class="adv-name">流式合成<small>${m.caps.stream?'边生成边播放':'当前模型仅支持整段生成'}</small></div><div class="adv-ctl"><button class="toggle ${state.stream?'on':''}" data-act="stream" role="switch" aria-checked="${state.stream}" aria-label="流式合成" ${m.caps.stream?'':'disabled style="opacity:.4;cursor:not-allowed"'}></button><span style="font-size:12px;color:var(--text-3)">${m.caps.stream?(state.stream?'已开启 · 首包更快':'关闭 · 音质更稳'):'当前模型不支持'}</span></div></div>`);
+ $('#adv-body').innerHTML=rows.join('');
+}
+function blocker(){
+ if(state.busy)return '正在生成…';
+ if(!state.text.trim())return '先输入要合成的文本';
+ if(!state.pick)return '选一个声音';
+ const m=model();
+ if(state.group==='design'&&!state.designText.trim())return '描述一下你想要的声音';
+ if(state.group==='mine'&&m.caps.cloneText&&!state.refText.trim())return '当前模型需要参考音频的文字内容';
+ return '';
+}
+function renderAction(){
+ const b=blocker();const m=model();
+ const dur=Math.max(1.2,Math.round(state.text.trim().length/5.2*10)/10);
+ $('#action-info').innerHTML=`<strong>${b?'':`预计 ${dur.toFixed(1)} 秒 · 24 kHz WAV`}</strong><span class="${b?'warn-txt':''}">${b||`将使用 ${esc(m.label)}${state.lang?' · '+LANGS.find(l=>l[0]===state.lang)[1]:''} · ${state.speed.toFixed(2)}× 语速`}</span>`;
+ const btn=$('#gen-btn');btn.disabled=!!b||state.busy;
+ $('#gen-label').textContent=state.busy?'生成中…':(state.result?'重新生成':'生成语音');
+}
+function renderOutput(){
+ const pill=$('#out-pill');
+ if(state.busy){
+  pill.className='pill busy';pill.textContent='生成中';
+  $('#out-body').innerHTML=`<div class="result-card"><p class="result-title">正在合成…</p><div class="result-meta">${esc(model().label)} · 排队与推理中</div><div class="progress-track"><div class="progress-fill" id="gen-progress" style="width:12%"></div></div><div class="times"><span>首次加载模型会稍慢</span><span>请稍候</span></div></div>`;
+  return;
+ }
+ if(!state.result){
+  pill.className='pill';pill.textContent='待生成';
+  const bars=waveBars(28).map(h=>`<i style="--h:${Math.max(6,h*.55)}px"></i>`).join('');
+  $('#out-body').innerHTML=`<div class="out-empty"><div class="wave-static">${bars}</div><p>还没有生成结果</p><span>填好文本、选好声音，点「生成语音」</span></div>`;
+  return;
+ }
+ pill.className='pill ok';pill.textContent='已完成';
+ const r=state.result,bars=waveBars(40).map((h,i)=>`<span class="bar" style="--h:${h}px;--d:${(i%9)*.07}s"></span>`).join('');
+ $('#out-body').innerHTML=`<div class="result-card">
+  <p class="result-title">${esc(r.title)}</p><div class="result-meta">${esc(r.model)} · ${esc(r.voice)} · ${r.time}</div>
+  <div class="wave ${state.playing?'playing':''}" id="wave"><div class="wave-progress" id="wave-progress"></div>${bars}</div>
+  <div class="times"><span id="t-cur">${fmt(state.pos)}</span><span>${fmt(r.dur)}</span></div>
+  <div class="player-ctrl"><button class="play-main" data-act="play" aria-label="播放或暂停">${icon(state.playing?'pause':'play','ic sm')}</button>
+   <button class="mini-btn" data-act="download" title="下载 WAV">${icon('down','ic sm')}</button>
+   <button class="mini-btn" data-act="reuse" title="复用参数">${icon('copy','ic sm')}</button>
+   <button class="mini-btn" data-act="toast" data-msg="已保存到作品库" title="保存">${icon('plus','ic sm')}</button>
+   <span style="flex:1"></span><span class="tag">24 kHz</span></div></div>`;
+ syncPlayer();
+}
+function fmt(s){const m=Math.floor(s/60),x=Math.floor(s%60);return m+':'+String(x).padStart(2,'0')}
+function syncPlayer(){
+ const r=state.result;if(!r)return;
+ const p=Math.min(100,state.pos/r.dur*100);
+ const wp=$('#wave-progress');if(wp)wp.style.setProperty('--p',p+'%');
+ const cur=$('#t-cur');if(cur)cur.textContent=fmt(state.pos);
+ const wave=$('#wave');if(wave)wave.classList.toggle('playing',state.playing);
+ const bars=$$('#wave .bar');bars.forEach((b,i)=>b.classList.toggle('done',i/40*100<=p));
+}
+function renderRecent(){
+ const items=state.library.slice(0,4);
+ $('#recent-list').innerHTML=items.map(t=>`<div class="recent" data-act="play-recent" data-key="${t.id}"><span class="avatar a3" style="width:30px;height:30px;font-size:11px">${icon('play','ic sm')}</span><span class="r-main"><span class="r-name">${esc(t.title)}</span><span class="r-meta">${esc(t.model)} · ${esc(t.voice)}</span></span><span class="r-dur">${t.dur.toFixed(1)}s</span></div>`).join('');
+ $('#nav-count').textContent=state.library.length;
+}
+function renderLibrary(){
+ const total=state.library.reduce((a,b)=>a+b.dur,0);
+ $('#lib-stats').innerHTML=[[ '作品总数',state.library.length+'','个'],['本周新增',state.library.filter(t=>t.time.startsWith('今天')||t.time.startsWith('昨天')).length+'','个'],['累计时长',Math.round(total)+'','秒'],['可用模型','7','个']].map(([k,v,u])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v} <small>${u}</small></div></div>`).join('');
+ $('#lib-filters').innerHTML=['全部','预置音色','我的音色','声音设计'].map(f=>`<button class="chip ${state.filter===f?'active':''}" data-act="filter" data-key="${f}">${f}</button>`).join('');
+ const list=state.filter==='全部'?state.library:state.library.filter(t=>t.kind===state.filter);
+ $('#lib-list').innerHTML=list.length?list.map(t=>`<div class="list-row"><span class="avatar a4" style="width:34px;height:34px;font-size:12px">${icon('play','ic sm')}</span><span class="lr-main"><span class="lr-title">${esc(t.title)}</span><span class="lr-meta">${esc(t.model)} · ${esc(t.voice)} · ${esc(t.time)}</span></span><span class="tag ${t.kind==='声音设计'?'acc':''}">${esc(t.kind)}</span><span class="r-dur" style="width:46px;text-align:right">${t.dur.toFixed(1)}s</span><button class="mini-btn" data-act="play-recent" data-key="${t.id}" aria-label="播放">${icon('play','ic sm')}</button><button class="mini-btn" data-act="download" aria-label="下载">${icon('down','ic sm')}</button></div>`).join(''):'<div class="out-empty" style="border:none"><p>这个分类下还没有作品</p><span>去创作台生成第一条吧</span></div>';
+}
+function renderVoiceCards(){
+ $('#voice-cards').innerHTML=VOICES.map((v,i)=>`<div class="vcard"><div class="vc-top"><span class="avatar a${i%5+1}">${esc(v.name.slice(0,1))}</span><span><span class="vc-name">${esc(v.name)}</span><span class="vc-meta">${esc(v.meta)}</span></span></div>
+  <div class="mini-wave">${waveBars(24).map(h=>`<i style="--h:${Math.max(4,h*.7)}px"></i>`).join('')}</div>
+  <div class="vc-foot"><span class="tag ${v.text?'pri':''}">${esc(v.tag)}</span><span class="spacer"></span><button class="mini-btn" data-act="preview" data-key="${esc(v.name)}" aria-label="试听">${icon('play','ic sm')}</button><button class="mini-btn" data-act="toast" data-msg="已打开音色编辑（原型演示）" aria-label="编辑">${icon('set','ic sm')}</button></div></div>`).join('');
+}
+function renderSystem(){
+ $('#model-cards').innerHTML=MODELS.map((m,i)=>`<div class="mcard"><div class="mc-top"><span class="dot" style="box-shadow:none"></span><span class="mc-name">${esc(m.label)}</span><span class="tag ${i===0?'pri':''}">${i===0?'当前加载':'权重就绪'}</span></div><div class="mc-note">${esc(m.note)}</div><div class="mc-foot"><span class="tag">${esc(m.family)}</span><span class="tag">环境自检通过</span><span class="spacer"></span><button class="btn" style="min-height:32px;padding:5px 11px;font-size:12px" data-act="switch-model" data-key="${m.key}">${i===0?'已加载':'加载'}</button></div></div>`).join('');
+}
+function podSrcReady(){return pod.src==='text'?pod.text.trim().length>=10:pod.extractChars>=10}
+function renderPodStepper(){
+ const flags=[podSrcReady(),pod.speakers.length>=2&&pod.speakers.every(s=>!!s.voice),pod.lines.length>0,pod.synthDone];
+ const names=['内容源','主持阵容','对话稿','成品与发布'];
+ const firstTodo=flags.findIndex(f=>!f);
+ $('#pod-stepper').innerHTML=names.map((n,i)=>{
+  const cls=flags[i]?'done':(i===firstTodo?'active':'');
+  return `<span class="pstep ${cls}"><span class="pn">${flags[i]?'✓':i+1}</span><span>${n}</span></span>`+(i<3?'<span class="pstep-line"></span>':'')
+ }).join('')+`<span style="flex:1"></span><span style="font-size:11px;color:var(--text-3)">${pod.lines.length} 轮 · 预计 ${podEstimate()}</span>`;
+}
+function renderPodSource(){
+ const tabs=[['text','粘贴文本'],['file','上传文件'],['url','网页链接']];
+ let body='';
+ if(pod.src==='text'){
+  body=`<textarea class="textarea" id="pod-src-text" rows="7" style="font-size:12.5px;min-height:150px" placeholder="粘贴文章、会议记录、学习笔记…（将按主持阵容改写为多轮多人对话）">${esc(pod.text)}</textarea>
+   <div style="display:flex;justify-content:space-between;margin-top:6px"><span class="chip-label">可直接朗读，也可交给大模型改写</span><span class="chip-label">${pod.text.length} / 20000</span></div>`;
+ }else if(pod.src==='file'){
+  body=`<div class="dropzone" data-act="pod-file"><b>${pod.fileName?esc(pod.fileName):'点击或拖拽文件到这里'}</b>${pod.fileName?(pod.extractChars?`已提取 ${pod.extractChars} 字正文`:'解析中…'):'支持 txt / md / pdf / docx · ≤ 20 MB'}</div>
+   ${pod.sourceError?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>${esc(pod.sourceError)}</span></div>`:''}`;
+ }else{
+  body=`<div style="display:flex;gap:8px"><input class="input" id="pod-src-url" value="${esc(pod.url)}" placeholder="https:// 文章页面地址"><button class="btn" data-act="pod-url-extract" ${pod.extracting?'disabled':''}>${pod.extracting?'抓取中…':'抓取'}</button></div>
+   ${pod.extractChars?`<p class="chip-label" style="margin-top:9px">✓ 已提取 ${pod.extractChars} 字正文，可直接生成对话稿</p>`:''}
+   ${pod.sourceError?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>${esc(pod.sourceError)}</span></div>`:''}`;
+ }
+ const srcNote=pod.src==='url'||(pod.src==='file'&&pod.fileName&&!pod.fileName.toLowerCase().endsWith('.txt'))
+  ?'网页 / 非 txt 文档需由大模型改写成多人对话稿。':'纯文本可直接朗读，也可以改写成多人对话。';
+ $('#pod-source').innerHTML=`
+  <div class="pcol-head"><span class="step">1</span><h3>内容源</h3><span class="spacer"></span><button class="btn btn-ghost" style="min-height:30px;padding:4px 9px;font-size:12px" data-act="pod-llm">${icon('set','ic sm')} 大模型</button></div>
+  <p class="pcol-sub">文章、文件或链接，决定节目讲什么</p>
+  <div class="src-tabs">${tabs.map(([k,n])=>`<button class="${pod.src===k?'active':''}" data-act="pod-src" data-key="${k}">${n}</button>`).join('')}</div>
+  ${body}
+  <div class="llm-strip">${icon('spark','ic sm')}<span class="lm"><b>${esc(pod.llm.model||'未配置')}</b> · ${esc(pod.llm.base||'未设置服务地址')}</span><button class="chip" data-act="pod-llm">配置 / 测试</button></div>
+  <div class="src-actions">
+   <button class="btn btn-primary" data-act="pod-direct" ${podSrcReady()?'':'disabled'}>${icon('play','ic sm')} 直接朗读（单音色 · 无需大模型）</button>
+   <button class="btn sec" data-act="pod-gen" ${podSrcReady()&&!pod.genning?'':'disabled'}>${icon('spark','ic sm')} ${pod.genning?'改写中…':'由大模型改写为多人对话稿'}</button>
+  </div>
+  ${!podSrcReady()?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>内容源至少需要 10 个字才能成稿。</span></div>`:''}
+  <p class="chip-label" style="margin-top:9px;line-height:1.55">${srcNote}</p>`;
+}
+function renderPodScript(){
+ const rows=pod.lines.map((l,i)=>{
+  const isHost=l.role==='host';
+  const editing=pod.editLine===i;
+  const opt=`<select data-line="${i}" aria-label="切换该行说话人">${pod.speakers.map((s,j)=>`<option value="${j}" ${s.name===l.name?'selected':''}>${esc(s.name)} · ${esc((VOICES.find(v=>v.id===s.voice)||{}).name||'未配置')}</option>`).join('')}</select>`;
+  return `<div class="dlg ${isHost?'':'guest'}">
+   <span class="avatar a${isHost?1:2}" style="width:30px;height:30px;font-size:11px">${esc(l.name.slice(0,1))}</span>
+   <div class="dlg-body"><div class="dlg-who"><span class="tag ${isHost?'pri':'acc'}">${isHost?'主播':'嘉宾'}</span>${opt}<span class="spacer"></span>
+    <button class="mini-btn" style="width:26px;height:26px" data-act="pod-line-edit" data-i="${i}" title="编辑">${icon('copy','ic sm')}</button>
+    <button class="mini-btn" style="width:26px;height:26px" data-act="pod-line-del" data-i="${i}" title="删除">${icon('close','ic sm')}</button></div>
+    ${editing?`<div class="dlg-edit"><textarea id="pod-line-edit-text">${esc(pod.editText)}</textarea><div style="display:flex;gap:6px;margin-top:6px"><button class="btn" style="min-height:30px;padding:4px 11px;font-size:12px" data-act="pod-line-save" data-i="${i}">保存</button><button class="btn sec" style="min-height:30px;padding:4px 11px;font-size:12px" data-act="pod-line-cancel">取消</button></div></div>`
+      :`<div class="bubble" data-act="pod-line-edit" data-i="${i}">${esc(l.text)||'（空行，点击编辑）'}</div>`}</div></div>`;
+ }).join('');
+ $('#pod-script-col').innerHTML=`
+  <div class="pcol-head"><span class="step">3</span><h3>对话稿</h3><span class="spacer"></span><span class="tag pri">${pod.lines.length} 轮 · ${podEstimate()}</span></div>
+  <p class="pcol-sub">逐轮可编辑；点击气泡改文字，下拉可换说话人与音色</p>
+  ${pod.lines.length?`<div class="dlg-list">${rows}</div>`:`<div class="out-empty" style="padding:26px 12px"><div class="wave-static">${waveBars(20).map(h=>`<i style="--h:${Math.max(6,h*.5)}px"></i>`).join('')}</div><p>还没有对话稿</p><span>完成左侧内容源后点「直接朗读」或「改写」</span></div>`}
+  <button class="btn sec" style="width:100%;margin-top:8px" data-act="pod-line-add">${icon('plus','ic sm')} 插入一轮对话</button>
+  <button class="btn sec" style="width:100%;margin-top:8px" data-act="pod-save">${icon('down','ic sm')} 保存剧集</button>`;
+}
+function renderPodCast(){
+ const cards=pod.speakers.map((s,i)=>`
+  <div class="spk-card"><div class="sc-head"><span class="tag ${s.role==='host'?'pri':''}">${s.role==='host'?'主播':`嘉宾 ${pod.speakers.slice(0,i).filter(x=>x.role!=='host').length+1}`}</span><b>${esc(s.name)||'未命名'}</b>
+   ${s.role!=='host'?`<button class="mini-btn" style="width:26px;height:26px" data-act="pod-cast-del" data-i="${i}" title="移除嘉宾">${icon('close','ic sm')}</button>`:''}</div>
+   <div class="spk-row"><input data-spk="${i}" data-field="name" value="${esc(s.name)}" placeholder="姓名"><select data-spk="${i}" data-field="voice" aria-label="音色">${voiceOptions(s.voice)}</select></div>
+   <textarea data-spk="${i}" data-field="desc" placeholder="人设 / 简介（生成对话稿时供大模型参考）">${esc(s.desc)}</textarea></div>`).join('');
+ $('#pod-cast-col').innerHTML=`
+  <div class="pcol-head"><span class="step">2</span><h3>主持阵容</h3><span class="spacer"></span><span class="chip-label">主播 1 · 嘉宾 ${pod.speakers.filter(s=>s.role!=='host').length}</span></div>
+  <p class="pcol-sub">姓名、音色与人设会一起交给大模型改写对话稿</p>
+  ${cards}
+  <button class="btn sec" style="width:100%" data-act="pod-cast-add">${icon('plus','ic sm')} 添加嘉宾</button>
+  <div class="adv-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><div class="adv-name" style="width:56px">语速</div><div class="adv-ctl"><input type="range" id="pod-speed" min="0.5" max="2" step="0.05" value="${pod.speed}"><span class="range-val">${pod.speed.toFixed(2)}×</span></div></div>
+  <div class="notice" style="margin-top:12px">${icon('info','ic sm')}<span>切到不支持声音克隆的模型时，未配置预置音色的角色会在这里标出并提示更换。</span></div>`;
+}
+function renderPodOutput(){
+ const tabs=[['final','成品合成'],['stream','流式播放'],['push','直播推流']];
+ let body='';
+ if(pod.outTab==='final'){
+  body=`<div class="push-grid"><div>
+   <p style="font-size:13px;margin:0 0 4px"><strong>整段合成，音质最稳</strong></p>
+   <p style="font-size:12px;color:var(--text-3);margin:0">逐句合成后拼成一条音轨，完成后自动归档为剧集，可试听与下载。</p>
+   <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn sec" data-act="pod-synth" ${pod.lines.length&&!pod.synthBusy?'':'disabled'}>${pod.synthBusy?`合成中 ${pod.synthProgress}/${pod.lines.length}`:'合成播客成品'}</button>
+    <button class="btn sec" data-act="pod-play" ${pod.synthDone?'':'disabled'}>${icon('play','ic sm')}试听</button>
+    <button class="btn sec" data-act="pod-download" ${pod.synthDone?'':'disabled'}>${icon('down','ic sm')}下载 WAV</button></div>
+   ${!pod.lines.length?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>请先生成或载入对话稿，才能合成成品。</span></div>`:''}
+  </div><div>
+   <div class="result-card"><p class="result-title">${pod.synthDone?'第 12 期 · 好工具为什么不存在':'当前剧集尚未合成'}</p><div class="result-meta">${pod.synthDone?'16 轮 · 284.6 秒 · 24 kHz WAV':'完成合成后可在此试听'}</div>
+    <div class="wave" style="height:44px">${waveBars(34).map((h,i)=>`<span class="bar ${pod.synthDone?'done':''}" style="--h:${Math.max(6,h*.7)}px"></span>`).join('')}</div>
+    ${pod.synthBusy?`<div class="progress-track"><div class="progress-fill" style="width:${Math.round(pod.synthProgress/Math.max(1,pod.lines.length)*100)}%"></div></div><div class="times"><span>正在合成第 ${pod.synthProgress} / ${pod.lines.length} 句</span><span>请稍候</span></div>`:'<div class="times"><span>0:00</span><span>'+(pod.synthDone?'4:44':'—')+'</span></div>'}
+   </div></div></div>`;
+ }else if(pod.outTab==='stream'){
+  body=`<p style="font-size:13px;margin:0 0 4px"><strong>逐句合成，边生成边播放</strong></p>
+   <p style="font-size:12px;color:var(--text-3);margin:0">2.5 秒预缓冲后开始播放，适合先听效果再决定是否导出成品；完成后同样自动保存。</p>
+   <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-primary" data-act="pod-stream" ${pod.lines.length&&!pod.streamBusy?'':'disabled'}>${pod.streamBusy?'流式合成中…':'流式合成并播放'}</button>
+   <span class="tag">2.5s 预缓冲</span><span class="tag">非流式成品仍可下载</span></div>`;
+ }else{
+  const protos=['rtmp','srt','rtsp','hls'];
+  const ph={rtmp:'rtmp://服务器:1935/app/推流码',srt:'srt://服务器:9000?streamid=xxx',rtsp:'rtsp://服务器:8554/流名'}[pod.protocol];
+  body=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap"><button class="toggle ${pod.pushOn?'on':''}" data-act="pod-push-toggle" role="switch" aria-checked="${pod.pushOn}" aria-label="推流开关"></button>
+   <span style="font-size:12px;color:var(--text-2)">${pod.pushOn?'推流到流媒体服务器':'不推流 · 本地播放（与创作台一致）'}</span><span style="flex:1"></span><span class="tag">${icon('info','ic sm')} ffmpeg 已就绪</span></div>
+   ${pod.pushOn?`<div class="push-grid"><div>
+    <div class="proto-chips">${protos.map(p=>`<button class="chip ${pod.protocol===p?'active':''}" data-act="pod-proto" data-key="${p}">${p.toUpperCase()}</button>`).join('')}</div>
+    ${pod.protocol!=='hls'?`<input class="input" id="pod-push-url" value="${esc(pod.pushUrl)}" placeholder="${esc(ph)}" style="font-family:ui-monospace,monospace;font-size:12px">
+     <p class="chip-label" style="margin-top:8px;line-height:1.5">需要一个接收端（如本机 SRS 或直播平台推流地址）；只在本机试听推荐 HLS。</p>`:`<div class="notice">${icon('info','ic sm')}<span>拉流地址：<code>${location.protocol}//${location.host}/live/&lt;剧集ID&gt;.m3u8</code><br>用 VLC 等支持 HLS 的播放器打开；浏览器地址栏直接打开只会显示文本。</span></div>`}
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn btn-primary" data-act="pod-push-start" ${pod.lines.length&&!pod.pushing?'':'disabled'}>开始合成并推流</button>
+     ${pod.pushing?'<button class="btn sec" data-act="pod-push-stop">停止推流</button>':''}</div>
+   </div><div>
+    <div class="push-status">${pod.pushing?'<span class="live-dot"></span>':'<span class="dot" style="box-shadow:none"></span>'}<span>${pod.pushStatus||'尚未开始推流'}</span></div>
+    ${pod.pushing?`<div class="progress-track"><div class="progress-fill" style="width:42%"></div></div><div class="times"><span>7 / 16 句 · 02:14 已推</span><span>预计剩余 03:05</span></div>`:''}
+    <div class="kv" style="margin-top:12px"><span class="k" style="width:88px">协议</span><span class="v">${pod.protocol.toUpperCase()}</span></div>
+    <div class="kv"><span class="k" style="width:88px">实时状态</span><span class="v">${pod.pushing?'推流中':'空闲'}</span></div>
+   </div></div>`:`<div class="out-empty" style="padding:22px"><p>推流未开启</p><span>打开左上开关后可选择 RTMP / SRT / RTSP / HLS</span></div>`}`;
+ }
+ $('#pod-output').innerHTML=`
+  <div class="pcol-head"><span class="step">4</span><h3>成品与发布</h3><span class="spacer"></span><span class="chip-label">合成进度与推流状态在这里统一查看，不用再滚动长侧栏</span></div>
+  <div class="out-tabs">${tabs.map(([k,n])=>`<button class="${pod.outTab===k?'active':''}" data-act="pod-out-tab" data-key="${k}">${n}</button>`).join('')}</div>
+  ${body}`;
+}
+const POD_BADGE={draft:['存稿',''],synthesizing:['合成中','busy'],pushing:['推流中','busy'],completed:['已完成','ok'],failed:['失败','err'],stopped:['已停止','err']};
+function podTaskText(t){
+ if(t.status==='synthesizing')return `${t.progress||0}/${t.linesCount} 句`;
+ if(t.status==='pushing'&&t.push)return `${t.push.linesDone}/${t.push.linesTotal} 句 · ${fmt(t.push.elapsed)}/${fmt(t.push.duration)}`;
+ if(t.status==='completed')return t.duration?`时长 ${t.duration.toFixed(1)}s`:'';
+ if(t.status==='failed')return t.error||'未知错误';
+ return '';
+}
+function podTaskBar(t){
+ const pct=t.status==='synthesizing'?Math.min(100,Math.round(100*(t.progress||0)/Math.max(1,t.linesCount)))
+  :t.status==='pushing'&&t.push?Math.min(100,Math.round(100*t.push.elapsed/Math.max(1,t.push.duration))):0;
+ return pct?`<div class="qbar"><div class="qbar-fill" style="width:${pct}%"></div></div>`:'';
+}
+function renderPodEpisodes(){
+ if(state.view!=='podcast')return;
+ const active=['synthesizing','pushing'];
+ const running=pod.tasks.filter(t=>active.includes(t.status)).length;
+ const queue=[...pod.tasks].sort((a,b)=>active.includes(b.status)-active.includes(a.status));
+ $('#out-title').textContent='任务与剧集';
+ $('#out-pill').className=running?'pill busy':'pill';$('#out-pill').textContent=running?running+' 进行中':'2 组';
+ $('#out-recent').hidden=true;
+ $('#out-tip').textContent='任务队列只跟踪已提交合成 / 推流的任务，点击看详情；播客列表包含全部剧集（含存稿），点击载入编辑器。';
+ const queueHtml=queue.length?queue.map(t=>{
+  const b=POD_BADGE[t.status]||['未知',''];
+  const color=b[1]==='busy'?'var(--warn)':b[1]==='ok'?'var(--ok)':b[1]==='err'?'var(--danger)':'var(--text-3)';
+  const rowCls=b[1]==='busy'?'st-live':b[1]==='err'?'st-err':'';
+  const tagCls=b[1]==='busy'?'live':b[1]==='ok'?'ok':b[1]==='err'?'err':'';
+  return `<div class="task-row ${rowCls}" data-act="pod-task-detail" data-key="${t.id}" title="点击查看任务详情">
+   <span class="dot" style="box-shadow:none;background:${color};margin-top:5px"></span>
+   <span class="tm"><b>${esc(t.title)}</b><span>${esc(podTaskText(t)||'—')} · ${esc(t.time)}</span>${podTaskBar(t)}</span>
+   <span class="tag ${tagCls}">${b[0]}</span>
+   <span style="color:var(--text-3);align-self:center">›</span></div>`;
+ }).join(''):'<div class="out-empty-sm">暂无任务。开始合成后，这里会实时更新进度。</div>';
+ const listHtml=pod.episodes.length?pod.episodes.map(e=>{
+  const b=POD_BADGE[e.status]||['未知',''];
+  const color=b[1]==='busy'?'var(--warn)':b[1]==='ok'?'var(--ok)':b[1]==='err'?'var(--danger)':'var(--text-3)';
+  const rowCls=b[1]==='busy'?'st-live':b[1]==='err'?'st-err':'';
+  const tagCls=b[1]==='busy'?'live':b[1]==='ok'?'ok':b[1]==='err'?'err':'';
+  return `<div class="ep-row ${rowCls}" data-act="pod-ep-load" data-key="${e.id}" title="点击载入到播客编辑器">
+   <span class="dot" style="box-shadow:none;background:${color}"></span>
+   <span class="em"><b>${esc(e.title)}</b><span>${e.lines} 轮 · ${e.duration?e.duration.toFixed(1)+'s':'—'} · ${esc(e.time)}</span></span>
+   <span class="tag ${tagCls}">${b[0]}</span>
+   ${e.duration?`<button class="mini-btn" style="width:28px;height:28px" data-act="pod-ep-download" data-key="${e.id}" title="下载成品">${icon('down','ic sm')}</button>`:''}
+   ${pod.confirmDel===e.id?`<button class="chip" style="color:var(--danger);border-color:var(--danger)" data-act="pod-ep-del" data-key="${e.id}">确认删除</button>`:`<button class="mini-btn" style="width:28px;height:28px" data-act="pod-ep-del" data-key="${e.id}" title="删除">${icon('close','ic sm')}</button>`}</div>`;
+ }).join(''):'<div class="out-empty-sm">暂无播客剧集。生成对话稿并保存后，会出现在这里。</div>';
+ $('#out-body').innerHTML=`
+  <div class="out-group">
+   <div class="og-head"><span class="og-title">任务队列</span>${running?`<span class="og-live">● ${running} 进行中</span>`:''}<span class="spacer"></span>
+    <button class="mini-btn" style="width:28px;height:28px" data-act="pod-queue-refresh" title="刷新队列">${icon('refresh','ic sm')}</button></div>
+   ${queueHtml}
+  </div>
+  <div class="out-group">
+   <div class="og-head"><span class="og-title">播客列表</span><span class="og-count">${pod.episodes.length}</span><span class="spacer"></span>
+    <button class="mini-btn" style="width:28px;height:28px" data-act="pod-list-refresh" title="刷新列表">${icon('refresh','ic sm')}</button></div>
+   ${listHtml}
+  </div>`;
+}
+function renderPodDetail(){
+ const t=pod.tasks.find(x=>x.id===pod.detailId);
+ if(!t)return;
+ const b=POD_BADGE[t.status]||['未知',''];
+ const cast=pod.speakers.map(s=>`${esc(s.name)}（${esc((VOICES.find(v=>v.id===s.voice)||{}).name||'未配置')}）`).join(' · ');
+ let mid='';
+ if(t.status==='synthesizing'){
+  mid+=`<div class="qbar" style="height:6px"><div class="qbar-fill" style="width:${Math.round(100*(t.progress||0)/Math.max(1,t.linesCount))}%"></div></div>
+   <p style="font-size:12px;color:var(--text-3);margin:7px 0 0">正在合成 ${t.progress||0} / ${t.linesCount} 句…（本页实时刷新，切走也不会中断）</p>`;
+ }
+ if(t.status==='pushing'&&t.push){
+  mid+=`<div class="detail-grid">
+   <span class="dk">推流协议</span><span class="dv">${t.push.protocol.toUpperCase()} ${t.push.mode==='live'?'（实时合成推流）':'（成品直推）'}</span>
+   <span class="dk">推流地址</span><span class="dv"><code>${esc(t.push.url)}</code></span>
+   <span class="dk">已推送</span><span class="dv">${fmt(t.push.elapsed)} / ${fmt(t.push.duration)} · ${t.push.linesDone}/${t.push.linesTotal} 句</span>
+   </div><div class="qbar" style="height:6px"><div class="qbar-fill" style="width:${Math.round(100*t.push.elapsed/Math.max(1,t.push.duration))}%"></div></div>
+   <button class="btn sec" style="margin-top:10px;color:var(--danger)" data-act="pod-detail-stop" data-key="${t.id}">停止推流</button>`;
+ }
+ if(t.status==='failed')mid+=`<div class="notice warn">${icon('info','ic sm')}<span>${esc(t.error||'合成失败')}</span></div>`;
+ if(t.status==='completed'){
+  mid+=`<div class="detail-grid"><span class="dk">成品时长</span><span class="dv">${t.duration?t.duration.toFixed(1)+'s':'—'}</span></div>
+   <div style="display:flex;gap:8px;margin-bottom:6px"><button class="btn sec" data-act="pod-detail-play">${icon('play','ic sm')}试听</button><button class="btn sec" data-act="pod-detail-download">${icon('down','ic sm')}下载成品</button></div>`;
+ }
+ $('#pod-detail-body').innerHTML=`
+  <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">
+   <span class="tag ${b[1]==='busy'?'live':b[1]==='ok'?'ok':b[1]==='err'?'err':''}">${b[0]}</span>
+   <b id="pod-detail-title" style="font-size:15px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)}</b>
+   <button class="mini-btn" data-act="pod-detail-close" aria-label="关闭">${icon('close','ic sm')}</button></div>
+  ${mid}
+  <div class="detail-grid">
+   <span class="dk">来源</span><span class="dv">${esc(t.source||'粘贴文本')}</span>
+   <span class="dk">对话稿</span><span class="dv">${t.linesCount||12} 轮 · 语速 ×${pod.speed.toFixed(2)}</span>
+   <span class="dk">主持阵容</span><span class="dv">${cast}</span>
+   <span class="dk">创建时间</span><span class="dv">${esc(t.time)}</span>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+   <button class="btn" data-act="pod-detail-load" data-key="${t.id}">载入编辑器</button>
+   <button class="btn sec" style="color:var(--danger)" data-act="pod-detail-del" data-key="${t.id}">删除剧集</button></div>`;
+}
+function renderPod(){
+ renderPodStepper();renderPodSource();renderPodScript();renderPodCast();renderPodOutput();
+ const flags=[podSrcReady(),pod.speakers.length>=2&&pod.speakers.every(s=>!!s.voice),pod.lines.length>0,pod.synthDone];
+ const cur=flags.findIndex(f=>!f);
+ ['#pod-source','#pod-cast-col','#pod-script-col','#pod-output'].forEach((sel,i)=>{
+  const el=$(sel);if(el)el.classList.toggle('stage-active',i===cur);
+ });
+}
+function refreshPod(){renderPod();if(state.view==='podcast')renderPodEpisodes()}
+function makeScript(kind){
+ if(!podSrcReady()){toast('内容源至少需要 10 个字',true);return}
+ pod.genning=true;renderPodSource();
+ setTimeout(()=>{
+  pod.genning=false;
+  if(kind==='direct'){
+   const raw=pod.src==='text'?pod.text:'这是一段从内容源提取的正文。我们将按语句切分为朗读稿。';
+   pod.lines=raw.split(/[。！？\n]/).map(s=>s.trim()).filter(s=>s.length>4).slice(0,8).map(t=>({role:'host',name:pod.speakers[0].name,text:t}));
+   if(!pod.lines.length)pod.lines=[{role:'host',name:pod.speakers[0].name,text:raw.slice(0,80)}];
+  }else{
+   const g=pod.speakers.find(s=>s.role!=='host')||pod.speakers[0];
+   pod.lines=[
+    {role:'host',name:pod.speakers[0].name,text:'欢迎收听本期节目，我们从一个看似简单的问题开始。'},
+    {role:'guest',name:g.name,text:'这个问题背后其实有一整套工程取舍，我想先聊聊最容易被忽略的一点。'},
+    {role:'host',name:pod.speakers[0].name,text:'是说用户根本不需要知道这些复杂度吗？'},
+    {role:'guest',name:g.name,text:'对。好的设计会把选择收敛成一句人话，而不是一堆参数。'},
+    {role:'host',name:pod.speakers[0].name,text:'那我们用一个具体例子把它讲清楚。'},
+    {role:'guest',name:g.name,text:'好，就从「选一个声音」开始说起。'}
+   ];
+  }
+  pod.editLine=-1;renderPod();toast(kind==='direct'?'已按语句生成朗读稿':'对话稿已按主持阵容改写完成');
+ },1100);
+}
+const TITLES={workbench:['创作台','把文字变成声音'],podcast:['播客工坊','多人对话一次成片'],voices:['我的音色','上传一次，处处复用'],library:['作品库','生成记录与参数复用'],system:['系统状态','模型与运行环境']};
+function switchView(k){
+ state.view=k;$$('.view').forEach(v=>v.hidden=v.dataset.view!==k);
+ $$('#nav-primary a, .nav a').forEach(a=>a.classList.toggle('active',a.dataset.key===k));
+ $('#page-title').textContent=TITLES[k][0];$('#page-sub').textContent=TITLES[k][1];
+ $('#output-panel').hidden=!(k==='workbench'||k==='podcast');
+ if(k==='podcast'){
+  renderPod();renderPodEpisodes();
+ }else if(k==='workbench'){
+  $('#out-title').textContent='本次结果';
+  $('#out-recent').hidden=false;
+  $('#out-tip').textContent='结果会自动保存到「作品库」。切换模型不会影响已生成的音频。';
+  renderOutput();renderRecent();
+ }
+ $('#content').scrollTop=0;
+}
+function setModel(k,fromUser){
+ const prev=model();state.model=k;const m=model();
+ const order=GROUPS.filter(([g])=>m.caps[g]).map(([g])=>g);
+ if(!m.caps[state.group]){
+  state.group=order[0]||'';state.pick=null;
+  if(fromUser)toast(`已切到「${GROUPS.find(g=>g[0]===state.group)?.[1]||'可用方式'}」：${prev.label} 的方式在 ${m.label} 中不可用`,true);
+ }
+ if(state.group==='preset'&&m.speakers.length&&!m.speakers.some(s=>s[0]===state.pick))state.pick=m.speakers[0][0];
+ if(state.group==='mine'&&!state.pick)state.pick=VOICES[0].id;
+ if(state.group==='design'&&state.pick!=='design')state.pick='design';
+ if(state.group==='mine'){const v=VOICES.find(x=>x.id===state.pick);state.refText=v?v.text:''}
+ if(!m.caps.stream)state.stream=false;
+ if(!m.caps.lang)state.lang='';
+ if(!m.caps.instruct)state.instruct='';
+ state.menu=false;
+ renderAll();
+ if(fromUser)toast(`已切换到 ${m.label}`);
+}
+function renderAll(){renderModelMenu();renderCapNotice();renderTabs();renderSounds();renderAdv();renderAction();renderOutput();renderRecent();renderLibrary();renderVoiceCards();renderSystem();renderPod();syncThemeIcon()}
+function syncThemeIcon(){const d=document.documentElement.getAttribute('data-theme')==='dark';$('#theme-icon').innerHTML=`<use href="#i-${d?'sun':'moon'}"/>`}
+
+let genTimer=null,playTimer=null;
+function generate(){
+ if(blocker()||state.busy)return;
+ state.busy=true;state.playing=false;state.pos=0;clearInterval(playTimer);renderAction();renderOutput();
+ let p=12;genTimer=setInterval(()=>{p=Math.min(94,p+Math.random()*17);const el=$('#gen-progress');if(el)el.style.width=p+'%'},220);
+ setTimeout(()=>{
+  clearInterval(genTimer);state.busy=false;
+  const m=model();let voice='—';
+  if(state.group==='preset')voice=(m.speakers.find(s=>s[0]===state.pick)||['','预置音色'])[1];
+  else if(state.group==='mine')voice=(VOICES.find(v=>v.id===state.pick)||{}).name||'我的音色';
+  else voice=state.designText.slice(0,12)+'…';
+  const dur=Math.max(1.4,Math.round(state.text.trim().length/5.2*10)/10);
+  const title=state.text.trim().replace(/\s+/g,' ').slice(0,22)+(state.text.trim().length>22?'…':'');
+  const kind=state.group==='preset'?'预置音色':state.group==='mine'?'我的音色':'声音设计';
+  state.result={title,dur,model:m.label,voice,time:'刚刚',kind};
+  state.library.unshift({id:'t'+Date.now(),title,model:m.label,voice,dur,kind,time:'刚刚'});
+  renderAction();renderOutput();renderRecent();renderLibrary();
+  toast('生成完成，可以试听或下载');
+ },1700);
+}
+function togglePlay(){
+ if(!state.result)return;
+ state.playing=!state.playing;
+ if(state.playing){
+  playTimer=setInterval(()=>{state.pos+=.1;if(state.pos>=state.result.dur){state.pos=state.result.dur;state.playing=false;clearInterval(playTimer);renderOutput();return}syncPlayer()},100);
+ }else clearInterval(playTimer);
+ renderOutput();
+}
+function downloadWav(){
+ const r=state.result;
+ const sr=24000,dur=Math.min(3,r?r.dur:2),n=Math.floor(sr*dur);
+ const buf=new ArrayBuffer(44+n*2),dv=new DataView(buf);
+ const w=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i))};
+ w(0,'RIFF');dv.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);
+ dv.setUint32(24,sr,true);dv.setUint32(28,sr*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);w(36,'data');dv.setUint32(40,n*2,true);
+ for(let i=0;i<n;i++){const t=i/sr,v=Math.sin(2*Math.PI*220*t)*.12*Math.exp(-2*((t%.5)/.5));dv.setInt16(44+i*2,v*32767,true)}
+ const blob=new Blob([buf],{type:'audio/wav'}),a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);a.download='voice-studio-demo.wav';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+ toast('已导出示例音频（原型演示）');
+}
+
+document.addEventListener('click',e=>{
+ if(e.target.id==='llm-modal'){pod.llmModal=false;$('#llm-modal').hidden=true;return}
+ if(e.target.id==='pod-detail-modal'){pod.detailModal=false;$('#pod-detail-modal').hidden=true;return}
+ const t=e.target.closest('[data-act]');
+ if(!t){if(state.menu){state.menu=false;renderModelMenu()}return}
+ const a=t.dataset.act,k=t.dataset.key;
+ switch(a){
+  case 'view':switchView(k);break;
+  case 'toast':toast(t.dataset.msg||'操作已完成（原型演示）');break;
+  case 'theme':{const d=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',d);try{localStorage.setItem('vs-theme',d)}catch(_){}syncThemeIcon();break}
+  case 'help':toast('快捷键：Ctrl/⌘ + Enter 生成 · 空格播放/暂停 · Esc 关闭菜单',true);break;
+  case 'toggle-menu':state.menu=!state.menu;renderModelMenu();break;
+  case 'model':state.menu=false;setModel(k,true);break;
+  case 'switch-model':setModel(k,true);switchView('workbench');break;
+  case 'group':state.group=k;state.pick=null;
+   if(k==='preset')state.pick=(model().speakers[0]||[])[0]||null;
+   if(k==='mine'){state.pick=VOICES[0].id;state.refText=VOICES[0].text}
+   if(k==='design')state.pick='design';
+   renderAll();break;
+  case 'pick':{if(e.target.closest('[data-act="preview"]'))break;state.pick=k;
+   if(state.group==='mine'){const v=VOICES.find(x=>x.id===k);state.refText=v?v.text:''}
+   renderSounds();renderAction();break}
+  case 'preview':e.stopPropagation();toast(`试听「${k}」（原型演示）`);break;
+  case 'sample':state.text=SAMPLES[+t.dataset.i].text;$('#text-input').value=state.text;renderAction();break;
+  case 'clear-text':state.text='';$('#text-input').value='';renderAction();break;
+  case 'design-preset':state.designText=t.dataset.t;$('#design-input').value=state.designText;renderAction();break;
+  case 'lang':state.lang=k;renderAdv();renderAction();break;
+  case 'stream':if(model().caps.stream){state.stream=!state.stream;renderAdv()}break;
+  case 'generate':generate();break;
+  case 'play':togglePlay();break;
+  case 'download':downloadWav();break;
+  case 'reuse':toast('已把本条参数回填到创作台');switchView('workbench');break;
+  case 'play-recent':{const it=state.library.find(x=>x.id===k);if(it){state.result={title:it.title,dur:it.dur,model:it.model,voice:it.voice,time:it.time};state.pos=0;switchView('workbench');renderOutput();toast('已载入作品，点播放试听')}break}
+  case 'filter':state.filter=k;renderLibrary();break;
+  case 'pod-src':pod.src=k;pod.sourceError='';renderPodSource();renderPodStepper();break;
+  case 'pod-file':pod.fileName='访谈纪要.pdf';pod.extractChars=3480;renderPodSource();renderPodStepper();toast('已解析文件，提取 3480 字正文（原型演示）');break;
+  case 'pod-url-extract':{
+   if(!pod.url.trim()){toast('先填写网页链接',true);break}
+   pod.extracting=true;renderPodSource();
+   setTimeout(()=>{pod.extracting=false;pod.extractChars=5120;renderPodSource();renderPodStepper();toast('网页正文抓取完成')},900);break}
+  case 'pod-llm':{
+   pod.llmModal=true;$('#llm-modal').hidden=false;
+   $('#llm-base').value=pod.llm.base;$('#llm-key').value='';$('#llm-model').value=pod.llm.model;
+   $('#llm-temp').value=pod.llm.temp;$('#llm-rounds').value=pod.llm.rounds;$('#llm-style').value=pod.llm.style;
+   $('#llm-test-result').textContent='';break}
+  case 'pod-llm-close':pod.llmModal=false;$('#llm-modal').hidden=true;break;
+  case 'pod-llm-test':$('#llm-test-result').textContent='连接成功 · 模型 '+pod.llm.model+' 可用（原型演示）';break;
+  case 'pod-llm-save':{
+   pod.llm.base=$('#llm-base').value.trim();pod.llm.model=$('#llm-model').value.trim()||'未配置';
+   pod.llm.temp=parseFloat($('#llm-temp').value)||0.7;pod.llm.rounds=$('#llm-rounds').value.trim();
+   pod.llm.style=$('#llm-style').value.trim();pod.llmModal=false;$('#llm-modal').hidden=true;
+   renderPodSource();toast('大模型配置已保存');break}
+  case 'pod-direct':makeScript('direct');break;
+  case 'pod-gen':makeScript('llm');break;
+  case 'pod-line-edit':pod.editLine=+t.dataset.i;pod.editText=pod.lines[pod.editLine].text;renderPodScript();{const el=$('#pod-line-edit-text');if(el)el.focus()}break;
+  case 'pod-line-save':{const i=+t.dataset.i,v=$('#pod-line-edit-text').value.trim();pod.lines[i].text=v||pod.lines[i].text;pod.editLine=-1;renderPodScript();renderPodStepper();renderPodOutput();break}
+  case 'pod-line-cancel':pod.editLine=-1;renderPodScript();break;
+  case 'pod-line-del':pod.lines.splice(+t.dataset.i,1);pod.editLine=-1;renderPodScript();renderPodOutput();renderPodStepper();break;
+  case 'pod-line-add':{const alt=pod.lines.length%2?'guest':'host',s=pod.speakers.find(x=>x.role===alt)||pod.speakers[0];
+   pod.lines.push({role:s.role,name:s.name,text:''});pod.editLine=pod.lines.length-1;pod.editText='';renderPodScript();renderPodOutput();break}
+  case 'pod-cast-add':{const used=new Set(pod.speakers.map(s=>s.voice)),free=VOICES.find(v=>!used.has(v.id))||VOICES[0];
+   pod.speakers.push({role:'guest',name:'嘉宾'+(pod.speakers.filter(s=>s.role!=='host').length+1),desc:'',voice:free.id});
+   renderPodCast();renderPodScript();renderPodStepper();toast('已添加一位嘉宾并自动分配未占用的音色');break}
+  case 'pod-cast-del':{
+   if(pod.speakers.filter(s=>s.role!=='host').length<=1){toast('至少保留一位嘉宾',true);break}
+   pod.speakers.splice(+t.dataset.i,1);renderPodCast();renderPodScript();renderPodStepper();break}
+  case 'pod-out-tab':pod.outTab=k;renderPodOutput();break;
+  case 'pod-save':{
+   pod.episodes.unshift({id:'e'+Date.now(),title:'未命名剧集 · '+pod.lines.length+' 轮',status:'draft',lines:pod.lines.length,duration:null,time:'刚刚'});
+   if(state.view==='podcast')renderPodEpisodes();toast('剧集已保存，可在右侧队列载入');break}
+  case 'pod-synth':{
+   if(!pod.lines.length){toast('请先生成或载入对话稿',true);break}
+   if(pod.synthBusy)break;
+   pod.outTab='final';pod.synthBusy=true;pod.synthDone=false;pod.synthProgress=0;renderPodOutput();
+   let n=0;const tm=setInterval(()=>{
+    n++;pod.synthProgress=Math.min(pod.lines.length,n);
+    const tq=pod.tasks.find(t=>t.status==='synthesizing');if(tq)tq.progress=pod.synthProgress;
+    renderPodOutput();if(state.view==='podcast')renderPodEpisodes();
+    if(n>=pod.lines.length){clearInterval(tm);pod.synthBusy=false;pod.synthDone=true;pod.duration=284.6;
+     if(tq){tq.status='completed';tq.duration=284.6;const ep=pod.episodes.find(e=>e.id===tq.episodeId);if(ep){ep.status='completed';ep.duration=284.6}}
+     renderPodOutput();renderPodStepper();if(state.view==='podcast')renderPodEpisodes();toast('播客成品合成完成，可试听或下载')}
+   },260);break}
+  case 'pod-play':toast(pod.synthDone?'开始试听播客成品（原型演示）':'请先合成成品',!pod.synthDone);break;
+  case 'pod-download':case 'pod-ep-download':downloadWav();break;
+  case 'pod-stream':{
+   if(!pod.lines.length){toast('请先生成对话稿',true);break}
+   pod.streamBusy=true;renderPodOutput();toast('开始流式合成，2.5 秒预缓冲（原型演示）');
+   setTimeout(()=>{pod.streamBusy=false;renderPodOutput();toast('流式播放完成，成品已自动保存')},1600);break}
+  case 'pod-push-toggle':pod.pushOn=!pod.pushOn;renderPodOutput();break;
+  case 'pod-proto':pod.protocol=k;renderPodOutput();break;
+  case 'pod-push-start':{
+   if(!pod.lines.length){toast('请先生成对话稿',true);break}
+   pod.pushing=true;pod.pushStatus='● 推流中 · '+pod.protocol.toUpperCase();renderPodOutput();renderPodEpisodes();toast('推流已开始');break}
+  case 'pod-push-stop':{
+   pod.pushing=false;pod.pushStatus='已停止';
+   const pt=pod.tasks.find(t=>t.status==='pushing');
+   if(pt){pt.status='stopped';pt.push=null;const ep=pod.episodes.find(e=>e.id===pt.episodeId);if(ep)ep.status='stopped'}
+   renderPodOutput();renderPodEpisodes();toast('已停止推流');break}
+  case 'pod-queue-refresh':renderPodEpisodes();toast('任务队列已刷新（原型演示：轮询进行中的任务）');break;
+  case 'pod-list-refresh':renderPodEpisodes();toast('播客列表已刷新（原型演示：重新拉取剧集）');break;
+  case 'pod-task-detail':{
+   pod.detailId=k;pod.detailModal=true;$('#pod-detail-modal').hidden=false;renderPodDetail();break}
+  case 'pod-detail-close':pod.detailModal=false;$('#pod-detail-modal').hidden=true;break;
+  case 'pod-detail-stop':{
+   const t=pod.tasks.find(x=>x.id===k);
+   if(t){t.status='stopped';t.push=null;const e=pod.episodes.find(x=>x.id===t.episodeId);if(e)e.status='stopped'}
+   pod.pushing=false;pod.pushStatus='已停止';renderPodDetail();renderPodEpisodes();renderPodOutput();toast('已停止推流');break}
+  case 'pod-detail-load':pod.detailModal=false;$('#pod-detail-modal').hidden=true;toast('已把该剧集载入编辑器（原型演示）');break;
+  case 'pod-detail-del':{
+   const t=pod.tasks.find(x=>x.id===k);
+   pod.episodes=pod.episodes.filter(e=>e.id!==(t?t.episodeId:k));
+   pod.tasks=pod.tasks.filter(x=>x.id!==k);
+   pod.detailModal=false;$('#pod-detail-modal').hidden=true;renderPodEpisodes();toast('剧集已删除');break}
+  case 'pod-detail-play':toast('开始试听成品（原型演示）');break;
+  case 'pod-detail-download':downloadWav();break;
+  case 'pod-ep-load':toast('已把剧集载入编辑器（原型演示）');break;
+  case 'pod-ep-del':{
+   if(pod.confirmDel!==k){pod.confirmDel=k;renderPodEpisodes();toast('再次点击「确认删除」以移除该剧集',true);break}
+   pod.episodes=pod.episodes.filter(e=>e.id!==k);
+   pod.tasks=pod.tasks.filter(t=>t.episodeId!==k);
+   pod.confirmDel=null;renderPodEpisodes();toast('剧集已删除');break}
+  case 'upload':case 'doctor':toast(a==='doctor'?'7 个模型权重与运行环境自检通过':'已打开上传对话框（原型演示）');break;
+ }
+});
+document.addEventListener('input',e=>{
+ const id=e.target.id;
+ if(id==='text-input'){state.text=e.target.value;$('#char-count').textContent=state.text.length+' / 2000';renderAction()}
+ if(id==='design-input'){state.designText=e.target.value;renderAction()}
+ if(id==='ref-input'){state.refText=e.target.value;renderAction()}
+ if(id==='instruct-input'){state.instruct=e.target.value}
+ if(id==='speed-range'){state.speed=parseFloat(e.target.value);$('#speed-val').textContent=state.speed.toFixed(2)+'×';renderAction()}
+ if(id==='pod-src-text'){pod.text=e.target.value;renderPodStepper()}
+ if(id==='pod-src-url')pod.url=e.target.value;
+ if(id==='pod-push-url')pod.pushUrl=e.target.value;
+ if(id==='pod-line-edit-text')pod.editText=e.target.value;
+ if(id==='pod-speed'){pod.speed=parseFloat(e.target.value);const v=$('#pod-speed').parentElement.querySelector('.range-val');if(v)v.textContent=pod.speed.toFixed(2)+'×';renderPodStepper()}
+ if(e.target.dataset.spk!==undefined){const i=+e.target.dataset.spk;pod.speakers[i][e.target.dataset.field]=e.target.value;renderPodStepper()}
+});
+document.addEventListener('change',e=>{
+ const t=e.target;
+ if(t.dataset.spk!==undefined&&t.dataset.field==='voice'){pod.speakers[+t.dataset.spk].voice=t.value;renderPodScript();renderPodStepper()}
+ if(t.dataset.line!==undefined){const s=pod.speakers[+t.value];if(s){pod.lines[+t.dataset.line].role=s.role;pod.lines[+t.dataset.line].name=s.name;renderPodScript()}}
+});
+document.addEventListener('keydown',e=>{
+ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();if(state.view==='workbench')generate()}
+ if(e.key==='Escape'&&pod.llmModal){pod.llmModal=false;$('#llm-modal').hidden=true}
+ if(e.key==='Escape'&&pod.detailModal){pod.detailModal=false;$('#pod-detail-modal').hidden=true}
+ if(e.key==='Escape'&&state.menu){state.menu=false;renderModelMenu()}
+ if(e.key===' '&&state.view==='workbench'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&!e.target.closest('button')&&state.result){e.preventDefault();togglePlay()}
+});
+$('#upload-zone').addEventListener('click',()=>toast('已打开上传对话框（原型演示）'));
+$('#char-count').textContent=state.text.length+' / 2000';
+renderAll();
+</script>
+</body>
+</html>

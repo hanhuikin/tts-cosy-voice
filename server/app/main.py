@@ -19,6 +19,7 @@ from .engine import setup_sys_path
 setup_sys_path()
 
 from .engine import MODEL_REGISTRY, QUEUE_MAX, engine
+from .model_registry import MODEL_KEYS, is_available
 from .routes import podcast, system, tasks, tts, voices
 from .storage import DATA_DIR, storage
 
@@ -83,19 +84,21 @@ async def startup() -> None:
     for t in storage.list_tasks(500):
         if t["status"] == "running":
             storage.finish_task(t["id"], None, None, 0, "failed", "服务重启中断", 0, None)
-    # 默认加载 cosyvoice3; 若未下载则尝试 cosyvoice2, 都没有则保持 idle 等待 /api/admin/model
-    target = None
-    for key in (_default_model, "cosyvoice2"):
-        cfg = MODEL_REGISTRY[key]
-        if (cfg["dir"] / "llm.pt").exists():
-            target = key
-            break
+    # 预载默认模型; 未下载时按注册表顺序找第一个权重就绪的模型, 都没有则 idle
+    if _default_model not in MODEL_REGISTRY:
+        logger.warning("unknown COSYVOICE_DEFAULT_MODEL=%s, falling back to registry order",
+                       _default_model)
+        order = list(MODEL_KEYS)
+    else:
+        order = [_default_model] + [k for k in MODEL_KEYS if k != _default_model]
+    target = next((k for k in order if is_available(k)), None)
     if target:
         logger.info("preloading model: %s", target)
         engine.load_async(target, loop)
     else:
-        logger.warning("no pretrained model found under CosyVoice/pretrained_models, "
-                       "run scripts/download_models.py first; serving UI in idle state")
+        logger.warning("no local model weights found under %s, run scripts/download_models.py "
+                       "or set the *_DIR env vars; serving UI in idle state",
+                       MODEL_REGISTRY["cosyvoice3"]["dir"].parent)
 
 
 if __name__ == "__main__":

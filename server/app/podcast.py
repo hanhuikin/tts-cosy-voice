@@ -21,6 +21,7 @@ import requests
 
 from .audio import pcm_to_wav, wav_header
 from .engine import TTSRequest, engine
+from .model_registry import MODEL_REGISTRY
 from .storage import storage
 
 logger = logging.getLogger("cosyvoice-server.podcast")
@@ -133,16 +134,36 @@ def resolve_line_request(line: dict, speakers: list[dict]) -> TTSRequest:
         spk = next((s for s in speakers if s.get("role") == role), None) or speakers[0]
     voice_id = (spk.get("voice_id") or "").strip()
     voice = storage.get_voice(voice_id) if voice_id else None
-    if not voice:
-        raise ValueError(f"说话人「{spk.get('name') or line.get('role', 'host')}」未配置有效音色")
+
+    # 播客跟随工作台当前已加载的模型 (而不是写死 cosyvoice3)
+    status = engine.status()
+    model = status["model"] or "cosyvoice3"
+    cfg = MODEL_REGISTRY[model]
+    clone_mode = next((m for m in ("zero_shot", "cross_lingual") if m in cfg["modes"]), None)
+    spk_id = None
+    if clone_mode:
+        if not voice:
+            raise ValueError(f"说话人「{spk.get('name') or line.get('role', 'host')}」未配置有效音色")
+        mode = clone_mode
+    else:
+        # 没有克隆能力的模型 (如 Qwen3-TTS CustomVoice): 按角色分配内置说话人
+        available = status.get("speakers") or []
+        if not available:
+            raise ValueError(f"当前模型「{cfg['label']}」既不支持声音克隆也没有内置说话人, "
+                             "请切换到支持克隆的模型后再合成播客")
+        idx = next((i for i, s in enumerate(speakers) if s is spk), 0)
+        mode, spk_id = "sft", available[idx % len(available)]
+
     req = TTSRequest(
-        text=line["text"], model="cosyvoice3", mode="zero_shot",
-        voice_id=voice_id, speed=float(line.get("speed", 1.0)), stream=False,
+        text=line["text"], model=model, mode=mode, spk_id=spk_id,
+        voice_id=voice_id if clone_mode else None,
+        speed=float(line.get("speed", 1.0)), stream=False,
     )
-    req.prompt_wav = voice["file"]
-    req.prompt_text = voice["prompt_text"]
-    if not Path(req.prompt_wav).exists():
-        raise ValueError(f"参考音频不存在: {req.prompt_wav}")
+    if clone_mode:
+        req.prompt_wav = voice["file"]
+        req.prompt_text = voice["prompt_text"]
+        if not Path(req.prompt_wav).exists():
+            raise ValueError(f"参考音频不存在: {req.prompt_wav}")
     err = engine.validate(req)
     if err:
         raise ValueError(err)

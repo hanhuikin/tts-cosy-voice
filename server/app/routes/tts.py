@@ -51,11 +51,11 @@ async def tts(body: TTSRequest):
 
     if spec.stream:
         return _stream_response(job, task_id, sample_rate)
-    return await _collect_response(job, task_id, spec, sample_rate)
+    return await _collect_response(job, task_id, spec)
 
 
-async def _collect_response(job, task_id: str, spec: EngineSpec, sample_rate: int) -> Response:
-    """非流式: 收齐所有分块, 打完整 WAV 返回。"""
+async def _collect_response(job, task_id: str, spec: EngineSpec) -> Response:
+    """非流式: 收齐所有分块, 打完整 WAV 返回 (采样率以本 job 实际输出为准)。"""
     parts: list[bytes] = []
     t0 = time.time()
     status, error = "ok", None
@@ -65,6 +65,7 @@ async def _collect_response(job, task_id: str, spec: EngineSpec, sample_rate: in
         elif kind == "error":
             status, error = "failed", payload
             break
+    sample_rate = job.sample_rate or 24000
     infer_ms = int((time.time() - t0) * 1000)
     if status != "ok" or not parts:
         storage.finish_task(task_id, None, None, sample_rate, status, error or "no audio produced", infer_ms, None)
@@ -132,29 +133,41 @@ def _stream_response(job, task_id: str, sample_rate: int) -> StreamingResponse:
 @router.post("/v1/audio/speech")
 async def openai_speech(body: OpenAISpeechRequest):
     voice = body.voice
+    cfg = MODEL_REGISTRY[body.model]
     spec_kwargs = dict(
         text=body.input,
         model=body.model,
         speed=body.speed,
         stream=False,
-        mode="sft",
         spk_id=None,
         voice_id=None,
         prompt_text=None,
+        instruct_text=None,
     )
     if voice.startswith("voice:") or voice.startswith("v:"):
-        spec_kwargs.update(mode="zero_shot", voice_id=voice.split(":", 1)[1])
+        # 不支持 zero_shot 的模型用跨语言模式承载参考音频
+        clone_mode = next((m for m in ("zero_shot", "cross_lingual") if m in cfg["modes"]), None)
+        if clone_mode is None:
+            raise HTTPException(400, f"模型 {body.model} 不支持参考音频克隆")
+        spec_kwargs.update(mode=clone_mode, voice_id=voice.split(":", 1)[1])
+    elif "sft" in cfg["speaker_modes"]:
+        spec_kwargs.update(mode="sft", spk_id=voice)
+    elif "instruct" in cfg["speaker_modes"]:
+        spec_kwargs.update(mode="instruct", spk_id=voice)
+    elif cfg["instruct_kind"] == "design":
+        # VoiceDesign: voice 字段直接作为声音描述
+        spec_kwargs.update(mode="instruct", instruct_text=voice)
     else:
-        spec_kwargs.update(spk_id=voice)
+        raise HTTPException(400, f"模型 {body.model} 无内置说话人, 请传 voice:<音色id>")
 
     try:
         spec = EngineSpec(**TTSRequest(**spec_kwargs).model_dump())
     except Exception as e:
         raise HTTPException(400, str(e))
-    if spec.mode == "zero_shot":
+    if spec.voice_id:
         # /v1 端点无 prompt_text 字段: 从已存音色读取
         _resolve_prompt(spec)
-        if not (spec.prompt_text or "").strip():
+        if cfg["requires_prompt_text"] and not (spec.prompt_text or "").strip():
             raise HTTPException(400, "referenced voice has no prompt_text; use /api/voices to set it")
     err = engine.validate(spec)
     if err:
@@ -165,4 +178,4 @@ async def openai_speech(body: OpenAISpeechRequest):
         job = await engine.submit(spec)
     except QueueFullError:
         raise HTTPException(429, "server busy")
-    return await _collect_response(job, task_id, spec, sample_rate=engine.status()["sample_rate"] or 24000)
+    return await _collect_response(job, task_id, spec)

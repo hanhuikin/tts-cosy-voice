@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Studio · 界面设计方案</title>
+<script>
+(function(){try{var t=localStorage.getItem('vs-theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t)}catch(e){}})();
+</script>
+<style>
+:root{--ease:cubic-bezier(.22,.8,.3,1)}
+:root[data-theme="light"]{
+ --bg:#F4F6FC;--surface:#FFFFFF;--surface-2:#F8F9FD;--surface-3:#EDF1F9;
+ --line:#E4E9F3;--line-2:#D3DBEA;--text:#151B2E;--text-2:#58637B;--text-3:#8B96AD;
+ --primary:#4F5BD5;--primary-2:#6C63E8;--primary-soft:#EEF0FF;--primary-ink:#FFFFFF;
+ --accent:#0E9E95;--accent-soft:#E2F6F3;--ok:#12805C;--ok-soft:#E4F5EE;
+ --warn:#B07015;--warn-soft:#FFF3DC;--danger:#CF4247;--danger-soft:#FDECEC;
+ --shadow:0 1px 2px rgba(21,27,46,.04),0 10px 30px rgba(21,27,46,.06);--shadow-sm:0 1px 3px rgba(21,27,46,.06)
+}
+:root[data-theme="dark"]{
+ --bg:#0B1020;--surface:#121A2C;--surface-2:#161F33;--surface-3:#1D2840;
+ --line:#253048;--line-2:#33405C;--text:#EAEEF9;--text-2:#9BA7C0;--text-3:#6E7C98;
+ --primary:#838DFF;--primary-2:#A08BFF;--primary-soft:#252C58;--primary-ink:#0B1020;
+ --accent:#39D3C5;--accent-soft:#123B3B;--ok:#4FD1A5;--ok-soft:#12362C;
+ --warn:#F0B75A;--warn-soft:#3A2D14;--danger:#F08287;--danger-soft:#3B1D24;
+ --shadow:0 1px 2px rgba(0,0,0,.2),0 12px 32px rgba(0,0,0,.28);--shadow-sm:0 1px 3px rgba(0,0,0,.24)
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.75;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.wrap{display:grid;grid-template-columns:224px minmax(0,1fr);gap:32px;max-width:1240px;margin:0 auto;padding:0 28px}
+.toc{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;padding:32px 0 40px;border-right:1px solid var(--line)}
+.toc .brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+.mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--accent));display:grid;place-items:center;color:#fff;font-weight:700;flex:none}
+.brand b{display:block;font-size:14px;line-height:1.3}.brand small{display:block;color:var(--text-3);font-size:11px}
+.toc-label{font-size:11px;color:var(--text-3);letter-spacing:.8px;margin:16px 0 6px;font-weight:600}
+.toc a{display:block;padding:6px 12px;border-radius:8px;color:var(--text-2);font-size:13px;text-decoration:none;border-left:2px solid transparent}
+.toc a:hover{background:var(--surface-3);color:var(--text)}
+.toc a.active{background:var(--primary-soft);color:var(--primary);font-weight:600;border-left-color:var(--primary)}
+.toc-foot{margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
+.doc{padding:36px 0 100px;min-width:0}
+.hero{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:30px 32px;box-shadow:var(--shadow-sm);margin-bottom:26px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-80px;width:260px;height:260px;border-radius:50%;background:var(--primary-soft);opacity:.7}
+.hero>*{position:relative}
+.eyebrow{font-size:11px;letter-spacing:1.4px;color:var(--primary);font-weight:700;text-transform:uppercase;margin-bottom:10px}
+h1{font-size:30px;line-height:1.3;margin:0 0 10px;letter-spacing:-.4px;font-weight:750}
+.lead{font-size:14px;color:var(--text-2);margin:0;max-width:700px}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.tag{font-size:11px;padding:4px 11px;border-radius:999px;background:var(--surface-3);color:var(--text-2);font-weight:600}
+.tag.pri{background:var(--primary-soft);color:var(--primary)}
+.tag.acc{background:var(--accent-soft);color:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;background:var(--primary);color:var(--primary-ink);font-size:13px;font-weight:650;text-decoration:none;min-height:42px}
+.btn:hover{background:var(--primary-2)}
+.btn.sec{background:var(--surface-2);color:var(--text);border:1px solid var(--line)}
+.btn.sec:hover{background:var(--surface-3)}
+section{margin-bottom:38px;scroll-margin-top:20px}
+h2{font-size:20px;margin:0 0 6px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:center;gap:10px}
+h2 .num{font-size:12px;color:var(--primary);background:var(--primary-soft);padding:2px 9px;border-radius:6px;font-weight:700;letter-spacing:0}
+h3{font-size:15px;margin:24px 0 8px;font-weight:650}
+h4{font-size:13px;margin:16px 0 6px;font-weight:650;color:var(--text-2)}
+p{margin:0 0 12px;color:var(--text-2)}
+.sec-desc{color:var(--text-3);font-size:13px;margin-bottom:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:var(--shadow-sm);margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-sm);margin-bottom:14px}
+th{background:var(--surface-2);text-align:left;padding:11px 13px;font-weight:650;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 13px;border-bottom:1px solid var(--line);color:var(--text-2);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td strong{color:var(--text);font-weight:650}
+.yes{color:var(--ok);font-weight:700}.no{color:var(--text-3)}.req{color:var(--warn);font-weight:650}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--surface-3);padding:2px 6px;border-radius:5px;color:var(--primary)}
+ul,ol{margin:0 0 12px;padding-left:20px;color:var(--text-2)}li{margin-bottom:6px}
+.swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.sw{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.sw .c{height:56px}.sw .n{padding:8px 10px;font-size:11px;line-height:1.5}
+.sw .n b{display:block;font-size:12px;color:var(--text)}.sw .n span{color:var(--text-3);font-family:ui-monospace,monospace}
+.scale{display:flex;align-items:flex-end;gap:10px;height:76px;margin-top:10px}
+.scale div{flex:1;background:var(--primary-soft);border-radius:6px 6px 0 0;display:flex;align-items:flex-end;justify-content:center;font-size:11px;color:var(--primary);padding-bottom:5px;font-weight:600}
+.comp-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 0;border-bottom:1px solid var(--line)}
+.comp-row:last-child{border-bottom:none}
+.comp-row .lbl{width:118px;flex:none;font-size:12px;color:var(--text-3)}
+.chip{padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);font-size:12px;color:var(--text-2)}
+.chip.active{background:var(--primary-soft);border-color:var(--primary);color:var(--primary);font-weight:600}
+.input-demo{padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);min-width:200px;font-size:13px;color:var(--text-3)}
+.input-demo.focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);color:var(--text)}
+.toggle-demo{width:44px;height:26px;border-radius:999px;background:var(--primary);position:relative}
+.toggle-demo::after{content:"";position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff}
+.note{border-left:3px solid var(--primary);background:var(--primary-soft);color:var(--primary);padding:12px 15px;border-radius:0 10px 10px 0;font-size:13px;margin:14px 0;line-height:1.65}
+.note.warn{border-left-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.note b{font-weight:700}
+.kv{display:flex;gap:10px;font-size:13px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.kv:last-child{border-bottom:none}.kv .k{width:150px;flex:none;color:var(--text-3)}.kv .v{color:var(--text-2)}
+.check{list-style:none;padding:0}.check li{padding-left:26px;position:relative;margin-bottom:9px;color:var(--text-2);font-size:13px}
+.check li::before{content:"";position:absolute;left:2px;top:6px;width:13px;height:13px;border-radius:4px;background:var(--primary-soft);border:1.5px solid var(--primary)}
+.check li::after{content:"";position:absolute;left:6px;top:9px;width:5px;height:8px;border:solid var(--primary);border-width:0 1.6px 1.6px 0;transform:rotate(42deg)}
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.flow .f{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-size:12px;font-weight:600;white-space:nowrap}
+.flow .f.hi{background:var(--primary-soft);border-color:var(--primary);color:var(--primary)}
+.flow .arw{color:var(--text-3);font-size:14px}
+.ia{display:grid;grid-template-columns:150px 1fr 210px;gap:10px;margin:16px 0}
+.ia>div{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--surface-2);font-size:12px;color:var(--text-2)}
+.ia b{display:block;color:var(--text);font-size:13px;margin-bottom:8px}
+.ia .top{grid-column:1/-1;background:var(--primary-soft);border-color:var(--primary);color:var(--primary);font-weight:600;text-align:center;padding:10px}
+.footer{border-top:1px solid var(--line);padding-top:20px;margin-top:40px;font-size:12px;color:var(--text-3)}
+@media(max-width:1000px){.wrap{grid-template-columns:1fr;padding:0 18px}.toc{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line);padding:20px 0}.toc a{display:inline-block}.toc-label,.toc-foot{display:none}.grid4{grid-template-columns:repeat(2,1fr)}.swatches{grid-template-columns:repeat(3,1fr)}.ia{grid-template-columns:1fr}.ia .top{grid-column:auto}}
+@media(max-width:640px){.grid2,.grid3,.grid4{grid-template-columns:1fr}.swatches{grid-template-columns:repeat(2,1fr)}h1{font-size:24px}table{font-size:12px}th,td{padding:8px}.hero{padding:22px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<aside class="toc">
+ <div class="brand"><div class="mark">V</div><div><b>Voice Studio</b><small>界面设计方案 v1.3</small></div></div>
+ <div class="toc-label">方案目录</div>
+ <nav id="toc-nav">
+  <a href="#s1" class="active">01 现状诊断与目标</a>
+  <a href="#s2">02 设计原则</a>
+  <a href="#s3">03 信息架构</a>
+  <a href="#s4">04 设计系统</a>
+  <a href="#s5">05 核心界面决策</a>
+  <a href="#s5b">05B 播客工坊专项</a>
+  <a href="#s5c">05C 播客 UI 精修</a>
+  <a href="#s6">06 组件规范</a>
+  <a href="#s7">07 状态与反馈</a>
+  <a href="#s8">08 模型能力映射</a>
+  <a href="#s9">09 无障碍与响应式</a>
+  <a href="#s10">10 落地路径与验收</a>
+ </nav>
+ <div class="toc-foot"><button class="btn sec" id="theme-btn" style="width:100%;justify-content:center">切换明暗主题</button><p style="font-size:11px;color:var(--text-3);margin:12px 0 0">配套文件：<a href="prototype.html" style="color:var(--primary)">prototype.html</a></p></div>
+</aside>
+
+<main class="doc">
+ <div class="hero">
+  <div class="eyebrow">UI / UX Design Proposal</div>
+  <h1>Voice Studio 界面重构方案</h1>
+  <p class="lead">面向多模型语音合成控制台的一次完整重设计：把技术参数藏到背后，让用户只做三件事——输入文字、选一个声音、听结果。方案基于现有 5 个视图与 7 个模型能力实测，可直接映射到当前 API。</p>
+  <div class="hero-meta"><span class="tag pri">7 个模型</span><span class="tag">5 个视图</span><span class="tag">明暗双主题</span><span class="tag acc">WCAG 2.1 AA</span><span class="tag">响应式三档</span><span class="tag">播客能力 1:1 保留</span></div>
+  <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap"><a class="btn" href="prototype.html">打开高保真交互原型 →</a><button class="btn sec" id="theme-btn2">切换主题预览</button></div>
+ </div>
+
+ <section id="s1">
+  <h2><span class="num">01</span>现状诊断与目标</h2>
+  <p class="sec-desc">先说清楚旧界面哪里卡住了人，再定义新界面要解决什么。</p>
+  <div class="grid2">
+   <div class="card"><h3 style="margin-top:0">现状问题</h3><ul>
+    <li><strong>技术概念前置</strong>：用户必须先理解 <code>sft / zero_shot / cross_lingual / instruct</code> 才能开始合成。</li>
+    <li><strong>能力随模型漂移</strong>：7 个模型各自支持不同模式，4 个 Tab 需要动态增减，用户难以建立稳定心智模型。</li>
+    <li><strong>长表单堆叠</strong>：文本、模式、音色、模型、语速、流式、语言、指令全部平铺，首屏噪声高。</li>
+    <li><strong>结果与操作分离</strong>：生成完要去下方结果卡或右侧队列里找音频。</li>
+    <li><strong>诊断信息常驻</strong>：GPU、显存、队列、采样率、端口占着侧栏底部，属于排障信息而非日常信息。</li>
+    <li><strong>主题按钮位置随视图浮动</strong>，不符合「设置类控件位置固定」的预期。</li>
+   </ul></div>
+   <div class="card"><h3 style="margin-top:0">设计目标</h3><ul>
+    <li>把首屏决策从 <strong>4 步降到 2 步</strong>：输入文字 + 选声音。</li>
+    <li>用<strong>「用谁的声音」</strong>统一表达 7 个模型的能力差异，模式由系统推导。</li>
+    <li>结果<strong>常驻右侧</strong>，生成即可播放、下载、复用参数。</li>
+    <li>高级参数<strong>默认收起</strong>，需要时才展开，不牺牲专业用户控制力。</li>
+    <li>全局状态收敛到<strong>顶部模型切换器</strong>，异常时才打断用户。</li>
+    <li>一致的明暗主题、键盘操作与响应式布局，桌面到手机都能用。</li>
+   </ul></div>
+  </div>
+  <div class="flow"><span class="f">输入文本</span><span class="arw">→</span><span class="f hi">选择声音</span><span class="arw">→</span><span class="f">生成</span><span class="arw">→</span><span class="f hi">立即播放</span><span style="font-size:12px;color:var(--text-3);margin-left:8px">模式 / 语种 / 语速由系统推导或折叠收纳</span></div>
+ </section>
+
+ <section id="s2">
+  <h2><span class="num">02</span>设计原则：为什么「符合用户习惯」</h2>
+  <p class="sec-desc">每一条改造都对应一条可用性启发式，避免只凭审美做决定。</p>
+  <table>
+   <thead><tr><th style="width:190px">原则</th><th>落地做法</th><th style="width:170px">解决的旧问题</th></tr></thead>
+   <tbody>
+    <tr><td><strong>说用户的语言</strong></td><td>「声音克隆 / 跨语言 / 指令控制」→「预置音色 / 我的音色 / 声音设计」；后端 mode 由选择自动推导</td><td>技术名词门槛</td></tr>
+    <tr><td><strong>系统状态可见</strong></td><td>顶栏常驻当前模型 + 状态点；生成按钮旁显示预计时长与当前参数；进度条与结果状态芯片</td><td>不知道在跑什么</td></tr>
+    <tr><td><strong>识别优于回忆</strong></td><td>声音用卡片 + 头像 + 描述呈现，不用下拉列表；空文本时给 3 个一键示例</td><td>下拉里猜音色</td></tr>
+    <tr><td><strong>防错而非只报错</strong></td><td>按钮禁用时<strong>写明原因</strong>（「先输入要合成的文本」「描述一下你想要的声音」），不静默置灰</td><td>按钮灰了不知道为什么</td></tr>
+    <tr><td><strong>用户控制与自由</strong></td><td>切换模型若使当前方式失效，自动切到可用方式并<strong>解释原因</strong>；已生成音频不受切换影响</td><td>切换后表单失效</td></tr>
+    <tr><td><strong>美观与简约</strong></td><td>8pt 网格、单一主色、参数折叠、每屏一个主任务；渐变只用于品牌标识与波形</td><td>卡片堆叠、视觉噪声</td></tr>
+    <tr><td><strong>灵活性与效率</strong></td><td><code>Ctrl/⌘ + Enter</code> 生成、空格播放、参数一键复用、作品库筛选</td><td>重复操作</td></tr>
+    <tr><td><strong>一致性与标准</strong></td><td>固定的顶栏 / 左导航 / 右输出三段式；主题切换位置永不改变</td><td>控件位置漂移</td></tr>
+    <tr><td><strong>帮助恢复错误</strong></td><td>错误提示给出下一步动作（「去补录」「改用预置音色」），而非仅显示失败码</td><td>失败后无路可走</td></tr>
+   </tbody>
+  </table>
+ </section>
+
+ <section id="s3">
+  <h2><span class="num">03</span>信息架构</h2>
+  <p class="sec-desc">导航按「创作 / 管理」分层，把诊断页降级，把结果页升级。</p>
+  <div class="ia">
+   <div class="top">顶栏：页面标题 · 当前模型切换器（含状态）· 主题 · 帮助 —— 全局固定</div>
+   <div><b>左导航 228px</b>创作台（默认）<br>播客工坊<br>我的音色<br>作品库<br><span style="color:var(--text-3)">— 管理 —</span><br>系统状态<br><br><span style="color:var(--text-3);font-size:11px">底部仅一句状态，详情进系统状态页</span></div>
+   <div><b>中：主任务区</b>① 合成文本 + 示例<br>② 声音选择（卡片网格）<br>③ 高级设置（默认折叠）<br>④ 底部吸底操作条<br><br><span style="color:var(--text-3);font-size:11px">单一纵列、逐步披露、主 CTA 始终可见</span></div>
+   <div><b>右：输出面板 336px</b>本次结果 / 波形播放器<br>下载 · 复用 · 保存<br>最近生成 4 条<br><br><span style="color:var(--text-3);font-size:11px">仅创作台显示，结果不离开视线</span></div>
+  </div>
+  <table>
+   <thead><tr><th style="width:150px">视图</th><th style="width:120px">旧名称</th><th>职责变化</th></tr></thead>
+   <tbody>
+    <tr><td><strong>创作台</strong></td><td>合成工作台</td><td>从「参数表单」变成「一条主任务流」；结果移到右侧常驻面板</td></tr>
+    <tr><td><strong>作品库</strong></td><td>历史记录</td><td>升级为一级导航，强调「可复用的产出」；带统计条、分类筛选、参数复用</td></tr>
+    <tr><td><strong>我的音色</strong></td><td>音色库</td><td>保持上传能力，补充拖拽区、波形缩略、参考文本完整性状态</td></tr>
+    <tr><td><strong>播客工坊</strong></td><td>播客工坊</td><td>原有能力 1:1 保留：三栏 + 全宽成品区；右侧「任务队列」「播客列表」保持两个独立分组，任务详情单独成面板；详见 05B</td></tr>
+    <tr><td><strong>系统状态</strong></td><td>系统状态</td><td>降为次级导航；承载 GPU、队列、7 个模型权重与运行环境自检</td></tr>
+   </tbody>
+  </table>
+ </section>
+
+ <section id="s4">
+  <h2><span class="num">04</span>设计系统</h2>
+  <p class="sec-desc">一套语义化 token 覆盖明暗两套主题，组件只引用语义变量，不写死颜色。</p>
+  <h3>色彩</h3>
+  <div class="swatches">
+   <div class="sw"><div class="c" style="background:#4F5BD5"></div><div class="n"><b>主色 Primary</b><span>#4F5BD5</span></div></div>
+   <div class="sw"><div class="c" style="background:#6C63E8"></div><div class="n"><b>主色 Hover</b><span>#6C63E8</span></div></div>
+   <div class="sw"><div class="c" style="background:#0E9E95"></div><div class="n"><b>强调 Accent</b><span>#0E9E95</span></div></div>
+   <div class="sw"><div class="c" style="background:#12805C"></div><div class="n"><b>成功 Success</b><span>#12805C</span></div></div>
+   <div class="sw"><div class="c" style="background:#B07015"></div><div class="n"><b>警告 Warning</b><span>#B07015</span></div></div>
+   <div class="sw"><div class="c" style="background:#CF4247"></div><div class="n"><b>危险 Danger</b><span>#CF4247</span></div></div>
+   <div class="sw"><div class="c" style="background:#F4F6FC"></div><div class="n"><b>页面底 / 浅</b><span>#F4F6FC</span></div></div>
+   <div class="sw"><div class="c" style="background:#FFFFFF;border-bottom:1px solid #E4E9F3"></div><div class="n"><b>面板 / 浅</b><span>#FFFFFF</span></div></div>
+   <div class="sw"><div class="c" style="background:#0B1020"></div><div class="n"><b>页面底 / 深</b><span>#0B1020</span></div></div>
+   <div class="sw"><div class="c" style="background:#121A2C"></div><div class="n"><b>面板 / 深</b><span>#121A2C</span></div></div>
+   <div class="sw"><div class="c" style="background:#151B2E"></div><div class="n"><b>正文 / 浅</b><span>#151B2E</span></div></div>
+   <div class="sw"><div class="c" style="background:#EAEEF9"></div><div class="n"><b>正文 / 深</b><span>#EAEEF9</span></div></div>
+  </div>
+  <div class="note"><b>对比度：</b>正文与面板在浅色下 ≥ 12:1、深色下 ≥ 11:1；次要文字 ≥ 4.5:1；主色按钮与白字 ≥ 5.4:1，满足 WCAG 2.1 AA。状态色从不单独承载信息，始终搭配文字或图标。</div>
+  <div class="grid2">
+   <div class="card"><h3 style="margin-top:0">字体与层级</h3><div class="kv"><span class="k">字体栈</span><span class="v">Inter / PingFang SC / Microsoft YaHei / system-ui</span></div><div class="kv"><span class="k">标题</span><span class="v">21 / 16 / 15 px，字重 650–750，字距 -0.2px</span></div><div class="kv"><span class="k">正文</span><span class="v">14 px / 行高 1.75</span></div><div class="kv"><span class="k">辅助文字</span><span class="v">12 px，次要色；最低不小于 11 px</span></div><div class="kv"><span class="k">数字</span><span class="v"><code>font-variant-numeric: tabular-nums</code>，时长与字数不跳动</span></div></div>
+   <div class="card"><h3 style="margin-top:0">间距 / 圆角 / 阴影 / 动效</h3><div class="kv"><span class="k">间距</span><span class="v">4px 基准：4 / 8 / 12 / 16 / 24 / 32</span></div><div class="kv"><span class="k">圆角</span><span class="v">卡片 16 · 控件 10 · 胶囊 999</span></div><div class="kv"><span class="k">阴影</span><span class="v">两级：贴地 1px + 悬浮 10px，深色下换成纯黑透明</span></div><div class="kv"><span class="k">动效</span><span class="v">120–240ms，<code>cubic-bezier(.22,.8,.3,1)</code>；只动 transform / opacity</span></div><div class="kv"><span class="k">图标</span><span class="v">18px 线性描边 1.7px，统一 symbol sprite</span></div></div>
+  </div>
+  <div class="scale"><div style="height:16px">4</div><div style="height:24px">8</div><div style="height:32px">12</div><div style="height:44px">16</div><div style="height:60px">24</div><div style="height:74px">32</div></div>
+ </section>
+
+ <section id="s5">
+  <h2><span class="num">05</span>核心界面决策</h2>
+  <p class="sec-desc">六个最关键的交互决定，以及它们如何消解多模型带来的复杂性。</p>
+  <div class="grid2">
+   <div class="card"><h3 style="margin-top:0">① 用「选声音」替代「选模式」</h3><p>三种声音来源构成稳定的心智模型：<strong>预置音色</strong>（模型自带）、<strong>我的音色</strong>（上传的参考音频）、<strong>声音设计</strong>（文字描述凭空生成）。用户选的是结果，不是算法；后端 <code>mode</code> 由选择推导。</p></div>
+   <div class="card"><h3 style="margin-top:0">② 能力差异由界面吸收</h3><p>切换模型时，只显示该模型支持的声音分组与高级项；不支持的整行隐藏而不是置灰。若当前选择失效，自动切到第一个可用方式并给出一句解释。</p></div>
+   <div class="card"><h3 style="margin-top:0">③ 必填项永不折叠</h3><p>Qwen3-TTS Base 的参考文本、VoiceDesign 的声音描述都是必填，直接出现在声音选择区下方；只有语速、语种、风格指令、流式这些<strong>可选</strong>参数才进「高级设置」。</p></div>
+   <div class="card"><h3 style="margin-top:0">④ 主 CTA 吸底且会说话</h3><p>操作条固定在主任务区底部，左侧实时显示预计时长与当前参数；不满足条件时显示具体原因，而不是一个无声的灰色按钮。</p></div>
+   <div class="card"><h3 style="margin-top:0">⑤ 结果不离开视线</h3><p>右侧输出面板常驻：空状态给引导、生成中给进度、完成后给波形播放器与下载/复用/保存。最近 4 条作品可直接回放。</p></div>
+   <div class="card"><h3 style="margin-top:0">⑥ 全局状态在顶栏</h3><p>模型切换器带状态点，一次点击看到全部 7 个模型及其能力说明；GPU、显存、队列、端口等诊断信息收进系统状态页，异常时才用轻量通知提示。</p></div>
+  </div>
+ </section>
+
+ <section id="s5b">
+  <h2><span class="num">05B</span>播客工坊：保留全部功能，只重组结构</h2>
+  <p class="sec-desc">这一页的原实现功能密度最高。评审反馈「与原来差别较大」后，本版逐项对齐原能力：不删任何功能，只调整放在哪一栏、什么时候出现、状态怎么反馈。</p>
+  <div class="note"><b>约束：</b>原有能力 1:1 保留，请求字段与后端接口完全不变；改动只发生在信息组织层。特别地，<b>任务队列</b>与<b>播客列表</b>是两个独立区块，任务详情单独成页，三者不得合并。</div>
+  <table>
+   <thead><tr><th style="width:210px">原有能力</th><th>新位置</th><th style="width:220px">交互变化</th></tr></thead>
+   <tbody>
+    <tr><td>内容源：粘贴文本 / 上传文件 / 网页链接</td><td>第一栏「① 内容源」</td><td>三种来源做成等宽分段控件，切换不跳页</td></tr>
+    <tr><td>文件上传（txt / md / pdf / docx，≤20MB）、拖拽、正文提取字数</td><td>第一栏</td><td>拖拽区常驻，解析结果就地在卡片内反馈</td></tr>
+    <tr><td>URL 抓取正文、抓取中状态与错误提示</td><td>第一栏</td><td>输入行下方合并显示状态与提取字数</td></tr>
+    <tr><td>大模型配置与连通测试（base_url / key / model / 温度 / 轮数 / 风格提示）</td><td>第一栏底部状态条 + 配置弹窗</td><td>配置摘要常驻可见，避免「不知道有没有配」</td></tr>
+    <tr><td>直接朗读（单音色）与大模型改写多人对话稿两条成稿路径</td><td>第一栏底部两个并列按钮</td><td>按钮文案直接说明是否需要大模型</td></tr>
+    <tr><td>对话稿：轮数 / 预计时长 / 逐轮编辑 / 切换说话人与音色 / 删除 / 插入 / 重新生成 / 保存剧集</td><td>第二栏「③ 对话稿」</td><td>点击气泡即编辑，说话人下拉连带音色，插入与重生成保留</td></tr>
+    <tr><td>主持阵容：主播 ×1 + 嘉宾 ×N，姓名 / 音色 / 人设，增删嘉宾（至少 1 位）</td><td>第三栏「② 主持阵容」</td><td>新增嘉宾自动分配未占用音色；模型不支持克隆时标出</td></tr>
+    <tr><td>语速 0.5×~2× 与预计时长联动</td><td>第三栏底部</td><td>调整即时反映到顶部流程条</td></tr>
+    <tr><td>成品非流式合成、逐句进度、试听、下载</td><td>页面底部全宽「④ 成品与发布」· 成品合成 Tab</td><td>从第三栏拆出，避免原来第三列过长</td></tr>
+    <tr><td>流式合成并播放（2.5s 预缓冲）</td><td>底部 · 流式播放 Tab</td><td>与成品并列，状态互不遮挡</td></tr>
+    <tr><td>推流：开关 / RTMP·SRT·RTSP·HLS / 推流地址 / HLS 拉流地址 / 开始·停止 / 实时句数与剩余时间 / ffmpeg 检测</td><td>底部 · 直播推流 Tab</td><td>高级能力默认收纳，开启后才展示协议与地址</td></tr>
+    <tr><td><strong>任务队列</strong>：仅 <code>status !== 'draft'</code> 的任务，进行中优先排序，显示逐句进度 / 推流耗时 / 失败原因，<code>● N 进行中</code> 标记</td><td>右侧输出面板第 1 个独立分组「任务队列」</td><td>点击行 → 打开任务详情；独立空状态；刷新走 <code>pollPod(true)</code></td></tr>
+    <tr><td><strong>任务详情</strong>（原 <code>queueModal</code>）：状态、合成进度、推流协议 / 地址 / 已推时长与句数、停止推流、失败原因、成品试听下载、来源类型、对话稿轮数、语速、主持阵容、创建时间、载入编辑器、删除剧集</td><td>点击队列项打开的独立详情面板</td><td>1:1 复刻原详情内容，不缩略成一行提示</td></tr>
+    <tr><td><strong>播客列表</strong>：全部剧集（含 draft 存稿），轮数 / 时长 / 时间，载入编辑器、下载、删除</td><td>右侧输出面板第 2 个独立分组「播客列表」</td><td>点击行 → 载入编辑器；独立计数与空状态；刷新走 <code>loadEpisodes()</code>；删除两步确认</td></tr>
+    <tr><td>保存剧集</td><td>页头「保存剧集」按钮</td><td>存稿只进播客列表，不进任务队列（与原 <code>podQueue</code> 过滤规则一致）</td></tr>
+   </tbody>
+  </table>
+  <h3>结构上的四处改动</h3>
+  <div class="grid2">
+   <div class="card"><h4>① 加一条流程状态条</h4><p>内容源 → 阵容 → 对话稿 → 成品，已完成 / 当前 / 待办一眼可见，同时显示轮数与预计时长，解决原界面「①②③④ 编号分散在不同列」的问题。</p></div>
+   <div class="card"><h4>② 成品区从第三栏拆出</h4><p>原实现把阵容、成品、流式、推流全塞进第三列，滚动到一半就找不到主操作。现在第三栏只放阵容，成品与发布做成全宽底部区并用 Tab 分层。</p></div>
+   <div class="card"><h4>③ 任务队列与播客列表严格分开</h4><p>两个独立分组、各自标题 / 计数 / 刷新 / 空状态：队列只跟踪已提交的任务并点进详情，列表收纳全部剧集并点进编辑器。合并成一个列表会同时破坏这两条操作路径。</p></div>
+   <div class="card"><h4>④ 任务详情单独成页</h4><p>点队列项打开完整详情面板：合成进度、推流协议与地址、停止推流、失败原因、试听下载、来源、阵容、创建时间、载入编辑器、删除剧集，不压缩成列表行里的一句提示。</p></div>
+  </div>
+  <h4>两个区块的边界（不得合并）</h4>
+  <table>
+   <thead><tr><th style="width:120px">对比项</th><th>任务队列</th><th>播客列表</th></tr></thead>
+   <tbody>
+    <tr><td>数据源</td><td>episodes 中 <code>status !== 'draft'</code></td><td>全部 episodes，含 draft 存稿</td></tr>
+    <tr><td>排序</td><td>进行中优先，其余按时间倒序</td><td>接口返回顺序</td></tr>
+    <tr><td>每行信息</td><td>逐句进度 / 推流耗时 / 失败原因 + 进度条</td><td>轮数 / 成品时长 / 创建时间</td></tr>
+    <tr><td>点击行为</td><td><strong>打开任务详情面板</strong></td><td><strong>载入播客编辑器</strong></td></tr>
+    <tr><td>行内操作</td><td>无（统一收进详情面板）</td><td>下载成品、删除（两步确认）</td></tr>
+    <tr><td>刷新动作</td><td><code>pollPod(true)</code>，2s / 10s 轮询并接管进行中任务</td><td><code>loadEpisodes()</code></td></tr>
+   </tbody>
+  </table>
+  <div class="note warn"><b>兼容性：</b>播客仍通过 <code>/api/podcast/script</code>、<code>/parse-script</code>、<code>/episodes</code>、<code>/synthesize</code>、<code>/push</code> 与 <code>/api/llm/config</code> 工作；界面只负责把原有字段组织得更清楚，不引入新接口。</div>
+  <h3>补充验收项</h3>
+  <ul class="check">
+   <li>三种内容源各自可走通「直接朗读 / LLM 改写」两条成稿路径。</li>
+   <li>对话稿编辑、换说话人、删除、插入、重新生成后，提交字段与原实现一致。</li>
+   <li>「至少保留一位嘉宾」约束、语速与预计时长联动仍然生效。</li>
+   <li>成品 / 流式 / 推流三个 Tab 状态互不串扰，推流关闭时不展示协议与地址。</li>
+   <li>任务队列与播客列表是两个独立分组：各自有计数、刷新与空状态；draft 存稿只出现在播客列表。</li>
+   <li>点击队列项打开任务详情面板，详情里 9 类信息（进度 / 协议 / 地址 / 耗时 / 错误 / 来源 / 轮数 / 语速 / 阵容 / 时间）与操作（停止推流 / 试听 / 下载 / 载入 / 删除）齐全。</li>
+   <li>详情里停止推流或删除剧集后，队列与列表两处状态同步更新；剧集删除需要两步确认。</li>
+   <li>进行中任务在切页后仍显示正确状态，刷新后能自动接管。</li>
+  </ul>
+ </section>
+
+ <section id="s5c">
+  <h2><span class="num">05C</span>播客工坊 UI 精修（功能零改动）</h2>
+  <p class="sec-desc">功能与信息架构在 05B 已锁定，本轮只处理视觉层级、状态表达与微交互。所有 <code>data-act</code>、API 映射、数据模型与请求字段保持不变。</p>
+  <div class="note"><b>边界：</b>不新增字段、不删入口、不改点击行为；调整的是「哪块更醒目、什么颜色代表什么状态、鼠标与键盘怎么反馈」。</div>
+  <table>
+   <thead><tr><th style="width:210px">原有问题</th><th>精修做法</th><th style="width:150px">依据</th></tr></thead>
+   <tbody>
+    <tr><td>三栏视觉权重相同，不知道先看哪里</td><td>当前阶段卡片加主色描边 + 3px 浅主色光环，标题与编号同步高亮；流程条完成状态与卡片联动</td><td>系统状态可见 / 视觉引导</td></tr>
+    <tr><td>流程条与卡片编号重复，编号样式弱</td><td>编号统一为 24px 圆角徽标，当前阶段实心主色；卡片副标题缩进到与标题对齐</td><td>一致性与标准</td></tr>
+    <tr><td>对话稿是平铺气泡，主播与嘉宾难分辨</td><td>加虚线时间轴与角色圆点（主播主色 / 嘉宾强调色）、头像描边、气泡 hover 提示可编辑</td><td>识别优于回忆</td></tr>
+    <tr><td>主按钮出现 3 次（页头 / 内容源 / 底部成品区）</td><td>底部成品区与页头重复的合成按钮降为次级样式，页头保留唯一全局主 CTA；功能入口不删</td><td>美观简约 / 防误点</td></tr>
+    <tr><td>禁用原因只是灰色小字</td><td>「内容源不足 10 字」「还没有对话稿」改成警告条并写明下一步动作</td><td>防错与错误恢复</td></tr>
+    <tr><td>状态标签只有蓝 / 青两色，靠颜色单通道</td><td>新增 ok / warn / live / err 语义色，进行中与失败行加淡色底，标签始终带文字</td><td>无障碍 / 状态可辨</td></tr>
+    <tr><td>右侧两个分组行密集、层级弱</td><td>分组头加分隔线与计数胶囊，行加大圆角与 hover 底色，进度条独立成行</td><td>可读性 / 扫描效率</td></tr>
+    <tr><td>数字宽度跳动、表单焦点不统一</td><td>时长 / 轮数 / 计数统一 <code>tabular-nums</code>；输入框、下拉、文本域统一主色 3px 焦点环</td><td>细节 / 键盘可达</td></tr>
+    <tr><td>Tab 切换生硬、窄屏布局怪</td><td>Tab 加圆角与 hover 底色、160ms 过渡；1180px 明确「内容源 + 对话稿两栏、阵容全宽」，720px 去掉副标题缩进、时间轴内收</td><td>微交互 / 响应式</td></tr>
+   </tbody>
+  </table>
+  <h3>状态色规范</h3>
+  <table>
+   <thead><tr><th style="width:190px">状态</th><th style="width:130px">标签</th><th style="width:150px">行底色</th><th>圆点</th></tr></thead>
+   <tbody>
+    <tr><td>存稿 <code>draft</code></td><td>中性</td><td>无</td><td>次要色</td></tr>
+    <tr><td>合成中 / 推流中</td><td><code>live</code> 警告色</td><td><code>warn-soft</code> 淡黄</td><td>警告色</td></tr>
+    <tr><td>已完成 <code>completed</code></td><td><code>ok</code> 成功色</td><td>无</td><td>成功色</td></tr>
+    <tr><td>失败 / 已停止</td><td><code>err</code> 危险色</td><td><code>danger-soft</code> 淡红</td><td>危险色</td></tr>
+   </tbody>
+  </table>
+  <div class="note warn"><b>回归约束：</b>每次 UI 精修后都要重跑 05B 的能力对照表与验收项——特别是两个独立分组、draft 只进列表、队列点击进入详情、详情面板 9 类信息与 5 个操作。原型已用 DOM 桩做 15 项冒烟（功能 6 项 + UI 7 项 + 恢复 1 项 + 详情 1 项），全部通过。</div>
+  <ul class="check">
+   <li>阶段高亮跟随流程条推进，全部完成后不高亮任何卡片。</li>
+   <li>页面同一时刻只有一个全局主按钮，其余动作保持次级样式但仍可点击。</li>
+   <li>所有禁用态都给出可操作的下一步说明。</li>
+   <li>明暗主题下语义色对比度均 ≥ 4.5:1，状态不单靠颜色区分。</li>
+   <li>启用「减少动态效果」后过渡与波形动画全部停止。</li>
+  </ul>
+ </section>
+
+ <section id="s6">
+  <h2><span class="num">06</span>组件规范</h2>
+  <p class="sec-desc">下面是用同一套 token 渲染的真实组件状态，可直接作为前端实现的对照。</p>
+  <div class="card">
+   <div class="comp-row"><span class="lbl">主 / 次按钮</span><button class="btn">生成语音</button><button class="btn sec">取消</button><button class="btn" style="opacity:.45;cursor:not-allowed" disabled>禁用态</button><span style="font-size:12px;color:var(--text-3)">最小高度 40 / 主按钮 46px</span></div>
+   <div class="comp-row"><span class="lbl">筛选芯片</span><span class="chip active">预置音色</span><span class="chip">我的音色</span><span class="chip">声音设计</span><span style="font-size:12px;color:var(--text-3)">选中态用主色浅底，不用纯色块</span></div>
+   <div class="comp-row"><span class="lbl">输入框</span><span class="input-demo">请输入文字…</span><span class="input-demo focus">聚焦态 · 3px 主色环</span></div>
+   <div class="comp-row"><span class="lbl">开关</span><span class="toggle-demo"></span><span style="font-size:12px;color:var(--text-3)">44×26，带 role="switch" 与 aria-checked</span></div>
+   <div class="comp-row"><span class="lbl">状态标签</span><span class="tag pri">当前加载</span><span class="tag acc">自检通过</span><span class="tag">权重就绪</span><span style="font-size:12px;color:var(--text-3)">始终含文字，不靠颜色单通道</span></div>
+   <div class="comp-row"><span class="lbl">点击热区</span><span style="font-size:12px;color:var(--text-2)">所有可点击元素 ≥ 44×44（桌面）/ 48×48（移动），卡片整体可点</span></div>
+  </div>
+  <h3>状态与反馈矩阵</h3>
+  <table>
+   <thead><tr><th style="width:130px">场景</th><th>界面表现</th><th style="width:210px">用户下一步</th></tr></thead>
+   <tbody>
+    <tr><td>空状态</td><td>文本区给 3 个示例；输出面板给静态波形 + 一句引导</td><td>点示例 / 去生成</td></tr>
+    <tr><td>条件不满足</td><td>CTA 禁用 + 操作条写明原因，对应字段高亮提示</td><td>按提示补齐</td></tr>
+    <tr><td>生成中</td><td>按钮变「生成中…」+ 输出面板进度条与状态芯片，模型首次加载说明</td><td>等待，可继续编辑其它内容</td></tr>
+    <tr><td>生成完成</td><td>波形播放器、时长、下载 / 复用 / 保存，轻提示「生成完成」</td><td>立即试听</td></tr>
+    <tr><td>模型切换</td><td>分组与高级项按能力重排；失效选择自动纠正并说明原因</td><td>确认或改选声音</td></tr>
+    <tr><td>失败 / 不支持</td><td>错误卡给出可操作动作（「去补录」「改用预置音色」）</td><td>一键跳转修复</td></tr>
+   </tbody>
+  </table>
+ </section>
+
+ <section id="s7">
+  <h2><span class="num">07</span>状态与反馈</h2>
+  <div class="grid3">
+   <div class="card"><h3 style="margin-top:0">渐进披露</h3><p>首屏只出现文本、声音、生成三个要素。高级设置默认折叠，展开后仍是 4 行以内；专业用户的控制力没有减少，只是不再挡路。</p></div>
+   <div class="card"><h3 style="margin-top:0">即时可预期</h3><p>字数统计、预计时长、当前模型与语速实时显示在操作条，生成前就知道会得到什么。</p></div>
+   <div class="card"><h3 style="margin-top:0">不打断</h3><p>成功与非致命信息用右下角轻提示（2.8 秒自动消失）；只有需要用户决策的错误才用内联卡片。</p></div>
+  </div>
+  <div class="note warn"><b>危险操作：</b>删除音色、删除作品、未保存就切换模型等动作需二次确认，并在提示中提供撤销入口；纯 destroy 操作不使用不可逆交互。</div>
+ </section>
+
+ <section id="s8">
+  <h2><span class="num">08</span>模型能力映射（落地关键）</h2>
+  <p class="sec-desc">用户看到三种「声音方式」，系统按下表推导出后端需要的 <code>mode</code> 与字段。这张表直接对应 <code>model_registry.py</code> 的能力声明。</p>
+  <table>
+   <thead><tr><th>模型</th><th>预置</th><th>克隆</th><th>设计</th><th>语种</th><th>指令</th><th>流式</th><th>参考文本</th><th>后端 mode</th></tr></thead>
+   <tbody>
+    <tr><td><strong>CosyVoice 3.0</strong></td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td>选填</td><td><code>sft / zero_shot / cross_lingual / instruct</code></td></tr>
+    <tr><td><strong>CosyVoice 2.0</strong></td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td>选填</td><td><code>sft / zero_shot</code></td></tr>
+    <tr><td><strong>IndexTTS 2.0</strong></td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td>选填</td><td><code>zero_shot</code></td></tr>
+    <tr><td><strong>IndexTTS 2.5</strong></td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td>选填</td><td><code>zero_shot</code> + 语种前缀</td></tr>
+    <tr><td><strong>Qwen3-TTS 预置</strong></td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td><code>sft / instruct</code></td></tr>
+    <tr><td><strong>Qwen3-TTS 克隆</strong></td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td class="req">必填</td><td><code>zero_shot</code></td></tr>
+    <tr><td><strong>Qwen3-TTS 设计</strong></td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td><td class="no">—</td><td><code>instruct</code>（VoiceDesign）</td></tr>
+   </tbody>
+  </table>
+  <h3>表单字段 → 现有 API 映射</h3>
+  <table>
+   <thead><tr><th style="width:190px">界面动作</th><th>请求字段</th><th>依据</th></tr></thead>
+   <tbody>
+    <tr><td>选「预置音色」卡片</td><td><code>mode=sft</code>, <code>spk_id=&lt;id&gt;</code></td><td>model_registry.speaker_modes</td></tr>
+    <tr><td>选「我的音色」卡片</td><td><code>mode=zero_shot</code>, <code>voice_id</code>, <code>prompt_text</code></td><td>reference_modes / requires_prompt_text</td></tr>
+    <tr><td>我的音色 + 选定目标语言</td><td><code>mode=cross_lingual</code> 或文本语种前缀</td><td>lang_map</td></tr>
+    <tr><td>选「声音设计」</td><td><code>mode=instruct</code>, <code>instruct_text=&lt;描述&gt;</code></td><td>instruct_kind = design</td></tr>
+    <tr><td>高级设置 · 语速</td><td><code>speed</code></td><td>speed_mode = native / post</td></tr>
+    <tr><td>高级设置 · 流式</td><td><code>stream</code>（仅支持模型可见）</td><td>engine.validate</td></tr>
+    <tr><td>操作条禁用原因</td><td>复用现有 <code>synthBlocker</code> 计算逻辑</td><td>app.js</td></tr>
+   </tbody>
+  </table>
+  <div class="note"><b>兼容性：</b>Qwen3-TTS 的说话人 id 由 SDK 返回小写（<code>vivian</code>、<code>serena</code>…），界面显示名与提交值分离，校验做大小写不敏感归一化，避免历史参数回填失败。</div>
+ </section>
+
+ <section id="s9">
+  <h2><span class="num">09</span>无障碍与响应式</h2>
+  <div class="grid2">
+   <div class="card"><h3 style="margin-top:0">无障碍</h3><ul>
+    <li>所有交互控件有可见焦点环（2px 主色 + 2px 偏移），键盘可完整走通主流程。</li>
+    <li>图标按钮带 <code>aria-label</code>；开关用 <code>role="switch"</code> + <code>aria-checked</code>；模型菜单用 listbox 语义。</li>
+    <li>文本对比度 ≥ 4.5:1；状态同时用文字、图标与颜色三重编码。</li>
+    <li>遵循 <code>prefers-reduced-motion</code>，关闭波形与过渡动画。</li>
+    <li>主题记忆写入 localStorage，首帧前应用避免闪烁。</li>
+    <li>快捷键：<code>Ctrl/⌘+Enter</code> 生成、空格播放/暂停、<code>Esc</code> 关闭菜单。</li>
+   </ul></div>
+   <div class="card"><h3 style="margin-top:0">响应式三档</h3><div class="kv"><span class="k">≥ 1180px</span><span class="v">三栏：导航 228 / 主区自适应 / 输出 336</span></div><div class="kv"><span class="k">720–1180px</span><span class="v">输出面板下移到主区底部，声音卡片 2 列</span></div><div class="kv"><span class="k">&lt; 720px</span><span class="v">左导航变底部 Tab Bar，顶栏精简，卡片单列，操作条换行</span></div><div class="kv"><span class="k">&lt; 460px</span><span class="v">全部单列，统计 2×2，通知全宽</span></div><p style="margin-top:12px;font-size:12px;color:var(--text-3)">原型已实现以上断点，可直接拖动窗口验证。</p></div>
+  </div>
+ </section>
+
+ <section id="s10">
+  <h2><span class="num">10</span>落地路径与验收</h2>
+  <p class="sec-desc">这是设计方案与可交互原型，尚未改动线上 <code>server/static/</code>。建议按下面三步接入现有 Vue 应用。</p>
+  <div class="grid3">
+   <div class="card"><h3 style="margin-top:0">① 先换设计系统</h3><p>把本方案的语义 token 写进 <code>style.css</code> 的 <code>:root[data-theme]</code>，替换现有硬编码色值；组件类名沿用，视觉即可整体升级且不改逻辑。</p></div>
+   <div class="card"><h3 style="margin-top:0">② 再换创作台结构</h3><p>把 4 个 mode Tab 换成三种声音分组；在 <code>app.js</code> 增加 <code>group → mode/spk_id/voice_id/instruct_text</code> 的推导函数，其余请求字段保持不变。</p></div>
+   <div class="card"><h3 style="margin-top:0">③ 最后调整 IA 与播客</h3><p>结果区移到右侧常驻面板，侧栏底部诊断信息迁到系统状态页，主题按钮固定到顶栏；播客按 05B 的对照表逐项搬迁（加流程条、拆出全宽成品区、任务队列 / 播客列表两个独立分组、补任务详情面板），接口字段保持不变。</p></div>
+  </div>
+  <h3>验收清单</h3>
+  <div class="card"><ul class="check">
+   <li>7 个模型逐一切换，声音分组与高级设置项与第 08 节表格完全一致。</li>
+   <li>从「预置音色」切到只支持克隆的模型，界面自动纠正选择并给出原因说明。</li>
+   <li>所有禁用态都显示具体原因，用户无需猜测。</li>
+   <li>每种声音方式各完成一次真实合成，右侧能播放、下载、复用参数。</li>
+   <li>明暗主题下文本对比度均 ≥ 4.5:1，键盘可完成「输入 → 选声音 → 生成 → 播放」全流程。</li>
+   <li>720px / 460px 两个断点无横向滚动，主 CTA 仍可见可点。</li>
+   <li>启用「减少动态效果」后波形与过渡动画停止。</li>
+   <li>原有 41 例接口测试保持通过（UI 改造不应触碰请求契约）。</li>
+  </ul></div>
+  <div class="note"><b>交付物：</b><code>design/prototype.html</code>（可交互高保真原型，零外部依赖，双击即可打开）与 <code>design/ui-design-spec.html</code>（本方案）。原型中的音频为演示用合成音，不代表模型真实音质。</div>
+ </section>
+
+ <div class="footer">Voice Studio 界面设计方案 v1.3 · 基于 tts 项目 7 模型控制台现状 · 2026-11-12</div>
+</main>
+</div>
+<script>
+function toggle(){var d=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',d);try{localStorage.setItem('vs-theme',d)}catch(e){}}
+document.getElementById('theme-btn').addEventListener('click',toggle);
+document.getElementById('theme-btn2').addEventListener('click',toggle);
+var links=Array.from(document.querySelectorAll('#toc-nav a'));
+var secs=links.map(a=>document.querySelector(a.getAttribute('href')));
+function onScroll(){var y=window.scrollY+120,idx=0;secs.forEach((s,i)=>{if(s&&s.offsetTop<=y)idx=i});links.forEach((a,i)=>a.classList.toggle('active',i===idx))}
+window.addEventListener('scroll',onScroll,{passive:true});onScroll();
+</script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 # CosyVoice FastAPI 服务启动脚本 (Windows PowerShell)
-# 用法: powershell -ExecutionPolicy Bypass -File scripts\start.ps1 [-Port 8000] [-Model cosyvoice3|cosyvoice2]
+# 用法: powershell -ExecutionPolicy Bypass -File scripts\start.ps1 [-Port 8000] [-Model <模型key>]
+# -Model 支持: cosyvoice3 / cosyvoice2 / indextts2 / indextts25 / qwen3tts / qwen3tts_base / qwen3tts_design
+# 外部模型需先配置权重目录与解释器环境变量 (见 STARTUP.md)
 param(
     [int]$Port = 8000,
     [string]$Model = ""

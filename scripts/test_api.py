@@ -93,10 +93,24 @@ def _():
 def _():
     ms = requests.get(f"{BASE}/api/models").json()["models"]
     keys = {m["key"] for m in ms}
-    assert keys == {"cosyvoice3", "cosyvoice2"}, keys
+    expected = {"cosyvoice3", "cosyvoice2", "indextts2", "indextts25",
+                "qwen3tts", "qwen3tts_base", "qwen3tts_design"}
+    assert expected.issubset(keys), keys
     for m in ms:
-        assert set(m["modes"]) == {"sft", "zero_shot", "cross_lingual", "instruct"}
+        assert m["modes"] and set(m["modes"]) <= {"sft", "zero_shot", "cross_lingual", "instruct"}, m
+        if m["family"] == "cosyvoice":
+            assert set(m["modes"]) == {"sft", "zero_shot", "cross_lingual", "instruct"}
     return f"{len(ms)} models registered"
+
+
+@case("SYS-02B", "外部模型环境自检端点")
+def _():
+    r = requests.get(f"{BASE}/api/models/qwen3tts/doctor")
+    assert r.status_code == 200, f"expect 200, got {r.status_code}"
+    j = r.json()
+    for k in ("weights", "missing_files", "runtime", "dependencies"):
+        assert k in j, f"missing field: {k}"
+    return f"weights={j['weights']}, deps={j['dependencies']['ok']}"
 
 
 @case("SYS-03", "切换到不存在的模型 -> 422")
