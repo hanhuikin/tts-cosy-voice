@@ -97,5 +97,32 @@
     "sample_rate": 16000,
     "created_at": "2026-11-11T11:45:35",
     "file": "eb5b51e75f38.wav"
+  },
+  {
+    "id": "d2a0ebb1fda2",
+    "name": "示例男声",
+    "prompt_text": "希望你以后能够做的比我还好呦。",
+    "duration": 3.48,
+    "sample_rate": 16000,
+    "created_at": "2026-11-12T22:48:11",
+    "file": "d2a0ebb1fda2.wav"
+  },
+  {
+    "id": "e6cd9dcb9240",
+    "name": "温柔学姐",
+    "prompt_text": "您好,很高兴能为您提供配衣服务。选择您感兴趣的音色,让我们一起看起声音创作的奇幻之旅吧。",
+    "duration": 8.3940625,
+    "sample_rate": 16000,
+    "created_at": "2026-11-12T22:56:19",
+    "file": "e6cd9dcb9240.wav"
+  },
+  {
+    "id": "05c4d05b680d",
+    "name": "清脆少女生",
+    "prompt_text": "您好,很高兴能为您提供配衣服务。选择您感兴趣的音色,让我们一起看起声音创作的奇幻之旅吧",
+    "duration": 8.2663125,
+    "sample_rate": 16000,
+    "created_at": "2026-11-12T22:57:42",
+    "file": "05c4d05b680d.wav"
   }
 ]
