@@ -23,8 +23,11 @@ models/
 .env
 !.env.example
 
-# 运行时数据 (用户音频 + 数据库)
-server/data/
+# 运行时数据 (数据库 / 任务音频 / 播客成品 / 推流分片 / 大模型配置)
+# 例外: 音色参考音频随仓库分发 (约 3MB), 元数据见 server/data/voices/manifest.json;
+#       新克隆后执行 scripts/import_voices.py 导入。
+server/data/*
+!server/data/voices/
 server_run.log
 
 # IDE / 系统

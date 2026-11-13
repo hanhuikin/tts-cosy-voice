@@ -174,9 +174,24 @@ powershell -ExecutionPolicy Bypass -File scripts\start.ps1 -Port 8001 -Model ind
 ## 测试
 
 ```powershell
-.venv\Scripts\python.exe scripts\test_api.py          # 42 例接口测试
-.venv\Scripts\python.exe scripts\add_preset_voices.py # 导入开源预置音色
+.venv\Scripts\python.exe scripts\test_api.py            # 51 例接口回归
+.venv\Scripts\python.exe scripts\test_stream_push.py    # 流式播放 / 直播推流 12 例
+.venv\Scripts\python.exe scripts\test_model_matrix.py   # 7 模型逐个切换并合成
+.venv\Scripts\python.exe scripts\add_preset_voices.py   # 导入开源预置音色
 ```
+
+## 音色库随仓库分发
+
+`server/data/voices/` 下的参考音频（11 个，约 3MB）与 `manifest.json` 一起入库，
+换机器/新克隆后重建音色库：
+
+```powershell
+.venv\Scripts\python.exe scripts\import_voices.py           # 按 manifest 导入（已存在的 id 跳过）
+.venv\Scripts\python.exe scripts\import_voices.py --export  # 新增/改名音色后刷新 manifest 再提交
+```
+
+除 `voices/` 外的运行时数据（数据库、任务音频、播客成品、推流分片、`llm_config.json`）
+仍被 `.gitignore` 排除，不会入库。
 
 ## 说明
 

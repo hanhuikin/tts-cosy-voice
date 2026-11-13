@@ -1,0 +1,101 @@
+[
+  {
+    "id": "a5773ae24d54",
+    "name": "清新女生",
+    "prompt_text": "希望你以后能够做的比我还好呦。",
+    "duration": 3.48,
+    "sample_rate": 16000,
+    "created_at": "2026-11-10T16:06:12",
+    "file": "a5773ae24d54.wav"
+  },
+  {
+    "id": "b7f178a6560a",
+    "name": "自然男声EN",
+    "prompt_text": "Some call me nature, others call me mother nature.",
+    "duration": 5.3328125,
+    "sample_rate": 16000,
+    "created_at": "2026-11-11T09:19:11",
+    "file": "b7f178a6560a.wav"
+  },
+  {
+    "id": "8e4dc566a9db",
+    "name": "朗诵男声EN",
+    "prompt_text": "The north wind and the sun were disputing which was the stronger. When a traveler came along, wrapped in a warm cloak.",
+    "duration": 7.0625625,
+    "sample_rate": 16000,
+    "created_at": "2026-11-11T09:20:48",
+    "file": "8e4dc566a9db.wav"
+  },
+  {
+    "id": "5ba5212af6ec",
+    "name": "温柔女声EN",
+    "prompt_text": "Read for LibreVox.org by Amy Canig on July 23, 2011.",
+    "duration": 6.4,
+    "sample_rate": 16000,
+    "created_at": "2026-11-11T09:20:49",
+    "file": "5ba5212af6ec.wav"
+  },
+  {
+    "id": "d7b3e2e0a94d",
+    "name": "清亮女声EN",
+    "prompt_text": "The north wind and the sun were disputing, which was the stronger. On a traveler came along, wrapped in a warm cloak.",
+    "duration": 8.36,
+    "sample_rate": 16000,
+    "created_at": "2026-11-11T09:20:51",
+    "file": "d7b3e2e0a94d.wav"
+  },
+  {
+    "id": "2d31efc21331",
+    "name": "解说男声ZH",
+    "prompt_text": "在那之后完全收购那家公司，因此保持管理层的一致性，利益与即将加入家族的资产保持一致，这就是我们有时不买下全部的原因。",
+    "duration": 13.7496875,
+    "sample_rate": 16000,
+    "created_at": "2026-11-11T09:26:56",
+    "file": "2d31efc21331.wav"
+  },
+  {
+    "id": "dd4ee508d063",
+    "name": "太乙真人ZH",
+    "prompt_text": "对，这就是我万人敬仰的太乙真人。",
+    "duration": 6.76,
+    "sample_rate": 16000,
+    "created_at": "2026-11-11T09:26:56",
+    "file": "dd4ee508d063.wav"
+  },
+  {
+    "id": "1f80ee928256",
+    "name": "萝莉女",
+    "prompt_text": "Hey, hey, hey! What's up with you? If you don't eat the ice cream on the table, I'm going to lose it! Don't think I don't know you played games all night again last night! If you do this again next time, I'm going to be mad!",
+    "duration": 12.8,
+    "sample_rate": 16000,
+    "created_at": "2026-11-11T09:26:56",
+    "file": "1f80ee928256.wav"
+  },
+  {
+    "id": "b2a737786cc9",
+    "name": "电台男主播",
+    "prompt_text": "您好，很高兴能为您提供配音服务。选择您感兴趣的音色，让我们一起开启声音创作的奇幻之旅吧。",
+    "duration": 7.3375625,
+    "sample_rate": 16000,
+    "created_at": "2026-11-11T10:08:57",
+    "file": "b2a737786cc9.wav"
+  },
+  {
+    "id": "d72cb758ae14",
+    "name": "温柔学姐（温婉柔和,娓娓道来,亲切且富有感染力）",
+    "prompt_text": "您好，很高兴能为您提供配音服务。选择您感兴趣的音色，让我们一起开启声音创作的奇幻之旅吧。",
+    "duration": 8.3940625,
+    "sample_rate": 16000,
+    "created_at": "2026-11-11T10:34:40",
+    "file": "d72cb758ae14.wav"
+  },
+  {
+    "id": "eb5b51e75f38",
+    "name": "治愈博主（女，柔和,舒缓,治愈）",
+    "prompt_text": "晚上好，忙了一整天，辛苦了，先放松下来。听一听窗外的风声，让心情慢慢安静下来。",
+    "duration": 9.589875,
+    "sample_rate": 16000,
+    "created_at": "2026-11-11T11:45:35",
+    "file": "eb5b51e75f38.wav"
+  }
+]
