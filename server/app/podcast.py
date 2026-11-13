@@ -104,6 +104,45 @@ def parse_script(raw: str) -> list[dict]:
 
 # ---------- 逐句合成 ----------
 
+# 合成停止注册表: ep_id -> 待停标志 / 进行中的引擎 job 集合
+# 停止语义: 当前句在下一个 PCM 分块边界停止推理, 后续句子不再合成, 已合成部分落盘
+_synth_stop: set[str] = set()
+_synth_jobs: dict[str, set] = {}
+
+
+class SynthStopped(Exception):
+    """合成被用户停止 (区别于失败)。"""
+
+
+def request_synth_stop(ep_id: str) -> None:
+    _synth_stop.add(ep_id)
+    for job in _synth_jobs.get(ep_id, ()):  # 当前句的推理在分块边界停止
+        job.cancelled = True
+
+
+def _synth_stop_requested(ep_id: str) -> bool:
+    return ep_id in _synth_stop
+
+
+def _synth_clear_stop(ep_id: str) -> None:
+    _synth_stop.discard(ep_id)
+    _synth_jobs.pop(ep_id, None)
+
+
+def _synth_register(ep_id: str, job) -> None:
+    if ep_id:
+        _synth_jobs.setdefault(ep_id, set()).add(job)
+
+
+def _synth_unregister(ep_id: str, job) -> None:
+    if ep_id:
+        jobs = _synth_jobs.get(ep_id)
+        if jobs is not None:
+            jobs.discard(job)
+            if not jobs and not _synth_stop_requested(ep_id):
+                _synth_jobs.pop(ep_id, None)
+
+
 def episode_speakers(ep: dict) -> list[dict]:
     """剧集的说话人阵容: 优先 speakers_json; 旧数据从 voice_host/voice_guest 兼容构造。
     每项: {role: host|guest, name, desc, voice_id}。"""
@@ -176,45 +215,81 @@ def resolve_line_request(line: dict, speakers: list[dict]) -> TTSRequest:
     return req
 
 
-async def synth_line_pcm(req: TTSRequest) -> bytes:
-    """经引擎队列合成单句, 返回 int16 PCM。"""
+async def synth_line_pcm(req: TTSRequest, ep_id: str = None) -> bytes:
+    """经引擎队列合成单句, 返回 int16 PCM。ep_id 用于句内分块边界的停止检查。"""
     job = await engine.submit(req)
+    _synth_register(ep_id, job)
     parts: list[bytes] = []
-    async for kind, payload in engine.drain(job):
-        if kind == "chunk":
-            parts.append(payload)
-        elif kind == "error":
-            raise RuntimeError(payload)
+    try:
+        async for kind, payload in engine.drain(job):
+            if kind == "chunk":
+                if ep_id and _synth_stop_requested(ep_id):
+                    job.cancelled = True   # 让引擎在下一个分块边界停止推理
+                parts.append(payload)
+            elif kind == "cancelled":
+                raise SynthStopped("手动停止")
+            elif kind == "error":
+                raise RuntimeError(payload)
+    finally:
+        _synth_unregister(ep_id, job)
     return b"".join(parts)
+
+
+LINE_MARK = b"\x00LNSYNC\x00"   # 行边界同步标记: 仅在流式响应中下发, 前端剥除用于高亮当前轮; 不入 parts/落盘 WAV
 
 
 async def stream_episode_gen(ep_id: str):
     """本地流式合成 (与工作台一致的输出形态): WAV 头 + 逐句 PCM 分块;
-    播放器边播边收; 结束后完整 WAV 落盘为成品。"""
+    每句 PCM 前插入 8 字节行边界标记 (前端剥除, 不影响音频);
+    播放器边播边收; 结束后完整 WAV 落盘为成品, 并记录逐句采样偏移 (lines_meta)。"""
     ep = storage.get_episode(ep_id)
     lines = json.loads(ep["script_json"])
     speakers = episode_speakers(ep)
     yield wav_header(SAMPLE_RATE, 600 * SAMPLE_RATE)
     parts: list[bytes] = []
+    line_ends: list[int] = []   # 每句结束点的累计采样数 (与落盘 WAV 对应)
+    cum_bytes = 0
     done = 0
     status, error = "ok", None
     t0 = time.time()
     first_ms = None
+    job = None
     try:
         for line in lines:
+            if _synth_stop_requested(ep_id):
+                status, error = "stopped", "手动停止"
+                break
             req = resolve_line_request(line, speakers)
             job = await engine.submit(req)
-            async for kind, payload in engine.drain(job):
-                if kind == "chunk":
-                    parts.append(payload)
-                    if first_ms is None:
-                        first_ms = int((time.time() - t0) * 1000)
-                    yield payload
-                elif kind == "error":
-                    raise RuntimeError(payload)
+            _synth_register(ep_id, job)
+            line_start = cum_bytes
+            try:
+                yield LINE_MARK   # 标记下一句 PCM 的起点 (前端据此推算句边界采样偏移)
+                async for kind, payload in engine.drain(job):
+                    if kind == "chunk":
+                        if _synth_stop_requested(ep_id):
+                            job.cancelled = True   # 分块边界停止推理, 部分句子丢弃
+                            raise SynthStopped("手动停止")
+                        parts.append(payload)
+                        cum_bytes += len(payload)
+                        if first_ms is None:
+                            first_ms = int((time.time() - t0) * 1000)
+                        yield payload
+                    elif kind == "cancelled":
+                        raise SynthStopped("手动停止")
+                    elif kind == "error":
+                        raise RuntimeError(payload)
+            finally:
+                _synth_unregister(ep_id, job)
+                job = None
+            if cum_bytes > line_start:
+                line_ends.append(cum_bytes // 2)
             done += 1
             storage.update_episode(ep_id, progress=done)
-        status = "completed"
+        if status != "stopped":
+            status = "completed"
+    except SynthStopped as e:
+        status, error = "stopped", str(e)
     except asyncio.CancelledError:
         status, error = "failed", "client disconnected"
         raise
@@ -222,18 +297,30 @@ async def stream_episode_gen(ep_id: str):
         logger.exception("episode %s 本地流式失败", ep_id)
         status, error = "failed", f"{type(e).__name__}: {e}"
     finally:
+        if job is not None:
+            job.cancelled = True
+            _synth_unregister(ep_id, job)
+        _synth_clear_stop(ep_id)
         out = DATA_DIR / "podcasts" / f"{ep_id}.wav" if parts else None
         if parts:
             out.write_bytes(pcm_to_wav(parts, SAMPLE_RATE))
-        storage.update_episode(ep_id, status=status, error=error,
-                               file=str(out) if parts else None,
-                               duration=sum(len(p) for p in parts) / 2 / SAMPLE_RATE if parts else None,
-                               progress=done)
+        # 手动停止时最后一 partial 句的音频已入 WAV: 补记其结束点, 保证回放高亮到末尾仍对齐
+        if parts and cum_bytes and (not line_ends or line_ends[-1] < cum_bytes // 2):
+            line_ends.append(cum_bytes // 2)
+        update_kwargs = dict(status=status, error=error,
+                             file=str(out) if parts else None,
+                             duration=sum(len(p) for p in parts) / 2 / SAMPLE_RATE if parts else None,
+                             progress=done)
+        if line_ends:
+            update_kwargs["lines_meta"] = json.dumps({"ends": line_ends, "sr": SAMPLE_RATE})
+        storage.update_episode(ep_id, **update_kwargs)
         logger.info("episode %s 本地流式结束: %s, %d 句, %d bytes", ep_id, status, done, sum(len(p) for p in parts))
 
 
 async def synth_episode_final(ep_id: str) -> None:
-    """非流式: 逐句合成整段, 拼接为单 WAV 并落盘。后台任务。"""
+    """非流式: 逐句合成整段, 拼接为单 WAV 并落盘。后台任务。
+    停止: 已合成句子保留为部分成品 (status=stopped), 剩余句子不再合成。
+    lines_meta: 每句结束点的累计采样数 (与落盘 WAV 精确对应), 供前端播放时高亮当前轮对话。"""
     ep = storage.get_episode(ep_id)
     if not ep:
         return
@@ -241,25 +328,45 @@ async def synth_episode_final(ep_id: str) -> None:
     speakers = episode_speakers(ep)
     storage.update_episode(ep_id, status="synthesizing", progress=0, error=None)
     all_parts: list[bytes] = []
+    line_ends: list[int] = []
     done = 0
+    status, error = "completed", None
     try:
         for line in lines:
+            if _synth_stop_requested(ep_id):
+                status, error = "stopped", "手动停止"
+                break
             req = resolve_line_request(line, speakers)
-            pcm = await synth_line_pcm(req)
+            try:
+                pcm = await synth_line_pcm(req, ep_id=ep_id)
+            except SynthStopped:
+                status, error = "stopped", "手动停止"
+                break
             all_parts.append(pcm)
+            line_ends.append(sum(len(p) for p in all_parts) // 2)
             done += 1
             storage.update_episode(ep_id, progress=done)
-        wav = pcm_to_wav(all_parts, SAMPLE_RATE)
-        out = DATA_DIR / "podcasts" / f"{ep_id}.wav"
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_bytes(wav)
-        duration = sum(len(p) for p in all_parts) / 2 / SAMPLE_RATE
-        storage.update_episode(ep_id, status="completed", file=str(out),
-                               duration=round(duration, 2), progress=len(lines))
-        logger.info("episode %s final合成完成: %.1fs", ep_id, duration)
+        if status == "completed" or all_parts:
+            wav = pcm_to_wav(all_parts, SAMPLE_RATE) if all_parts else b""
+            out = DATA_DIR / "podcasts" / f"{ep_id}.wav"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            if all_parts:
+                out.write_bytes(wav)
+            duration = sum(len(p) for p in all_parts) / 2 / SAMPLE_RATE
+            storage.update_episode(ep_id, status=status, error=error,
+                                   file=str(out) if all_parts else None,
+                                   duration=round(duration, 2) if all_parts else None,
+                                   progress=done,
+                                   **({"lines_meta": json.dumps({"ends": line_ends, "sr": SAMPLE_RATE})}
+                                      if line_ends else {}))
+            logger.info("episode %s final合成结束: %s, %.1fs", ep_id, status, duration)
+        else:
+            storage.update_episode(ep_id, status=status, error=error, progress=done)
     except Exception as e:
         logger.exception("episode %s 合成失败", ep_id)
         storage.update_episode(ep_id, status="failed", error=f"{type(e).__name__}: {e}")
+    finally:
+        _synth_clear_stop(ep_id)
 
 
 # ---------- 推流 ----------

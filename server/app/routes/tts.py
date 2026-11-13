@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
@@ -15,6 +16,21 @@ from ..storage import TASKS_DIR, storage
 router = APIRouter()
 
 ESTIMATED_MAX_SECONDS = 600  # 流式 WAV 头里的占位时长
+
+# 进行中的推理 job (task_id -> Job): 供 /api/tasks/{id}/stop 置取消标志。
+# 请求收尾 (成功/失败/断开) 时移除; 推理线程在分块边界检查标志后真正停止。
+_active_jobs: dict[str, "object"] = {}
+
+
+def _release_job(task_id: str) -> None:
+    _active_jobs.pop(task_id, None)
+
+
+def _fail_stopped(task_id: str, sample_rate: int, infer_ms: int,
+                  first_ms: Optional[int], out_file: Optional[Path],
+                  duration: Optional[float]) -> None:
+    storage.finish_task(task_id, out_file, duration, sample_rate, "failed", "已停止", infer_ms, first_ms)
+    _release_job(task_id)
 
 
 def _resolve_prompt(spec: EngineSpec) -> None:
@@ -32,7 +48,7 @@ def _resolve_prompt(spec: EngineSpec) -> None:
 
 
 @router.post("/api/tts")
-async def tts(body: TTSRequest):
+async def tts(body: TTSRequest, request: Request):
     # pydantic 校验通过后转引擎内部 dataclass (含 prompt_wav 内部字段)
     spec = EngineSpec(**body.model_dump())
     _resolve_prompt(spec)
@@ -40,12 +56,16 @@ async def tts(body: TTSRequest):
     if err:
         raise HTTPException(400, err)
 
-    task_id = storage.create_task(spec)
+    # 前端可在 X-Client-Task-Id 预生成任务 id: 生成中即可凭它调用停止接口
+    client_tid = request.headers.get("x-client-task-id") or None
+    task_id = storage.create_task(spec, task_id=client_tid if client_tid else None)
     try:
         job = await engine.submit(spec)
     except QueueFullError:
         storage.finish_task(task_id, None, None, 0, "failed", "queue full", 0, None)
         raise HTTPException(429, f"server busy: inference queue is full (max {engine.status()['queue_max']})")
+    job.task_id = task_id
+    _active_jobs[task_id] = job
 
     sample_rate = engine.status()["sample_rate"] or 24000
 
@@ -59,16 +79,25 @@ async def _collect_response(job, task_id: str, spec: EngineSpec) -> Response:
     parts: list[bytes] = []
     t0 = time.time()
     status, error = "ok", None
+    cancelled = False
     async for kind, payload in engine.drain(job):
         if kind == "chunk":
             parts.append(payload)
+        elif kind == "cancelled":
+            status, error, cancelled = "failed", "已停止", True
+            break
         elif kind == "error":
             status, error = "failed", payload
             break
     sample_rate = job.sample_rate or 24000
     infer_ms = int((time.time() - t0) * 1000)
+    if cancelled:
+        # 排队即取消 / 推理完成后作废: 无成品落盘
+        _fail_stopped(task_id, sample_rate, infer_ms, None, None, None)
+        raise HTTPException(400, "已停止")
     if status != "ok" or not parts:
         storage.finish_task(task_id, None, None, sample_rate, status, error or "no audio produced", infer_ms, None)
+        _release_job(task_id)
         raise HTTPException(500, error or "no audio produced")
 
     wav = pcm_to_wav(parts, sample_rate)
@@ -76,6 +105,7 @@ async def _collect_response(job, task_id: str, spec: EngineSpec) -> Response:
     storage.finish_task(task_id, TASKS_DIR / f"{task_id}.wav", duration, sample_rate, "ok", None,
                         infer_ms, int((job.first_chunk_at - t0) * 1000) if job.first_chunk_at else None)
     (TASKS_DIR / f"{task_id}.wav").write_bytes(wav)
+    _release_job(task_id)
     return Response(
         content=wav,
         media_type="audio/wav",
@@ -102,6 +132,7 @@ def _stream_response(job, task_id: str, sample_rate: int) -> StreamingResponse:
         # 默认视为「客户端中途断开」: 生成器被取消/关闭时不会走到循环后,
         # 若把收尾写在循环之后, 任务会永远停在 running (播放器关页面即可复现)
         status, error = "failed", "client disconnected"
+        cancelled = False
         try:
             async for kind, payload in engine.drain(job):
                 if kind == "chunk":
@@ -110,6 +141,9 @@ def _stream_response(job, task_id: str, sample_rate: int) -> StreamingResponse:
                     if state["first_ms"] is None:
                         state["first_ms"] = int((time.time() - t0) * 1000)
                     yield payload
+                elif kind == "cancelled":
+                    status, error, cancelled = "failed", "已停止", True
+                    break
                 elif kind == "error":
                     status, error = "failed", payload
                     break
@@ -119,10 +153,21 @@ def _stream_response(job, task_id: str, sample_rate: int) -> StreamingResponse:
             duration = pcm_duration_seconds(total_bytes, sample_rate)
             infer_ms = int((time.time() - t0) * 1000)
             out_file = TASKS_DIR / f"{task_id}.wav" if parts else None
-            if status == "ok" and parts:
+            if cancelled:
+                # 已停止: 已收到的部分音频仍落盘, 任务标 failed/已停止
+                if parts:
+                    out_file.write_bytes(pcm_to_wav(parts, sample_rate))
+                _fail_stopped(task_id, sample_rate, infer_ms, state["first_ms"],
+                              out_file, duration if parts else None)
+            elif status == "ok" and parts:
                 out_file.write_bytes(pcm_to_wav(parts, sample_rate))
-            storage.finish_task(task_id, out_file, duration if parts else None,
-                                sample_rate, status, error, infer_ms, state["first_ms"])
+                storage.finish_task(task_id, out_file, duration if parts else None,
+                                    sample_rate, status, error, infer_ms, state["first_ms"])
+                _release_job(task_id)
+            else:
+                storage.finish_task(task_id, out_file, duration if parts else None,
+                                    sample_rate, status, error, infer_ms, state["first_ms"])
+                _release_job(task_id)
 
     return StreamingResponse(
         gen(),
@@ -133,6 +178,17 @@ def _stream_response(job, task_id: str, sample_rate: int) -> StreamingResponse:
             "Content-Disposition": f'inline; filename="{task_id}.wav"',
         },
     )
+
+
+# ---------- 停止生成 ----------
+@router.post("/api/tasks/{task_id}/stop")
+async def stop_task(task_id: str):
+    """停止进行中的合成: 排队中的直接跳过; 推理中的在下一个分块边界停止。"""
+    job = _active_jobs.get(task_id)
+    if job is None:
+        raise HTTPException(404, "任务不在进行中 (已完成、已停止或不存在)")
+    job.cancelled = True
+    return {"ok": True, "task_id": task_id, "stopping": True}
 
 
 # ---------- OpenAI 兼容端点 ----------

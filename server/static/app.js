@@ -44,10 +44,12 @@ class Player{
   }
   reset(){
     if(this.ctx){try{this.ctx.close()}catch(e){}this.ctx=null}
-    if(this.blobUrl){URL.revokeObjectURL(this.blobUrl);this.blobUrl=null}
+    if(this.blobUrl){staticWaveCache.delete(this.blobUrl);URL.revokeObjectURL(this.blobUrl);this.blobUrl=null}
     this.audio.pause();this.audio.removeAttribute('src');
     this.mode=null;this.aborter=null;this.parts=[];this.header=null;this.sampleRate=24000;
     this.playedSamples=0;this.totalSamples=0;this.peaks=[];this.rafId=null;this.nextTime=0;this.startTime=0;
+    this.segments=[];this.pendHandoff=false;this.holdEnd=false;this.view=null;
+    this.lineMarks=[];this.podEpId=null;this.lineMarkSr=24000;   // 逐句采样偏移(播客对话稿高亮对齐用)
     Object.assign(playerState,{active:false,playing:false,streaming:false,title:'',taskId:null,
       duration:0,position:0,firstMs:null,sampleRate:null});
     this.onTick();
@@ -63,8 +65,12 @@ class Player{
     if(this.ctx.state==='suspended')this.ctx.resume().catch(()=>{});
     return this.ctx;
   }
-  async startStream(resp,title,taskId){
-    this.reset();this.mode='stream';
+  async startStream(resp,title,taskId,extra){
+    this.reset();this.mode='stream';this.view=state.view||null;
+    if(extra){   // reset 会清空播客关联: 播客流式在 reset 后重新挂上 (标记数组按引用共享, 随流推进)
+      if(extra.podEpId)this.podEpId=extra.podEpId;
+      if(extra.lineMarks)this.lineMarks=extra.lineMarks;
+    }
     Object.assign(playerState,{active:true,streaming:true,title,taskId});
     this.ensureCtx();   // 同步创建: 与点击手势同一拍, 规避自动播放策略
     const reader=resp.body.getReader();this.aborter=reader;
@@ -84,6 +90,7 @@ class Player{
         this.startTime=ctx.currentTime+this.PREBUFFER;this.nextTime=this.startTime;this.startRaf();
       }
       this.nextTime=Math.max(this.nextTime,ctx.currentTime+this.PREBUFFER);
+      this.segments.push({t0:this.nextTime,s0:this.totalSamples});   // 调度段表: audiblePos 据此精确换算可听进度
       src.start(this.nextTime);this.nextTime+=audioBuf.duration;
       this.totalSamples+=samples;
       const step=Math.max(1,Math.floor(samples/12));
@@ -128,12 +135,55 @@ class Player{
     let off=44;for(const p of this.parts){full.set(p,off);off+=p.byteLength}
     const blob=new Blob([full],{type:'audio/wav'});
     this.blobUrl=URL.createObjectURL(blob);
-    this.audio.src=this.blobUrl;this.mode='file';
-    playerState.streaming=false;this.stopRaf();this.onTick();
+    this.audio.src=this.blobUrl;   // 成品 blob 先备好: 播完/重播/下载用, 不立即接管声音
+    playerState.streaming=false;
+    if(this.audibleRemaining()>0.15){   // 生成快于播放: 网络流收完但 WebAudio 队列还在播 → 保持流式播完再移交
+      this.pendHandoff=true;
+    }else{
+      this.handoffToFile(true);
+    }
+    this.onTick();
+  }
+  /* 流式真正播完 → 切 file 模式(blob 就绪)。ended=true: 进度定格 100%, 再按播放键从头重播;
+     关闭 AudioContext 后声音只由 audio 元素出, 避免双声源叠加 */
+  handoffToFile(ended){
+    if(this.ctx){try{this.ctx.close()}catch(e){}this.ctx=null}
+    this.mode='file';this.pendHandoff=false;this.holdEnd=!!ended;
+    playerState.streaming=false;
+    if(ended){playerState.position=playerState.duration;playerState.playing=false}
+    this.stopRaf();this.onTick();
+  }
+  audibleRemaining(){return this.mode==='stream'&&this.ctx?Math.max(0,this.totalSamples-this.audiblePos())/this.sampleRate:0}
+  /* 逐句偏移标记([{s:采样偏移,idx:句序}]): 播客流式由读流剥标记推算, 成品来自服务端 lines_meta。
+     sr = 标记的采样空间(服务端 24k)。file 模式必须用 lineMarkSr 换算 ——
+     decodeAudioData 会把音频重采样到设备率, this.sampleRate 被污染后不能用于标记比较 */
+  setLineMarks(marks,sr){this.lineMarkSr=sr||24000;this.lineMarks=(marks||[]).slice().sort((a,b)=>a.s-b.s)}
+  /* 当前可听位置落在第几句(采样偏移对齐, 与耳朵同步); 无标记或不属于播客播放返回 -1。
+     marks 是每句的起始采样点(第 0 句为 0): 已越过的起点数 - 1 = 正在播放的句序。
+     流式播完移交时 audio 元素从未真正播放(currentTime=0), 按 holdEnd 定格最后一句 */
+  currentLine(){
+    const m=this.lineMarks;if(!m.length)return -1;
+    if(this.mode==='file'&&this.holdEnd)return m.length-1;
+    const posSamples=this.mode==='stream'
+      ?this.audiblePos()
+      :(this.audio.currentTime||0)*this.lineMarkSr;
+    if(posSamples<=0)return -1;
+    let n=0;
+    for(const k of m){if(k.s<=posSamples)n++;else break}
+    return n-1;
+  }
+  /* 精确的「正在听见」的采样位置: 按调度段表映射 ctx 时间, 并扣除输出延迟;
+     断流重预缓冲插入的空窗不会让视觉进度超前耳朵 */
+  audiblePos(){
+    if(this.mode!=='stream'||!this.ctx)return 0;
+    const t=this.ctx.currentTime-(this.ctx.outputLatency||this.ctx.baseLatency||0);
+    let pos=0;
+    for(const sg of this.segments){if(t<sg.t0)break;pos=sg.s0+(t-sg.t0)*this.sampleRate}
+    return Math.min(Math.max(0,pos),this.totalSamples);
   }
   abortStream(){if(this.aborter){try{this.aborter.cancel()}catch(e){}}this.reset()}
   playFile(url,title,taskId){
-    this.reset();this.mode='file';
+    this.reset();this.mode='file';this.view=state.view||null;
     Object.assign(playerState,{active:true,title,taskId});
     this.audio.src=url;
     this.audio.play().then(()=>{playerState.playing=true;this.onTick()}).catch(()=>{});
@@ -143,19 +193,9 @@ class Player{
     },{once:true});
   }
   async decodePeaks(url){
-    try{
-      const ab=await(await fetch(url)).arrayBuffer();
-      const ctx=new (window.AudioContext||window.webkitAudioContext)();
-      const buf=await ctx.decodeAudioData(ab);ctx.close();
-      this.sampleRate=buf.sampleRate;playerState.sampleRate=buf.sampleRate;
-      const ch=buf.getChannelData(0);
-      const buckets=Math.min(220,Math.max(60,Math.floor(ch.length/400)));
-      const size=Math.max(1,Math.floor(ch.length/buckets));
-      this.peaks=[];
-      for(let b=0;b<buckets;b++){let peak=0;
-        for(let i=b*size;i<Math.min((b+1)*size,ch.length);i+=4)peak=Math.max(peak,Math.abs(ch[i]));
-        this.peaks.push(peak);}
-    }catch(e){/* 波形解码失败不影响播放 */}
+    const r=await decodeWavePeaks(url);
+    if(!r)return;   /* 波形解码失败不影响播放 */
+    this.sampleRate=r.sampleRate;playerState.sampleRate=r.sampleRate;this.peaks=r.peaks;
   }
   togglePlay(){
     if(this.mode==='stream'){
@@ -163,7 +203,7 @@ class Player{
       if(this.ctx.state==='running'){this.ctx.suspend();playerState.playing=false}
       else{this.ctx.resume();playerState.playing=true}
     }else if(this.audio.src){
-      if(this.audio.paused){this.audio.play();playerState.playing=true}
+      if(this.audio.paused){this.holdEnd=false;this.audio.play();playerState.playing=true}
       else{this.audio.pause();playerState.playing=false}
     }
     this.onTick();
@@ -172,8 +212,9 @@ class Player{
     const loop=()=>{
       if(!playerState.active){this.stopRaf();return}
       if(this.mode==='stream'&&this.ctx){   // ctx 创建前不得读 currentTime, 否则整条 rAF 链崩掉
-        playerState.position=Math.max(0,this.ctx.currentTime-this.startTime);
+        playerState.position=this.audiblePos()/this.sampleRate;
         playerState.playing=this.ctx.state==='running';
+        if(this.pendHandoff&&this.audibleRemaining()<=0.05)this.handoffToFile(true);
       }
       this.onTick();
       this.rafId=requestAnimationFrame(loop);
@@ -181,11 +222,124 @@ class Player{
     if(!this.rafId)loop();
   }
   stopRaf(){if(this.rafId){cancelAnimationFrame(this.rafId);this.rafId=null}}
+  /* 当前播放进度 → 波形渐变边界。stream 模式用可听位置(见 audiblePos, 与耳朵时序对齐);
+     file 模式用 audio 元素进度, holdEnd(流式自然播完移交)定格 100% */
+  draw(canvas){
+    /* 三处波形(#wave/#pod-wave/#pod-stream-wave)同时在 DOM, 只画当前视图可见的那块 */
+    canvas=canvas||[...document.querySelectorAll('.pb-wave-c')].find(c=>c.clientWidth>0&&c.clientHeight>0);
+    if(!canvas)return;
+    const total=Math.max(this.totalSamples,1);
+    const progress=this.mode==='stream'
+      ?Math.min(1,this.audiblePos()/total)
+      :(this.holdEnd?1:(this.audio.duration?this.audio.currentTime/this.audio.duration:0));
+    paintWave(canvas,this.peaks,progress);
+  }
+}
+/* ---------- 波形绘制(Player 与静态成品共用) ----------
+   canvas 峰值波形(移植自 main 分支): 已播放=蓝→青渐变圆角条, 未播放=暗灰;
+   peaks 按显示宽度重采样为固定条数(长音频条形不糊), 未就绪时用确定性伪峰值占位 */
+function paintWave(canvas,peaks,progress){
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.clientWidth,h=canvas.clientHeight;
+  if(!w||!h)return;
+  if(canvas.width!==Math.round(w*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr)}
+  const g=canvas.getContext('2d');
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,w,h);
+  if(!peaks||!peaks.length){
+    if(!Player.fakePeaks)Player.fakePeaks=Array.from({length:64},(_,i)=>.25+.45*Math.abs(Math.sin(i*1.7)+.3*Math.sin(i*.53)));
+    peaks=Player.fakePeaks;
+  }
+  const n=Math.max(40,Math.min(160,Math.round(w/4)));
+  let disp=peaks;
+  if(peaks.length>n){
+    disp=[];const size=peaks.length/n;
+    for(let b=0;b<n;b++){let m=0;
+      const a=Math.floor(b*size),z=Math.max(a+1,Math.floor((b+1)*size));
+      for(let j=a;j<z;j++)m=Math.max(m,peaks[j]||0);
+      disp.push(m);}
+  }
+  const barW=Math.max(2,w/n-1);
+  for(let i=0;i<n;i++){
+    const x=(i/n)*w;
+    const amp=Math.max(.06,Math.min(1,disp[i]));
+    const bh=amp*(h-6);
+    const played=(i/n)<=progress;
+    if(played){
+      const grad=g.createLinearGradient(x,0,x,h);
+      grad.addColorStop(0,'#4f8cff');grad.addColorStop(1,'#22d3ee');
+      g.fillStyle=grad;
+    }else{
+      g.fillStyle=document.documentElement.dataset.theme==='light'?'#c9d3e4':'#3a465e';
+    }
+    g.beginPath();
+    const r=Math.min(barW/2,2);
+    g.roundRect(x,(h-bh)/2,barW,bh,r);
+    g.fill();
+  }
+}
+/* 成品(未在播放时)的静态波形: 按音频地址解码并缓存, 进度 0 全灰展示 */
+const staticWaveCache=new Map();
+function decodeWavePeaks(url){
+  if(!staticWaveCache.has(url)){
+    const p=(async()=>{try{
+      const ab=await(await fetch(url)).arrayBuffer();
+      // 按 WAV 头的真实采样率建解码上下文: decodeAudioData 会重采样到上下文率,
+      // 不固定的话 peaks 的时间轴和 player.sampleRate 都会被设备率(44.1k/48k)污染
+      let rate=0;try{rate=new DataView(ab).getUint32(24,true)}catch(e){}
+      const ctx=new (window.AudioContext||window.webkitAudioContext)(rate?{sampleRate:rate}:{});
+      const buf=await ctx.decodeAudioData(ab);ctx.close();
+      const ch=buf.getChannelData(0);
+      const buckets=Math.min(220,Math.max(60,Math.floor(ch.length/400)));
+      const size=Math.max(1,Math.floor(ch.length/buckets));
+      const peaks=[];
+      for(let b=0;b<buckets;b++){let peak=0;
+        for(let i=b*size;i<Math.min((b+1)*size,ch.length);i+=4)peak=Math.max(peak,Math.abs(ch[i]));
+        peaks.push(peak);}
+      return{peaks,sampleRate:buf.sampleRate};
+    }catch(e){return null}})();
+    staticWaveCache.set(url,p);
+    if(staticWaveCache.size>24){const k=staticWaveCache.keys().next().value;staticWaveCache.delete(k)}
+  }
+  return staticWaveCache.get(url);
+}
+let staticWaveSeq=0;
+async function drawStaticWave(canvas,url){
+  const seq=++staticWaveSeq;
+  const r=await decodeWavePeaks(url);
+  if(seq!==staticWaveSeq)return;                                  // 已有更新的绘制请求
+  if(!canvas.isConnected||!canvas.clientWidth)return;             // 画布已被重渲染替换
+  if(player&&playerState.active&&player.view===state.view)return; // 播放已接管波形
+  paintWave(canvas,r?r.peaks:null,0);
+}
+/* 当前视图的波形画什么: 播放中→player 实时进度; 否则若有成品音频→静态解码真实波形 */
+function drawVisibleWave(){
+  const canvas=[...document.querySelectorAll('.pb-wave-c')].find(c=>c.clientWidth>0&&c.clientHeight>0);
+  if(!canvas)return;
+  if(player&&playerState.active&&player.view===state.view){player.draw(canvas);return}
+  const url=staticWaveUrl();
+  if(url)drawStaticWave(canvas,url);
+  else paintWave(canvas,null,0);
+}
+function staticWaveUrl(){
+  if(state.view==='workbench')
+    return state.result&&state.result.taskId?`/api/tasks/${state.result.taskId}/audio`:null;
+  if(state.view==='podcast'){
+    if(pod.outTab!=='final')return null;
+    return podSynthDone()?`/api/podcast/episodes/${pod.episode.id}/audio`:null;
+  }
+  return null;
 }
 let player=null;
 function onPlayerTick(){
   if(state.view==='workbench'&&state.result)syncPlayer();
   if(state.view==='podcast'&&(pod.outTab==='final'||pod.outTab==='stream'))updatePodWaveLive();
+  /* 对话稿播放跟随: 当前句号变化才更新高亮/滚动 */
+  if(state.view==='podcast'){
+    const li=player&&player.podEpId&&player.podEpId===(pod.episode&&pod.episode.id)?player.currentLine():-1;
+    if(li!==pod.playLine){pod.playLine=li;updatePodLineHighlight()}
+  }
+  drawVisibleWave();
 }
 
 /* ================= API ================= */
@@ -240,7 +394,8 @@ const TITLES={workbench:['创作台','把文字变成声音'],podcast:['播客�
 
 const state={view:'workbench',model:'cosyvoice3',modelTouched:false,group:'preset',pick:null,
   text:'',designText:'',refText:'',speed:1,lang:'',stream:false,instruct:'',
-  busy:false,previewBusy:false,genProg:0,result:null,menu:false,tasks:[],filter:'全部',bars:[]};
+  busy:false,previewBusy:false,genProg:0,result:null,menu:false,tasks:[],filter:'全部',bars:[],
+  genTaskId:null,genAbort:null,genStopping:false};
 state.bars=Array.from({length:40},(_,i)=>18+Math.round(Math.abs(Math.sin(i*1.7)*Math.cos(i*.43))*32));
 const voices=[];
 const vlib={file:null,name:'',prompt:'',busy:false,error:'',drag:false,peaks:[],
@@ -250,13 +405,14 @@ const vlib={file:null,name:'',prompt:'',busy:false,error:'',drag:false,peaks:[],
 const pod={
   src:'text',text:'',url:'',fileName:'',fileRaw:null,
   extractText:'',extractChars:0,extracting:false,sourceError:'',
+  extracted:false,extractText0:'',extractDirty:false,
   lines:[],speakers:[
     {role:'host',name:'主播',desc:'',voice_id:''},
     {role:'guest',name:'嘉宾1',desc:'',voice_id:''},
   ],
   speed:1,genning:false,genRaw:'',editLine:-1,editText:'',
-  outTab:'final',protocol:'rtmp',pushOn:false,pushUrl:'',pushing:false,pushStatus:'',
-  busyFinal:false,busyStream:false,busySince:0,progress:0,stopRequested:'',
+    outTab:'final',protocol:'rtmp',pushOn:false,pushUrl:'',pushing:false,pushStatus:'',playLine:-1,
+  busyFinal:false,busyStream:false,busySince:0,progress:0,stopRequested:'',stopping:false,
   episode:null,episodes:[],confirmDel:null,detail:null,detailOpen:false,ffmpeg:true,
   confirmPushOff:false,
 };
@@ -482,7 +638,7 @@ function renderOutput(){
   if(state.view!=='workbench')return;
   if(state.busy){
     setPill('busy','生成中');
-    $('#out-body').innerHTML=`<div class="result-card"><p class="result-title">正在合成…</p><div class="result-meta">${esc(model()?model().label:'')} · 排队与推理中</div><div class="progress-track"><div class="progress-fill" id="gen-progress" style="width:12%"></div></div><div class="times"><span>首次加载模型会稍慢</span><span>请稍候</span></div></div>`;
+    $('#out-body').innerHTML=`<div class="result-card"><p class="result-title">${state.genStopping?'正在停止…':'正在合成…'}</p><div class="result-meta">${esc(model()?model().label:'')} · 排队与推理中</div><div class="progress-track"><div class="progress-fill" id="gen-progress" style="width:12%"></div></div><div class="times"><span>首次加载模型会稍慢</span><span>${state.genStopping?'推理将在分块边界停止':'<button class="chip" data-act="gen-stop" style="color:var(--danger)">■ 停止生成</button>'}</span></div></div>`;
     return;
   }
   if(!state.result){
@@ -492,10 +648,10 @@ function renderOutput(){
     return;
   }
   setPill('ok','已完成');
-  const r=state.result,bars=peaksToBars(40).map((h,i)=>`<span class="bar" style="--h:${h}px;--d:${(i%9)*.07}s"></span>`).join('');
+  const r=state.result;
   $('#out-body').innerHTML=`<div class="result-card">
    <p class="result-title">${esc(r.title)}</p><div class="result-meta">${esc(r.model)} · ${esc(r.voice)} · ${esc(r.time)}</div>
-   <div class="wave ${playerState.playing?'playing':''}" id="wave"><div class="wave-progress" id="wave-progress"></div>${bars}</div>
+   <canvas class="pb-wave-c" id="wave" style="height:44px"></canvas>
    <div class="times"><span id="t-cur">${fmt(playerState.position)}</span><span>${fmt(playerState.duration||r.dur)}</span></div>
    <div class="player-ctrl"><button class="play-main" data-act="play" aria-label="播放或暂停">${icon(playerState.playing?'pause':'play','ic sm')}</button>
     <button class="mini-btn" data-act="download" title="下载 WAV">${icon('down','ic sm')}</button>
@@ -505,13 +661,9 @@ function renderOutput(){
 }
 function syncPlayer(){
   const r=state.result;if(!r||state.view!=='workbench')return;
-  const dur=playerState.duration||r.dur||0;
-  const p=dur?Math.min(100,playerState.position/dur*100):0;
-  const wp=$('#wave-progress');if(wp){wp.style.setProperty('--p',p+'%')}
   const cur=$('#t-cur');if(cur)cur.textContent=fmt(playerState.position);
-  const wave=$('#wave');if(wave)wave.classList.toggle('playing',playerState.playing);
   const playBtn=$('[data-act="play"]');if(playBtn)playBtn.innerHTML=icon(playerState.playing?'pause':'play','ic sm');
-  const bars=$$('#wave .bar');bars.forEach((b,i)=>b.classList.toggle('done',i/40*100<=p));
+  drawVisibleWave();
 }
 function renderRecent(){
   const items=state.tasks.slice(0,4);
@@ -857,20 +1009,28 @@ function renderPodStepper(){
 }
 function renderPodSource(){
   const tabs=[['text','粘贴文本'],['file','上传文件'],['url','网页链接']];
+  const prev=pod.extracted?(()=>{
+    const over=pod.extractChars>20000;
+    return`<div class="extract-prev">
+     <div class="extract-prev-head"><span>正文预览 · 可编辑 · <b id="pod-extract-chars"${over?' class="over"':''}>${pod.extractChars}</b> 字</span>
+      <button class="chip" data-act="pod-extract-reset" ${pod.extractDirty?'':'disabled'} title="放弃编辑，恢复为抓取的原始内容">还原</button></div>
+     <textarea class="extract-prev-edit" id="pod-src-extract" spellcheck="false" placeholder="可直接编辑：删除广告、口播提示等不合适的内容，编辑结果就是成稿内容。">${esc(pod.extractText)}</textarea></div>`;
+  })():'';
   let body='';
   if(pod.src==='text'){
     body=`<textarea class="textarea" id="pod-src-text" style="font-size:12.5px" placeholder="粘贴文章、会议记录、学习笔记…&#10;文章 / 文件 / 链接决定节目内容；可直接朗读，也可按主持阵容改写成多轮多人对话。">${esc(pod.text)}</textarea>`;
   }else if(pod.src==='file'){
     body=`<div class="dropzone" data-act="pod-file"><input type="file" id="pod-file-input" accept=".txt,.md,.pdf,.docx" hidden><b>${pod.fileName?esc(pod.fileName):'点击或拖拽文件到这里'}</b>${pod.fileName?(pod.extractChars?`已提取 ${pod.extractChars} 字正文`:(pod.extracting?'解析中…':'点击开始解析')):'支持 txt / md / pdf / docx · ≤ 20 MB'}</div>
+     ${prev}
      ${pod.sourceError?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>${esc(pod.sourceError)}</span></div>`:''}`;
   }else{
     body=`<div style="display:flex;gap:8px"><input class="input" id="pod-src-url" value="${esc(pod.url)}" placeholder="https:// 文章页面地址"><button class="btn" data-act="pod-url-extract" ${pod.extracting?'disabled':''}>${pod.extracting?'抓取中…':'抓取'}</button></div>
-     ${pod.extractChars?`<p class="chip-label" style="margin-top:9px">✓ 已提取 ${pod.extractChars} 字正文，可直接生成对话稿</p>`:''}
+     ${prev}
      ${pod.sourceError?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>${esc(pod.sourceError)}</span></div>`:''}`;
   }
   const counter=pod.src==='text'?`${pod.text.length} / 20000`:(pod.extractChars?`已提取 ${pod.extractChars} 字`:'待导入');
   $('#pod-source').innerHTML=`
-   <div class="pcol-head"><span class="step">1</span><h3>内容源</h3><span class="spacer"></span><span class="tag">${esc(counter)}</span></div>
+   <div class="pcol-head"><span class="step">1</span><h3>内容源</h3><span class="spacer"></span><span class="tag" id="pod-src-counter">${esc(counter)}</span></div>
    <p class="pcol-sub">文章、文件或链接，决定节目讲什么</p>
    <div class="src-scroll">
     <div class="src-tabs">${tabs.map(([k,n])=>`<button class="${pod.src===k?'active':''}" data-act="pod-src" data-key="${k}">${n}</button>`).join('')}</div>
@@ -888,7 +1048,7 @@ function renderPodScript(){
     const isHost=l.role==='host';
     const editing=pod.editLine===i;
     const opt=`<select data-line="${i}" aria-label="切换该行说话人">${pod.speakers.map((s,j)=>`<option value="${j}" ${s.name===l.name?'selected':''}>${esc(spkVoiceLabel(s))}</option>`).join('')}</select>`;
-    return`<div class="dlg ${isHost?'':'guest'}">
+    return`<div class="dlg ${isHost?'':'guest'} ${pod.playLine===i?'line-playing':''}" data-line="${i}">
      <span class="avatar a${isHost?1:2}" style="width:30px;height:30px;font-size:11px">${esc((l.name||'?').slice(0,1))}</span>
      <div class="dlg-body"><div class="dlg-who"><span class="tag ${isHost?'pri':'acc'}">${isHost?'主播':'嘉宾'}</span>${opt}<span class="spacer"></span>
       <button class="mini-btn" style="width:26px;height:26px" data-act="pod-line-edit" data-i="${i}" title="编辑">${icon('copy','ic sm')}</button>
@@ -903,6 +1063,13 @@ function renderPodScript(){
    ${pod.genning?genning:(pod.lines.length?`<div class="dlg-list">${rows}</div>`:`<div class="out-empty" style="padding:26px 12px"><div class="wave-static">${waveBars(20).map(h=>`<i style="--h:${Math.max(6,h*.5)}px"></i>`).join('')}</div><p>还没有对话稿</p><span>完成左侧内容源后点「直接朗读」或「大模型改写」</span></div>`)}
    ${pod.genning?'':`<button class="btn sec" style="width:100%;margin-top:8px" data-act="pod-line-add">${icon('plus','ic sm')} 插入一轮对话</button>
    <button class="btn sec" style="width:100%;margin-top:8px" data-act="pod-save">${icon('down','ic sm')} 保存剧集</button>`}`;
+  updatePodLineHighlight();   // 重渲染后恢复当前播放轮的高亮
+}
+/* 对话稿播放跟随: 高亮当前播放轮, 并在其离开可视区时滚动跟随(每次句号变化才调用) */
+function updatePodLineHighlight(){
+  const rows=document.querySelectorAll('#pod-script-col .dlg-list .dlg');
+  rows.forEach((el,i)=>el.classList.toggle('line-playing',i===pod.playLine));
+  if(pod.playLine>=0&&rows[pod.playLine])rows[pod.playLine].scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 function renderPodCast(){
   const c=caps();
@@ -937,13 +1104,14 @@ function renderPodOutput(){
      <p style="font-size:13px;margin:0 0 4px"><strong>整段合成，音质最稳</strong></p>
      <p style="font-size:12px;color:var(--text-3);margin:0">逐句合成后拼成一条音轨，完成后自动归档为剧集，可试听与下载。</p>
      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn sec" data-act="pod-synth" ${pod.lines.length&&!busy&&!pod.busyStream?'':'disabled'}>${busy?`合成中 ${pod.progress||0}/${pod.lines.length}`:'合成播客成品'}</button>
+      <button class="btn sec" data-act="pod-synth-stop" ${busy&&!pod.stopping?'':'disabled'}>${pod.stopping?'停止中…':'■ 停止'}</button>
       <button class="btn sec" data-act="pod-play" ${done?'':'disabled'}>${icon('play','ic sm')}试听</button>
       <button class="btn sec" data-act="pod-download" ${done?'':'disabled'}>${icon('down','ic sm')}下载 WAV</button></div>
      ${!pod.lines.length?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>请先生成或载入对话稿，才能合成成品。</span></div>`:''}
     </div><div>
      <div class="result-card"><p class="result-title">${pod.episode?esc(pod.episode.title):'当前剧集尚未合成'}</p>
       <div class="result-meta">${pod.lines.length} 轮 · ${done&&pod.episode&&pod.episode.duration?pod.episode.duration.toFixed(1)+' 秒 · ':''}24 kHz WAV</div>
-      <div class="wave ${podPlayingEp()?'playing':''}" style="height:44px" id="pod-wave"><div class="wave-progress" id="pod-wave-progress"></div>${peaksToBars(34).map(h=>`<span class="bar ${done?'done':''}" style="--h:${Math.max(6,h*.7)}px"></span>`).join('')}</div>
+      <canvas class="pb-wave-c" id="pod-wave" style="height:44px"></canvas>
       ${busy?`<div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><div class="times"><span>正在合成第 ${pod.progress||0} / ${pod.lines.length} 句</span><span>请稍候</span></div>`
         :`<div class="times"><span id="pod-t-cur">${podPlayingEp()?fmt(playerState.position):'0:00'}</span><span>${done&&pod.episode&&pod.episode.duration?fmt(pod.episode.duration):'—'}</span></div>`}
      </div></div></div>`;
@@ -953,6 +1121,7 @@ function renderPodOutput(){
      <p style="font-size:13px;margin:0 0 4px"><strong>逐句合成，边生成边播放</strong></p>
      <p style="font-size:12px;color:var(--text-3);margin:0">2.5 秒预缓冲后开始播放，适合先听效果再决定是否导出成品；完成后同样自动保存。</p>
      <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap"><button class="btn btn-primary" data-act="pod-stream" ${pod.lines.length&&!pod.busyStream&&!pod.busyFinal?'':'disabled'}>${pod.busyStream?'流式合成中…':'流式合成并播放'}</button>
+     <button class="btn sec" data-act="pod-stream-stop" ${pod.busyStream&&!pod.stopping?'':'disabled'}>${pod.stopping?'停止中…':'■ 停止'}</button>
      <span class="tag">2.5s 预缓冲</span><span class="tag">非流式成品仍可下载</span></div>
      ${pod.busyStream?`<div class="notice" style="margin-top:10px">${icon('info','ic sm')}<span id="pod-stream-notice-text">${playerState.firstMs?`正在播放 · 首包 ${playerState.firstMs} ms`
         :caps().stream?`正在合成首句，${esc(model()?model().label:'当前模型')} 逐块下发，首包到达即开始播放`
@@ -961,7 +1130,7 @@ function renderPodOutput(){
     </div><div>
      <div class="result-card"><p class="result-title">${pod.busyStream?'流式播放中':(done?'流式播放完成 · 已归档':'尚未开始流式播放')}</p>
       <div class="result-meta" id="pod-stream-meta">${pod.lines.length} 轮 · 24 kHz WAV${playerState.firstMs?` · 首包 ${playerState.firstMs} ms`:''}${pod.busyStream&&!playerState.firstMs?' · 等待首包…':''}</div>
-      <div class="wave ${playerState.playing?'playing':''}" style="height:44px" id="pod-stream-wave"><div class="wave-progress" id="pod-stream-wave-progress"></div>${peaksToBars(34).map(h=>`<span class="bar" style="--h:${Math.max(6,Math.round(h*.7))}px"></span>`).join('')}</div>
+      <canvas class="pb-wave-c" id="pod-stream-wave" style="height:44px"></canvas>
       <div class="times"><span id="pod-stream-t-cur">${fmt(playerState.position)}</span><span id="pod-stream-t-dur">${pod.busyStream&&!playerState.duration?'合成中…':(playerState.duration?fmt(playerState.duration):'—')}</span></div>
      </div></div></div>`;
   }else{
@@ -986,6 +1155,7 @@ function renderPodOutput(){
    <div class="pcol-head"><span class="step">4</span><h3>成品与发布</h3><span class="spacer"></span><span class="chip-label">合成进度与推流状态在这里统一查看，不用再滚动长侧栏</span></div>
    <div class="out-tabs">${tabs.map(([k,n])=>`<button class="${pod.outTab===k?'active':''}" data-act="pod-out-tab" data-key="${k}">${n}</button>`).join('')}</div>
    ${body}`;
+  drawVisibleWave();   // 新画布立即出波形: 播放中走实时进度, 未播放时解码成品静态波形
 }
 function pushInfo(){
   const pushing=pod.episodes.find(e=>e.status==='pushing'&&e.push);
@@ -999,31 +1169,15 @@ function podPlayingEp(){
     RegExp.$1===(pod.episode&&pod.episode.id);
 }
 function updatePodWaveLive(){
-  const wp=$('#pod-wave-progress');if(wp)wp.style.setProperty('--p',(playerState.duration?Math.min(100,playerState.position/playerState.duration*100):0)+'%');
   const cur=$('#pod-t-cur');if(cur)cur.textContent=fmt(playerState.position);
-  const wave=$('#pod-wave');if(wave)wave.classList.toggle('playing',playerState.playing);
-  /* 流式播放 Tab: 波形随收到的 PCM 实时生长 */
-  const sw=$('#pod-stream-wave');
-  if(sw){
-    sw.classList.toggle('playing',playerState.playing);
-    const swp=$('#pod-stream-wave-progress');
-    if(swp)swp.style.setProperty('--p',(playerState.duration?Math.min(100,playerState.position/playerState.duration*100):0)+'%');
-    const bars=sw.querySelectorAll('.bar');
-    const peaks=(player&&player.peaks)||[];
-    if(bars.length&&peaks.length){
-      bars.forEach((b,i)=>{
-        const v=peaks[Math.min(peaks.length-1,Math.floor(i/bars.length*peaks.length))]||0;
-        b.style.setProperty('--h',Math.max(6,Math.round(Math.min(1,v)*31))+'px');
-      });
-    }
-    const sc=$('#pod-stream-t-cur');if(sc)sc.textContent=fmt(playerState.position);
-    const sd=$('#pod-stream-t-dur');
-    if(sd)sd.textContent=playerState.streaming&&!playerState.duration?'合成中…':(playerState.duration?fmt(playerState.duration):'—');
-    const sm=$('#pod-stream-meta');
-    if(sm)sm.innerHTML=`${pod.lines.length} 轮 · 24 kHz WAV${playerState.firstMs?` · 首包 ${playerState.firstMs} ms`:''}${playerState.streaming&&!playerState.firstMs?' · 等待首包…':''}`;
-    const nt=$('#pod-stream-notice-text');
-    if(nt&&playerState.firstMs)nt.textContent=`正在播放 · 首包 ${playerState.firstMs} ms`;
-  }
+  const sc=$('#pod-stream-t-cur');if(sc)sc.textContent=fmt(playerState.position);
+  const sd=$('#pod-stream-t-dur');
+  if(sd)sd.textContent=playerState.streaming&&!playerState.duration?'合成中…':(playerState.duration?fmt(playerState.duration):'—');
+  const sm=$('#pod-stream-meta');
+  if(sm)sm.innerHTML=`${pod.lines.length} 轮 · 24 kHz WAV${playerState.firstMs?` · 首包 ${playerState.firstMs} ms`:''}${playerState.streaming&&!playerState.firstMs?' · 等待首包…':''}`;
+  const nt=$('#pod-stream-notice-text');
+  if(nt&&playerState.firstMs)nt.textContent=`正在播放 · 首包 ${playerState.firstMs} ms`;
+  /* 波形由 player.draw() 统一绘制(onPlayerTick 每帧调用) */
 }
 
 /* POD_BADGE: draft 存稿 / busy 合成中·推流中 / ok 已完成 / err 失败 (v1.6 单色系) */
@@ -1147,21 +1301,23 @@ function refreshPod(){renderPod();if(state.view==='podcast')renderPodEpisodes()}
 /* ---- 播客: 内容源 ---- */
 async function extractPodUrl(){
   if(!pod.url.trim()){toast('先填写网页链接',true);return}
-  pod.extracting=true;pod.sourceError='';pod.extractText='';renderPodSource();renderPodStepper();
+  pod.extracting=true;pod.sourceError='';pod.extractText='';pod.extracted=false;renderPodSource();renderPodStepper();
   try{
     const j=await(await api('/api/podcast/source/extract',{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:pod.url})})).json();
     pod.extractText=j.text;pod.extractChars=j.chars;
+    pod.extracted=true;pod.extractText0=j.text;pod.extractDirty=false;
     toast(`网页正文抓取完成，已提取 ${j.chars} 字`);
   }catch(e){pod.sourceError=e.message;}
   finally{pod.extracting=false;renderPodSource();renderPodStepper();}
 }
 async function extractPodFile(){
-  pod.extracting=true;pod.sourceError='';renderPodSource();
+  pod.extracting=true;pod.sourceError='';pod.extracted=false;renderPodSource();
   try{
     const fd=new FormData();fd.append('file',pod.fileRaw);
     const j=await(await api('/api/podcast/source/extract',{method:'POST',body:fd})).json();
     pod.extractText=j.text;pod.extractChars=j.chars;
+    pod.extracted=true;pod.extractText0=j.text;pod.extractDirty=false;
     toast(`已解析文件，提取 ${j.chars} 字正文`);
   }catch(e){pod.sourceError=e.message;pod.extractChars=0;}
   finally{pod.extracting=false;renderPodSource();renderPodStepper();}
@@ -1285,7 +1441,7 @@ async function loadEpisode(id){
 /* ---- 播客: 合成 (成品 / 流式) ---- */
 async function synthPodFinal(){
   if(!pod.lines.length||pod.busyFinal||pod.busyStream)return;
-  pod.busyFinal=true;pod.busySince=Date.now();pod.progress=0;
+  pod.busyFinal=true;pod.busySince=Date.now();pod.progress=0;pod.stopping=false;
   try{
     await saveEpisode(true);
     await api(`/api/podcast/episodes/${pod.episode.id}/synthesize`,{
@@ -1297,9 +1453,55 @@ async function synthPodFinal(){
     toast('合成启动失败: '+e.message,true,6000);
   }
 }
+/* 播客流式响应: 服务端在每句 PCM 前插入 8 字节行边界标记(\x00LNSYNC\x00)。
+   这里边读边剥出干净 PCM 流交给播放器, 标记位置换算成采样偏移追加进 marks ——
+   播放中的对话稿高亮据此与可听音频逐句对齐 */
+const POD_LINE_MARK=[0x00,0x4C,0x4E,0x53,0x59,0x4E,0x43,0x00];
+async function podMarkedStream(resp,marks){
+  const src=resp.body.getReader();
+  const out=new ReadableStream({
+    async start(ctrl){
+      let buf=new Uint8Array(0),clean=0;   // clean: 已输出的干净 PCM 字节数
+      const n=POD_LINE_MARK.length;
+      const push=u8=>{if(u8.length){ctrl.enqueue(u8);clean+=u8.length}};
+      while(true){
+        const{done,value}=await src.read();
+        if(done)break;
+        const merged=new Uint8Array(buf.length+value.length);
+        merged.set(buf);merged.set(value,buf.length);buf=merged;
+        let from=0,i=0;
+        while(i<=buf.length-n){
+          let hit=true;
+          for(let k=0;k<n;k++)if(buf[i+k]!==POD_LINE_MARK[k]){hit=false;break}
+          if(hit){
+            push(buf.slice(from,i));
+            marks.push({s:Math.floor(clean/2),idx:marks.length});   // 标记处=下一句 PCM 的采样起点
+            from=i+=n;
+          }else i++;
+        }
+        const keep=Math.min(n-1,buf.length-from);   // 留出可能被截断的标记尾巴
+        push(buf.slice(from,buf.length-keep));
+        buf=buf.slice(buf.length-keep);
+      }
+      push(buf);
+      ctrl.close();
+    }
+  });
+  return{body:out};
+}
+/* 成品逐句偏移(lines_meta) → 高亮标记; 句数与当前对话稿不一致(合成后又改过稿)则放弃对齐。
+   服务端存的是每句结束点 ends, 这里转成每句起点 [0, e0, e1, ...] —— 与流内标记同一语义。
+   返回 {marks, sr}; 无可用标记返回 null */
+function podLineMarks(ep){
+  if(!ep||!ep.lines_meta)return null;
+  let meta;try{meta=typeof ep.lines_meta==='string'?JSON.parse(ep.lines_meta):ep.lines_meta}catch(e){return null}
+  if(!meta||!Array.isArray(meta.ends)||!meta.ends.length)return null;
+  if(pod.lines.length&&meta.ends.length!==pod.lines.length)return null;
+  return{marks:[0,...meta.ends.slice(0,-1)].map((s,i)=>({s,idx:i})),sr:meta.sr||24000};
+}
 async function synthPodStream(){
   if(!pod.lines.length||pod.busyFinal||pod.busyStream)return;
-  pod.busyStream=true;pod.busySince=Date.now();pod.outTab='stream';renderPod();
+  pod.busyStream=true;pod.busySince=Date.now();pod.outTab='stream';pod.stopping=false;renderPod();
   try{
     await saveEpisode(true);
     const resp=await fetch(`/api/podcast/episodes/${pod.episode.id}/synthesize`,{
@@ -1309,17 +1511,32 @@ async function synthPodStream(){
       try{msg=(await resp.json()).detail||msg}catch(e){}
       throw new Error(msg);
     }
-    const ok=await player.startStream(resp,'播客流式 · '+((pod.episode&&pod.episode.title)||''),null);
+    const marks=[];
+    const ok=await player.startStream(await podMarkedStream(resp,marks),'播客流式 · '+((pod.episode&&pod.episode.title)||''),null,
+      {podEpId:pod.episode?pod.episode.id:null,lineMarks:marks});   // reset 后挂回: 句标记随流实时追加
+    if(pod.stopping){player.reset()}   // 已停止: 丢弃部分音频
     if(pod.episode){
       pod.episode=await(await api(`/api/podcast/episodes/${pod.episode.id}`)).json();
+      const meta=podLineMarks(pod.episode);
+      if(meta&&player.mode)player.setLineMarks(meta.marks,meta.sr);   // 服务端精确偏移替换流内推算
       await loadEpisodes();
     }
     renderPod();renderPodEpisodes();
-    if(ok)toast('流式播放完成，成品已自动保存');
+    if(ok)toast(pod.stopping?'已停止合成，已合成的部分已保存为成品':'流式播放完成，成品已自动保存');
   }catch(e){
     toast('流式合成失败: '+(e.message||''),true,6000);
     player.abortStream();
   }finally{pod.busyStream=false;renderPod();}
+}
+/* ---- 播客: 停止合成 (成品/流式通用) ----
+   后端: 当前句在 PCM 分块边界停止推理, 后续句子不再合成, 已合成部分落盘为成品;
+   流式不主动断开本地连接, 由服务端自然收尾, 保证剧集状态落库为 stopped */
+async function stopPodSynth(){
+  const eid=pod.episode&&pod.episode.id;
+  if(!eid||pod.stopping)return;
+  pod.stopping=true;renderPodOutput();
+  toast('正在停止合成…');
+  try{await api(`/api/podcast/episodes/${eid}/stop`,{method:'POST'})}catch(e){toast(e.message,true)}
 }
 /* ---- 播客: 推流 ---- */
 async function startPush(){
@@ -1392,10 +1609,10 @@ function syncPodTasks(){
       adopted.delete(e.id);
       if(kind==='pushing'&&pod.stopRequested===e.id){pod.stopRequested='';pod.pushStatus='已停止'}
       else if(e.status==='failed')toast(`「${e.title}」${kind==='pushing'?'推流失败':'合成失败'}: ${e.error||'未知错误'}`,true,6000);
-      else if(e.status==='stopped')toast(`「${e.title}」推流已停止`);
+      else if(e.status==='stopped')toast(`「${e.title}」${kind==='pushing'?'推流':'合成'}已停止`);
       else toast(`「${e.title}」${kind==='pushing'?'推流完成':'合成完成'}`);
       if(pod.episode&&e.id===pod.episode.id){
-        pod.busyFinal=false;pod.busyStream=false;pod.pushing=false;pod.busySince=0;
+        pod.busyFinal=false;pod.busyStream=false;pod.pushing=false;pod.busySince=0;pod.stopping=false;
         refreshPodEpisode(e.id);
       }
       renderPod();
@@ -1403,7 +1620,7 @@ function syncPodTasks(){
   }
   if(mine&&mine.status!=='draft'&&!QUEUE_ACTIVE.includes(mine.status)
       &&(pod.busyFinal||pod.busyStream)&&Date.now()-(pod.busySince||0)>2500){
-    pod.busyFinal=false;pod.busyStream=false;pod.busySince=0;
+    pod.busyFinal=false;pod.busyStream=false;pod.busySince=0;pod.stopping=false;
     refreshPodEpisode(mine.id);
   }
   if(state.view==='podcast')renderPodEpisodes();
@@ -1479,9 +1696,11 @@ function deriveRequest(){
   return payload;
 }
 let genTimer=null;
+function newClientTaskId(){return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,10)}
 function generate(){
   if(blocker()||state.busy)return;
   state.busy=true;state.genProg=12;
+  state.genTaskId=newClientTaskId();state.genAbort=new AbortController();state.genStopping=false;
   player.reset();
   renderAction();renderOutput();
   genTimer=setInterval(()=>{state.genProg=Math.min(94,state.genProg+Math.random()*17);
@@ -1490,12 +1709,20 @@ function generate(){
   const voiceLabel=payload.spk_id?((QWEN3_KNOWN[payload.spk_id]||[payload.spk_id])[0])
     :(payload.voice_id?voiceName(payload.voice_id)
     :(payload.mode==='instruct'?state.designText.trim().slice(0,12)+'…':'—'));
-  api('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  api('/api/tts',{method:'POST',headers:{'Content-Type':'application/json','X-Client-Task-Id':state.genTaskId},
+    body:JSON.stringify(payload),signal:state.genAbort.signal})
     .then(async resp=>{
-      const taskId=resp.headers.get('X-Task-Id');
+      const taskId=resp.headers.get('X-Task-Id')||state.genTaskId;
       const title=displayTaskText(state.text).trim().replace(/\s+/g,' ').slice(0,22)+(state.text.trim().length>22?'…':'');
       if(state.stream){
         await player.startStream(resp,voiceLabel+' · 流式',taskId);
+        if(state.genStopping){   // 已停止: 丢弃部分音频, 不作为作品
+          clearInterval(genTimer);
+          state.busy=false;state.genTaskId=null;state.genAbort=null;player.reset();
+          renderAction();renderOutput();loadTasks();
+          toast('已停止生成');
+          return;
+        }
         state.result={title,taskId,model:model().label,voice:voiceLabel,time:'刚刚'};
       }else{
         const blob=await resp.blob();
@@ -1507,17 +1734,31 @@ function generate(){
         playerState.duration=durMs?durMs/1000:0;
       }
       clearInterval(genTimer);
-      state.busy=false;
+      state.busy=false;state.genTaskId=null;state.genAbort=null;state.genStopping=false;
       renderAction();renderOutput();renderRecent();
       toast('生成完成，可以试听或下载');
       loadTasks();
     })
     .catch(e=>{
       clearInterval(genTimer);
-      state.busy=false;player.reset();
-      renderAction();renderOutput();
-      toast('合成失败: '+e.message,true,6000);
+      const stopped=state.genStopping||e.name==='AbortError';
+      state.busy=false;state.genTaskId=null;state.genAbort=null;state.genStopping=false;player.reset();
+      renderAction();renderOutput();loadTasks();
+      toast(stopped?'已停止生成':'合成失败: '+e.message,stopped?false:true,6000);
     });
+}
+/* 停止生成: 预生成的任务 id 调停止接口, 服务端在 PCM 分块边界停止推理并把任务落库为「已停止」;
+   不主动断开本地连接 —— 流由服务端自然收尾, 避免任务被误标为 client disconnected */
+async function stopGen(){
+  const tid=state.genTaskId;
+  if(!tid||state.genStopping)return;
+  state.genStopping=true;renderOutput();
+  try{
+    await api(`/api/tasks/${tid}/stop`,{method:'POST'});
+  }catch(e){
+    // 任务可能刚好完成: 恢复状态走正常完成流程
+    state.genStopping=false;renderOutput();
+  }
 }
 function previewPreset(spkId){
   if(state.previewBusy)return;
@@ -1725,7 +1966,7 @@ document.addEventListener('click',e=>{
    case 'theme':{const d=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
     document.documentElement.setAttribute('data-theme',d);
     try{localStorage.setItem('vs-theme',d)}catch(_){}
-    syncThemeIcon();break}
+    syncThemeIcon();drawVisibleWave();break}
    case 'help':toast('快捷键：Ctrl/⌘ + Enter 生成 · 空格播放/暂停 · Esc 关闭菜单',true);break;
    case 'toggle-menu':state.menu=!state.menu;renderModelMenu();break;
    case 'model':switchModel(k,true);break;
@@ -1779,11 +2020,15 @@ document.addEventListener('click',e=>{
    case 'pod-src':pod.src=k;pod.sourceError='';pod.extracting=false;renderPodSource();renderPodStepper();break;
    case 'pod-file':{const inp=$('#pod-file-input');if(inp)inp.click();break}
    case 'pod-url-extract':extractPodUrl();break;
+   case 'pod-extract-reset':pod.extractText=pod.extractText0;pod.extractChars=pod.extractText0.length;
+    pod.extractDirty=false;renderPodSource();renderPodStepper();break;
    case 'pod-llm':openLLMConfig();break;
    case 'pod-llm-close':$('#llm-modal').hidden=true;break;
    case 'pod-llm-test':testLLM();break;
    case 'pod-llm-save':saveLLMConfig();break;
    case 'pod-direct':if(!podSrcReady()){toast('内容源至少需要 10 个字',true);break}directRead();break;
+   case 'gen-stop':stopGen();break;
+   case 'pod-synth-stop':case 'pod-stream-stop':stopPodSynth();break;
    case 'pod-gen':genScript();break;
    case 'pod-line-edit':pod.editLine=+t.dataset.i;pod.editText=pod.lines[pod.editLine].text;renderPodScript();
     {const el=$('#pod-line-edit-text');if(el)el.focus()}break;
@@ -1808,7 +2053,11 @@ document.addEventListener('click',e=>{
    case 'pod-save':saveEpisode();break;
    case 'pod-synth':synthPodFinal();break;
    case 'pod-play':{if(!podSynthDone()||!pod.episode){toast('请先合成成品',true);break}
-    player.playFile(`/api/podcast/episodes/${pod.episode.id}/audio`,'播客 · '+(pod.episode.title||''),null);break}
+    player.playFile(`/api/podcast/episodes/${pod.episode.id}/audio`,'播客 · '+(pod.episode.title||''),null);
+    player.podEpId=pod.episode.id;
+    const lm=podLineMarks(pod.episode);               // 逐句偏移: 播放时高亮当前轮对话
+    if(lm)player.setLineMarks(lm.marks,lm.sr);
+    break}
    case 'pod-download':case 'pod-ep-download':{
     const eid=(a==='pod-download'?(pod.episode&&pod.episode.id):k);
     const ep=pod.episodes.find(x=>x.id===eid)||pod.episode;
@@ -1830,7 +2079,13 @@ document.addEventListener('click',e=>{
    case 'pod-detail-stop':stopPush(k);break;
    case 'pod-detail-load':{pod.detailOpen=false;$('#pod-detail-modal').hidden=true;loadEpisode(k);break}
    case 'pod-detail-del':{pod.detailOpen=false;$('#pod-detail-modal').hidden=true;removeEpisode(k);break}
-   case 'pod-detail-play':{player.playFile(`/api/podcast/episodes/${k}/audio`,'播客成品',null);break}
+   case 'pod-detail-play':{player.playFile(`/api/podcast/episodes/${k}/audio`,'播客成品',null);
+    player.podEpId=k;
+    // 仅当试听的是当前载入的剧集(句数一致)才对齐对话稿高亮
+    const dep=pod.episodes.find(x=>x.id===k);
+    const dlm=dep&&pod.episode&&dep.id===pod.episode.id?podLineMarks(dep):null;
+    if(dlm)player.setLineMarks(dlm.marks,dlm.sr);
+    break}
    case 'pod-detail-download':{const a4=document.createElement('a');
     a4.href=`/api/podcast/episodes/${k}/audio`;a4.download=k+'.wav';a4.click();break}
    case 'pod-ep-load':loadEpisode(k);break;
@@ -1897,6 +2152,10 @@ document.addEventListener('input',e=>{
   if(id==='instruct-input'){state.instruct=e.target.value;renderAction()}
   if(id==='speed-range'){state.speed=parseFloat(e.target.value);$('#speed-val').textContent=state.speed.toFixed(2)+'×';renderAction()}
   if(id==='pod-src-text'){pod.text=e.target.value;renderPodStepper();updatePodSrcButtons()}
+  if(id==='pod-src-extract'){
+    pod.extractText=e.target.value;pod.extractChars=e.target.value.length;
+    pod.extractDirty=pod.extractText!==pod.extractText0;updatePodExtractMeta();
+  }
   if(id==='pod-src-url')pod.url=e.target.value;
   if(id==='pod-push-url')pod.pushUrl=e.target.value;
   if(id==='pod-line-edit-text')pod.editText=e.target.value;
@@ -1917,6 +2176,16 @@ function updatePodSrcButtons(){
   btns.forEach(b=>b.disabled=!ready);
   const notice=$('#pod-source .notice.warn');
   if(notice)notice.hidden=ready;
+}
+/* 正文预览编辑态微更新: 字数 / 顶部计数 / 还原按钮, 不重绘文本域 */
+function updatePodExtractMeta(){
+  const n=$('#pod-extract-chars');
+  if(n){n.textContent=pod.extractChars;n.classList.toggle('over',pod.extractChars>20000)}
+  const c=$('#pod-src-counter');
+  if(c)c.textContent=pod.extractChars?`已提取 ${pod.extractChars} 字`:'待导入';
+  const rst=$('#pod-source [data-act="pod-extract-reset"]');
+  if(rst)rst.disabled=!pod.extractDirty;
+  updatePodSrcButtons();
 }
 document.addEventListener('change',e=>{
   const t=e.target;

@@ -56,15 +56,17 @@ class TTSRequest:
     stream: bool = False
 
 
-@dataclass
+@dataclass(eq=False)  # 按身份哈希: 播客停止链路要把 Job 放进 set
 class Job:
     spec: TTSRequest
     out_q: asyncio.Queue
     loop: asyncio.AbstractEventLoop
+    task_id: Optional[str] = None
     first_chunk_at: Optional[float] = None
     done: bool = False
     error: Optional[str] = None
     sample_rate: int = 24000
+    cancelled: bool = False  # 置 True 后: 排队中直接跳过; 推理中在下一个分块边界停止
 
 
 class EventBus:
@@ -278,15 +280,29 @@ class Engine:
             if self._state != "ready" or self._key != job.spec.model:
                 put(("error", f"model switched while job queued (loaded: {self._key})"))
                 return
+            if job.cancelled:
+                put(("cancelled", None))
+                job.done = True
+                return
             t0 = time.time()
             first = True
             for pcm in self._backend.synthesize(job.spec):
+                if job.cancelled:
+                    # 分块边界停止: 生成器随之关闭, 上游流式推理循环立即退出
+                    put(("cancelled", None))
+                    job.done = True
+                    return
                 job.sample_rate = getattr(self._backend, "sample_rate", None) or job.sample_rate
                 now = time.time()
                 if first:
                     job.first_chunk_at = now
                     first = False
                 put(("chunk", pcm))
+            if job.cancelled:
+                # 非流式推理不可中断 (单次前向): 结果作废, 按取消处理
+                put(("cancelled", None))
+                job.done = True
+                return
             job.done = True
             job.error = None
             self._last_infer_ms = int((time.time() - t0) * 1000)
@@ -316,13 +332,16 @@ class Engine:
         return job
 
     async def drain(self, job: Job) -> AsyncIterator[tuple[str, Optional[str]]]:
-        """产出 ('chunk', pcm_bytes), 终止于 ('end', None) 或 ('error', msg)。"""
+        """产出 ('chunk', pcm_bytes), 终止于 ('end', None) / ('error', msg) / ('cancelled', None)。"""
         while True:
             kind, payload = await job.out_q.get()
             if kind == "chunk":
                 yield "chunk", payload
             elif kind == "end":
                 yield "end", None
+                break
+            elif kind == "cancelled":
+                yield "cancelled", None
                 break
             else:
                 yield "error", payload
@@ -333,7 +352,12 @@ class Engine:
         while True:
             job = await self.task_queue.get()
             try:
-                await self._loop.run_in_executor(None, self._infer_worker, job)
+                if job.cancelled:
+                    # 停止时任务还在排队: 不再送入推理
+                    job.done = True
+                    job.loop.call_soon_threadsafe(job.out_q.put_nowait, ("cancelled", None))
+                else:
+                    await self._loop.run_in_executor(None, self._infer_worker, job)
             except Exception:  # pragma: no cover
                 logger.exception("worker crashed on job")
                 job.loop.call_soon_threadsafe(job.out_q.put_nowait, ("error", "internal worker error"))

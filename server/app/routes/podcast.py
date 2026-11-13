@@ -326,6 +326,16 @@ def stop_push(pid: str):
     return podcast.push_manager.stop()
 
 
+@router.post("/podcast/episodes/{pid}/stop")
+def stop_episode(pid: str):
+    """停止合成 (成品/流式通用): 当前句在分块边界停止推理, 后续句子不再合成。"""
+    ep = storage.get_episode(pid)
+    if not ep:
+        raise HTTPException(404, "episode not found")
+    podcast.request_synth_stop(pid)
+    return {"ok": True, "episode_id": pid, "stopping": True}
+
+
 @router.get("/podcast/push/status")
 def push_status():
     return podcast.push_manager.status()

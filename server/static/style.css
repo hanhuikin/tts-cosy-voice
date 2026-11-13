@@ -167,6 +167,8 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 .result-title{font-size:13px;font-weight:650;line-height:1.4;margin:0 0 2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .result-meta{font-size:11px;color:var(--text-3);margin-bottom:14px}
 .wave{display:flex;align-items:center;gap:2px;height:52px;margin-bottom:8px;position:relative;overflow:hidden}
+/* canvas 峰值波形(移植自 main): 已播放蓝→青渐变, 未播放暗灰 */
+.pb-wave-c{display:block;width:100%;min-width:120px;margin-bottom:8px}
 .wave .bar{flex:1;min-width:2px;border-radius:2px;background:var(--line-2);height:var(--h);transition:background .2s,transform .2s;transform-origin:center}
 .wave .bar.done{background:var(--primary)}
 .wave.playing .bar{animation:wv 1s ease-in-out infinite alternate;animation-delay:var(--d)}
@@ -294,13 +296,24 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 .dropzone{border:1.5px dashed var(--line-2);border-radius:12px;padding:24px 12px;text-align:center;background:var(--surface-2);cursor:pointer;font-size:12px;color:var(--text-3)}
 .dropzone:hover{border-color:var(--primary);color:var(--primary)}
 .dropzone b{display:block;color:var(--text);font-size:13px;margin-bottom:3px}
+.extract-prev{margin-top:10px;flex:1 1 auto;min-height:190px;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);overflow:hidden}
+.extract-prev-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px 6px 12px;font-size:12px;color:var(--text-3);background:var(--surface-3);border-bottom:1px solid var(--line)}
+.extract-prev-body{flex:1 1 auto;min-height:0;padding:10px 12px;font-size:12.5px;line-height:1.7;color:var(--text-2);white-space:pre-wrap;word-break:break-word;overflow-y:auto;scrollbar-width:thin}
+.extract-prev-edit{flex:1 1 auto;min-height:0;display:block;width:100%;resize:none;border:0;outline:none;background:transparent;padding:10px 12px;font-size:12.5px;line-height:1.7;color:var(--text-2);font-family:inherit}
+.extract-prev-edit:focus{box-shadow:inset 0 0 0 2px var(--primary-soft)}
+.extract-prev-head b{color:var(--text-2);font-variant-numeric:tabular-nums}
+.extract-prev-head b.over{color:var(--danger)}
+.extract-prev-more{color:var(--text-3)}
 .llm-strip{display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);margin-top:12px;font-size:11px;color:var(--text-3)}
 .llm-strip .lm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .llm-strip .lm b{color:var(--text-2)}
 .src-actions{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .src-actions .btn{width:100%;justify-content:center}
 .dlg-list{max-height:430px;overflow-y:auto;padding-right:4px}
-.dlg{display:flex;gap:9px;margin-bottom:10px}
+.dlg{display:flex;gap:9px;margin-bottom:10px;border-left:2px solid transparent;border-radius:4px;scroll-margin:12px;transition:background .2s,border-color .2s}
+/* 播放跟随: 当前轮对话左侧描边 + 微底色 (与可听音频逐句对齐) */
+.dlg.line-playing{border-left-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,transparent)}
+.dlg.line-playing .bubble{border-color:color-mix(in srgb,var(--primary) 35%,transparent)}
 .dlg .avatar{width:30px;height:30px;font-size:11px;flex:none}
 .dlg-body{flex:1;min-width:0}
 .dlg-who{display:flex;align-items:center;gap:7px;margin-bottom:5px;flex-wrap:wrap}
@@ -534,6 +547,11 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 #pod-source .llm-strip .chip{min-height:24px;padding:1px 9px;font-size:11px}
 #pod-source>p.chip-label{margin-top:5px;font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #pod-source .notice.warn{margin-top:6px;padding:7px 11px}
+/* 正文预览: 编辑区保底 140px, 大屏吃满剩余高度; 小屏内容超出时由 src-scroll 滚动
+   (text/file 标签无预览时编辑区仍 flex:1 恰好填满, 不会出现滚动条) */
+#pod-source .src-scroll{overflow-y:auto;scrollbar-width:thin}
+#pod-source .src-scroll:has(.extract-prev) .dropzone{flex:0 0 auto;padding:10px 12px}
+#pod-source .src-scroll:has(.extract-prev) .dropzone b{margin-bottom:1px}
 /* 成品区沿用 v1.5 验证过的 185px 安全高度，保证三个按钮与波形完整可见 */
 @media(max-width:720px){#pod-source .src-actions{flex-direction:column}#pod-source .textarea{min-height:150px}}
 /* ===== v1.8 音色库：按原实现 1:1 补齐能力，只重组结构 ===== */

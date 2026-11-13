@@ -80,10 +80,12 @@ class Storage:
         self._lock = threading.Lock()
         with self._lock:
             self._db.executescript(_SCHEMA)
-            # 老库迁移: 补 speakers_json 列 (多说话人阵容)
+            # 老库迁移: 补 speakers_json 列 (多说话人阵容) / lines_meta 列 (逐句采样偏移, 供前端播放高亮对齐)
             cols = {r[1] for r in self._db.execute("PRAGMA table_info(podcasts)")}
             if "speakers_json" not in cols:
                 self._db.execute("ALTER TABLE podcasts ADD COLUMN speakers_json TEXT NOT NULL DEFAULT '[]'")
+            if "lines_meta" not in cols:
+                self._db.execute("ALTER TABLE podcasts ADD COLUMN lines_meta TEXT NOT NULL DEFAULT '[]'")
             self._db.commit()
 
     def _exec(self, sql: str, params: tuple = ()) -> None:
@@ -139,10 +141,11 @@ class Storage:
         return True
 
     # ---------- tasks ----------
-    def create_task(self, spec) -> str:  # spec: engine.TTSRequest
-        tid = new_id()
+    def create_task(self, spec, task_id: Optional[str] = None) -> str:  # spec: engine.TTSRequest
+        # task_id 可由前端预生成 (X-Client-Task-Id): 生成中即可凭它调用停止接口
+        tid = task_id or new_id()
         self._exec(
-            "INSERT INTO tasks(id,text,model,mode,spk_id,voice_id,instruct_text,speed,stream,created_at)"
+            "INSERT OR IGNORE INTO tasks(id,text,model,mode,spk_id,voice_id,instruct_text,speed,stream,created_at)"
             " VALUES(?,?,?,?,?,?,?,?,?,?)",
             (tid, spec.text, spec.model, spec.mode, spec.spk_id, spec.voice_id,
              spec.instruct_text, spec.speed, int(spec.stream), now_iso()),
@@ -210,7 +213,7 @@ class Storage:
         if not fields:
             return
         allowed = {"title", "script_json", "voice_host", "voice_guest", "speakers_json", "speed",
-                   "status", "progress", "file", "duration", "error"}
+                   "status", "progress", "file", "duration", "error", "lines_meta"}
         sets, params = [], []
         for k, v in fields.items():
             if k in allowed:
