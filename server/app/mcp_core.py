@@ -19,7 +19,9 @@ import os
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import quote
 from pathlib import Path
+from uuid import uuid4
 
 from .storage import DATA_DIR
 
@@ -31,8 +33,9 @@ SUPPORTED_VERSIONS = {"2024-11-05", "2025-03-26", "2025-06-18"}
 LATEST_VERSION = "2025-06-18"
 
 INSTRUCTIONS = (
-    "CosyVoice TTS 服务: 文本转语音、音色库管理、播客工坊 (对话稿→逐句合成→成品音频)。\n"
-    "常用路径: server_status 确认模型就绪 → list_voices 选音色 → tts_synthesize 合成短句; "
+    "CosyVoice TTS 服务: 文本转语音、音色库、背景音乐混流、播客工坊 (对话稿→逐句合成→成品音频)。\n"
+    "常用路径: server_status 确认模型就绪 → list_voices 选音色 → tts_synthesize 合成短句"
+    " (可带 bgm_file 混入背景乐, list_bgm 查看曲目); "
     "长对话用 podcast_create_episode + podcast_synthesize 逐句合成。"
 )
 
@@ -46,7 +49,7 @@ DOWNLOAD_DIR = Path(os.environ.get("COSYVOICE_MCP_DOWNLOAD_DIR")
 # ---------- HTTP 回环调用 ----------
 
 def http_req(base: str, path: str, *, method: str = "GET", body=None, source: str = "",
-             timeout: int = 60) -> tuple[int, dict, bytes]:
+             timeout: int = 60, content_type: str | None = None) -> tuple[int, dict, bytes]:
     """调服务 REST 接口, 返回 (status, headers, body_bytes)。带 X-Client-Source 来源标识。"""
     url = base.rstrip("/") + path
     headers = {"Accept": "application/json"}
@@ -54,14 +57,24 @@ def http_req(base: str, path: str, *, method: str = "GET", body=None, source: st
         headers["X-Client-Source"] = f"mcp:{source}"
     data = None
     if body is not None:
-        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
-        headers["Content-Type"] = "application/json"
+        data = body if isinstance(body, bytes) else json.dumps(body, ensure_ascii=False).encode("utf-8")
+        headers["Content-Type"] = content_type or "application/json"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.status, dict(r.headers), r.read()
     except urllib.error.HTTPError as e:
         return e.code, dict(e.headers), e.read()
+
+
+def _multipart(field: str, filename: str, data: bytes) -> tuple[bytes, str]:
+    """构造 multipart/form-data 报文, 返回 (body, Content-Type)。"""
+    boundary = f"----cosyvoice-mcp-{uuid4().hex}"
+    body = (f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
+            f"Content-Type: application/octet-stream\r\n\r\n").encode("utf-8") \
+           + data + f"\r\n--{boundary}--\r\n".encode("utf-8")
+    return body, f"multipart/form-data; boundary={boundary}"
 
 
 def json_of(status: int, payload: bytes):
@@ -159,6 +172,9 @@ def t_tts_synthesize(args: dict, base: str) -> list[dict]:
         raise RuntimeError("需要 voice_id / spk_id / instruct_text 之一来指定声音")
     if not mode:
         raise RuntimeError(f"无法为模型 {model} 解析合成模式, 请显式传 mode")
+    if args.get("bgm_file"):
+        body.update(bgm_file=args["bgm_file"], bgm_volume=args.get("bgm_volume", 0.18),
+                    bgm_duck=args.get("bgm_duck", True))
 
     st, hd, payload = http_req(base, "/api/tts", method="POST", body=body, source="tts_synthesize",
                                timeout=600)
@@ -253,7 +269,8 @@ def t_podcast_get_episode(args: dict, base: str) -> list[dict]:
     check(st, pl, "读取剧集")
     ep = json_of(st, pl)
     info = {k: ep.get(k) for k in ("id", "title", "status", "progress", "lines_count",
-                                   "duration", "error", "has_audio", "speed", "created_at")}
+                                   "duration", "error", "has_audio", "speed", "created_at",
+                                   "bgm_file", "bgm_volume", "bgm_duck")}
     info["speakers"] = [f"{s.get('name')}({'主持' if s.get('role') == 'host' else '嘉宾'}, "
                         f"voice_id={s.get('voice_id') or '-'})" for s in ep.get("speakers", [])]
     script = [{"role": ln.get("role"), "name": ln.get("name"), "text": ln.get("text")}
@@ -279,6 +296,9 @@ def t_podcast_create_episode(args: dict, base: str) -> list[dict]:
     speakers = [s for s in (args.get("speakers") or []) if isinstance(s, dict)]
     body = {"title": title[:100], "source_type": "text", "source_ref": "",
             "lines": clean, "speakers": speakers, "speed": args.get("speed", 1.0)}
+    if args.get("bgm_file"):
+        body.update(bgm_file=args["bgm_file"], bgm_volume=args.get("bgm_volume", 0.18),
+                    bgm_duck=args.get("bgm_duck", True))
     st, _, pl = http_req(base, "/api/podcast/episodes", method="POST", body=body,
                          source="podcast_create_episode")
     check(st, pl, "创建剧集")
@@ -340,6 +360,68 @@ def t_podcast_stop(args: dict, base: str) -> list[dict]:
     return [{"type": "text", "text": f"已请求停止剧集 {pid} 的合成 (当前句在分块边界结束)。"}]
 
 
+def t_list_bgm(args: dict, base: str) -> list[dict]:
+    st, _, pl = http_req(base, "/api/bgm")
+    check(st, pl, "读取背景音乐列表")
+    items = json_of(st, pl)["items"]
+    if not items:
+        return [{"type": "text", "text": "曲库为空。可用 upload_bgm 上传本地音频文件。"}]
+    lines = [f"- {b['name']} (bgm_file=\"{b['file']}\", {b['duration'] or '?'}s, "
+             f"{b['size'] / 1048576:.1f}MB)" for b in items]
+    return [{"type": "text",
+             "text": f"共 {len(items)} 首背景乐:\n" + "\n".join(lines)
+                     + "\n把其中的 file 值作为 tts_synthesize / podcast_create_episode 的 bgm_file 参数即可混入。"}]
+
+
+def t_upload_bgm(args: dict, base: str) -> list[dict]:
+    """上传本地音频文件到 BGM 库 (MCP 客户端与服务同机时直接读路径)。"""
+    path = (args.get("path") or "").strip()
+    if not path:
+        raise RuntimeError("path 不能为空: 本地音频文件路径")
+    p = Path(path)
+    if not p.exists():
+        raise RuntimeError(f"文件不存在: {path}")
+    data = p.read_bytes()
+    if len(data) > 20 * 1024 * 1024:
+        raise RuntimeError("文件过大 (max 20MB)")
+    # 显示名不带扩展名时补上源文件扩展名 (服务端按扩展名校验格式)
+    name = args.get("name") or p.stem
+    if not Path(name).suffix:
+        name += p.suffix
+    body, ctype = _multipart("file", name, data)
+    st, _, pl = http_req(base, "/api/bgm", method="POST", body=body, source="upload_bgm",
+                         content_type=ctype, timeout=120)
+    check(st, pl, "上传背景音乐")
+    b = json_of(st, pl)
+    logger.info("[MCP] upload_bgm: %s (%.1fMB)", b["file"], b["size"] / 1048576)
+    return [{"type": "text",
+             "text": f"已入库: {b['name']} (bgm_file=\"{b['file']}\", "
+                     f"{(b.get('duration') or '?')}s, {b['size'] / 1048576:.1f}MB)。"
+                     f"可把它作为 tts_synthesize / podcast_create_episode 的 bgm_file。"}]
+
+
+def t_rename_bgm(args: dict, base: str) -> list[dict]:
+    file = args.get("file") or ""
+    name = (args.get("name") or "").strip()
+    if not file or not name:
+        raise RuntimeError("需要 file (现有文件名) 与 name (新名称)")
+    st, _, pl = http_req(base, f"/api/bgm/{quote(file)}", method="PUT",
+                         body={"name": name}, source="rename_bgm")
+    check(st, pl, "重命名背景音乐")
+    b = json_of(st, pl)
+    return [{"type": "text", "text": f"已重命名: {file} → {b['file']} (剧集引用已同步)。"}]
+
+
+def t_delete_bgm(args: dict, base: str) -> list[dict]:
+    file = args.get("file") or ""
+    if not file:
+        raise RuntimeError("file 不能为空")
+    st, _, pl = http_req(base, f"/api/bgm/{quote(file)}", method="DELETE",
+                         body={}, source="delete_bgm")
+    check(st, pl, "删除背景音乐")
+    return [{"type": "text", "text": f"已删除 {file}, 引用它的剧集已自动关闭背景乐。"}]
+
+
 # ---------- 工具目录 ----------
 
 _TOOLS: list[dict] = [
@@ -367,6 +449,12 @@ _TOOLS: list[dict] = [
                                   "enum": ["sft", "zero_shot", "cross_lingual", "instruct"]},
                          "include_base64": {"type": "boolean",
                                             "description": "返回值附带 base64 音频内容块, 默认 false"},
+                         "bgm_file": {"type": "string",
+                                      "description": "背景音乐文件名 (list_bgm 获取); 合成时循环混入并自动闪避"},
+                         "bgm_volume": {"type": "number",
+                                        "description": "BGM 基础音量 0~1, 默认 0.18"},
+                         "bgm_duck": {"type": "boolean",
+                                      "description": "说话时自动压低背景乐, 默认 true"},
                      },
                      "required": ["text"], "additionalProperties": False}},
     {"name": "list_tasks",
@@ -422,6 +510,10 @@ _TOOLS: list[dict] = [
                                           "name": {"type": "string"}, "desc": {"type": "string"},
                                           "voice_id": {"type": "string"}}}},
                          "speed": {"type": "number", "description": "全局语速 0.5~2.0, 默认 1.0"},
+                         "bgm_file": {"type": "string",
+                                      "description": "背景音乐文件名 (list_bgm 获取); 整部剧循环混入"},
+                         "bgm_volume": {"type": "number", "description": "BGM 基础音量 0~1, 默认 0.18"},
+                         "bgm_duck": {"type": "boolean", "description": "说话时自动压低背景乐, 默认 true"},
                      },
                      "required": ["title", "lines"], "additionalProperties": False}},
     {"name": "podcast_synthesize",
@@ -442,6 +534,26 @@ _TOOLS: list[dict] = [
      "inputSchema": {"type": "object",
                      "properties": {"episode_id": {"type": "string"}},
                      "required": ["episode_id"], "additionalProperties": False}},
+    {"name": "list_bgm",
+     "description": "列出背景音乐曲库 (名称/时长/大小)。返回的 file 值用作 tts_synthesize / podcast_create_episode 的 bgm_file。",
+     "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False}},
+    {"name": "upload_bgm",
+     "description": "上传本地音频文件到背景音乐库 (wav/mp3/flac/m4a/mp4/aac/ogg/opus/webm, ≤20MB, 服务与本机同机时可用本地路径)。",
+     "inputSchema": {"type": "object",
+                     "properties": {"path": {"type": "string", "description": "本地音频文件路径"},
+                                    "name": {"type": "string", "description": "入库显示名 (默认用原文件名)"}},
+                     "required": ["path"], "additionalProperties": False}},
+    {"name": "rename_bgm",
+     "description": "重命名背景音乐曲目 (引用它的剧集自动同步)。",
+     "inputSchema": {"type": "object",
+                     "properties": {"file": {"type": "string", "description": "现有文件名"},
+                                    "name": {"type": "string", "description": "新名称"}},
+                     "required": ["file", "name"], "additionalProperties": False}},
+    {"name": "delete_bgm",
+     "description": "删除背景音乐曲目 (引用它的剧集自动关闭背景乐)。",
+     "inputSchema": {"type": "object",
+                     "properties": {"file": {"type": "string", "description": "曲目文件名"}},
+                     "required": ["file"], "additionalProperties": False}},
 ]
 
 _HANDLERS = {
@@ -458,6 +570,10 @@ _HANDLERS = {
     "podcast_synthesize": t_podcast_synthesize,
     "podcast_get_audio": t_podcast_get_audio,
     "podcast_stop": t_podcast_stop,
+    "list_bgm": t_list_bgm,
+    "upload_bgm": t_upload_bgm,
+    "rename_bgm": t_rename_bgm,
+    "delete_bgm": t_delete_bgm,
 }
 
 

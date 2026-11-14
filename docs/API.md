@@ -245,7 +245,7 @@ BGM 库保存在 `server/data/bgm/`; 合成时循环混入（短曲自动交叉�
 
 ## MCP 接入
 
-服务内置 **Model Context Protocol** 支持, 三种传输共用同一套 13 个工具
+服务内置 **Model Context Protocol** 支持, 三种传输共用同一套 17 个工具
 (实现: `server/app/mcp_core.py`):
 
 ### 工具目录
@@ -254,17 +254,21 @@ BGM 库保存在 `server/data/bgm/`; 合成时循环混入（短曲自动交叉�
 |---|---|---|
 | `server_status` | — | 引擎状态/模型/GPU/队列/音色数 |
 | `list_voices` | — | 音色库列表 (id/名称/参考文本) |
-| `tts_synthesize` | `text*`, `voice_id`, `spk_id`, `instruct_text`, `model`, `speed`, `mode`, `include_base64` | 同步合成整段 (≤2000 字); 声音三选一; 返回本地文件路径+下载链接 |
+| `tts_synthesize` | `text*`, `voice_id`, `spk_id`, `instruct_text`, `model`, `speed`, `mode`, `include_base64`, `bgm_file`, `bgm_volume`, `bgm_duck` | 同步合成整段 (≤2000 字); 声音三选一; 可混入背景乐; 返回本地文件路径+下载链接 |
 | `list_tasks` | `limit?`, `status?` | 任务历史 (含 source 来源) |
 | `get_task` | `task_id*` | 单任务详情 |
 | `get_task_audio` | `task_id*`, `format?` | 下载任务音频到本地 |
 | `stop_task` | `task_id*` | 停止进行中的合成 |
 | `podcast_list_episodes` | `limit?` | 剧集列表 |
 | `podcast_get_episode` | `episode_id*` | 剧集详情 (对话稿/阵容/进度) |
-| `podcast_create_episode` | `title*`, `lines*`, `speakers?`, `speed?` | 从对话稿创建剧集 |
+| `podcast_create_episode` | `title*`, `lines*`, `speakers?`, `speed?`, `bgm_file`, `bgm_volume`, `bgm_duck` | 从对话稿创建剧集 (可配背景乐, 随剧集保存) |
 | `podcast_synthesize` | `episode_id*`, `wait?=true`, `timeout_s?=900` | 触发合成; 默认阻塞等待完成 |
 | `podcast_get_audio` | `episode_id*`, `format?` | 下载成品音频 |
 | `podcast_stop` | `episode_id*` | 停止合成 |
+| `list_bgm` | — | 背景音乐曲库 (file 值用作 bgm_file) |
+| `upload_bgm` | `path*`, `name?` | 上传本地音频文件入库 |
+| `rename_bgm` | `file*`, `name*` | 重命名曲目 (剧集引用同步) |
+| `delete_bgm` | `file*` | 删除曲目 (引用剧集自动关 BGM) |
 
 工具产出音频统一落盘 `server/data/mcp/` (可用环境变量 `COSYVOICE_MCP_DOWNLOAD_DIR` 改向)。
 所有 MCP 工具调用 REST 时带 `X-Client-Source: mcp:<工具名>` → 服务控制台「音频产出」日志可区分来源。
