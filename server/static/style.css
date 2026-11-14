@@ -887,3 +887,9 @@ body{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
 .vcard{min-width:0}
 @media(max-width:720px){.voice-grid{grid-template-columns:repeat(1,minmax(0,1fr))}}
 @media(max-width:460px){.voice-grid{grid-template-columns:repeat(1,minmax(0,1fr))}}
+
+/* ====== 背景音乐 ====== */
+.bgm-play{width:34px;height:34px;border-radius:50%;background:var(--primary);color:var(--primary-ink);display:grid;place-items:center;flex:none;border:none;cursor:pointer;padding:0}
+.bgm-play:hover{background:var(--primary-2)}
+.bgm-play.playing{background:var(--accent)}
+.adv-ctl select.input{min-height:34px}

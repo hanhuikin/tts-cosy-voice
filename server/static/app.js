@@ -390,14 +390,23 @@ const LANG_DEFS=[['zh','中文'],['en','English'],['ja','日本語'],['ko','한�
 const LANG_DEFAULT=['zh','en','ja','ko','yue'];
 const SYS_MODE_NAMES={sft:'预置音色',zero_shot:'声音克隆',cross_lingual:'跨语种复刻',instruct:'指令控制'};
 const TITLES={workbench:['创作台','把文字变成声音'],podcast:['播客工坊','多人对话一次成片'],
-  voices:['我的音色','上传一次，处处复用'],library:['作品库','生成记录与参数复用'],
+  voices:['我的音色','上传一次，处处复用'],bgm:['背景音乐','循环混音 · 说话自动压低'],
+  library:['作品库','生成记录与参数复用'],
   system:['系统状态与设置','模型、运行环境与权重目录配置']};
 
 const state={view:'workbench',model:'cosyvoice3',modelTouched:false,group:'preset',pick:null,
   text:'',designText:'',refText:'',speed:1,lang:'',stream:false,instruct:'',
   busy:false,previewBusy:false,genProg:0,result:null,menu:false,themeMenu:false,fontMenu:false,dl:null,tasks:[],filter:'全部',bars:[],
-  genTaskId:null,genAbort:null,genStopping:false};
+  genTaskId:null,genAbort:null,genStopping:false,
+  bgmOn:false,bgmFile:'',bgmVol:0.18,bgmDuck:true};
 state.bars=Array.from({length:40},(_,i)=>18+Math.round(Math.abs(Math.sin(i*1.7)*Math.cos(i*.43))*32));
+/* 背景音乐: 全局曲目库 + 创作台偏好持久化 */
+const bgmList=[];let bgmAudio=null;
+const bgm={confirmDel:null,renaming:null,uploading:false};
+try{const s=JSON.parse(localStorage.getItem('vs-bgm')||'null');
+  if(s){state.bgmOn=!!s.on;state.bgmFile=s.file||'';state.bgmVol=Math.min(.5,Math.max(.05,+s.vol||.18));state.bgmDuck=s.duck!==false}}catch(e){}
+function saveBgmPrefs(){try{localStorage.setItem('vs-bgm',
+  JSON.stringify({on:state.bgmOn,file:state.bgmFile,vol:state.bgmVol,duck:state.bgmDuck}))}catch(e){}}
 const voices=[];
 const vlib={file:null,name:'',prompt:'',busy:false,error:'',drag:false,peaks:[],
   editId:null,editName:'',editPrompt:'',confirmDel:null};
@@ -414,6 +423,7 @@ const pod={
   speed:1,genning:false,genRaw:'',editLine:-1,editText:'',
     outTab:'final',protocol:'rtmp',pushOn:false,pushUrl:'',pushing:false,pushStatus:'',playLine:-1,
   busyFinal:false,busyStream:false,busySince:0,progress:0,stopRequested:'',stopping:false,
+  bgmOn:false,bgmFile:'',bgmVol:0.18,bgmDuck:true,
   episode:null,episodes:[],confirmDel:null,detail:null,detailOpen:false,ffmpeg:true,
   confirmPushOff:false,
 };
@@ -668,7 +678,81 @@ function renderAdv(){
     rows.push(`<div class="adv-row"><div class="adv-name">风格指令<small>可留空</small></div><div class="adv-ctl"><input class="input" id="instruct-input" value="${esc(state.instruct)}" placeholder="例如：用四川话说这句话 / 用特别愤怒的语气"></div></div>`);
   }
   rows.push(`<div class="adv-row"><div class="adv-name">流式合成<small>${c.stream?'边生成边播放':'当前模型为整段生成后分块下发'}</small></div><div class="adv-ctl"><button class="toggle ${state.stream?'on':''}" data-act="stream" role="switch" aria-checked="${state.stream}" aria-label="流式合成" ${c.stream?'':'disabled style="opacity:.4;cursor:not-allowed"'}></button><span style="font-size:12px;color:var(--text-3)">${c.stream?(state.stream?'已开启 · 首包更快':'关闭 · 音质更稳'):'当前模型不支持边播边生成'}</span></div></div>`);
+  rows.push(bgmPickerHTML('wb'));
   $('#adv-body').innerHTML=rows.join('');
+}
+
+/* ================= 背景音乐 ================= */
+/* BGM 库: 创作台/播客工坊两处共用同一曲目列表与选择器组件;
+   管理视图 (左侧栏「背景音乐」) 负责上传 / 改名 / 删除 / 试听。
+   合成时服务端循环混入 (BGM 比内容短则交叉淡化无缝循环), 说话时自动压低。 */
+
+async function loadBgm(){
+  try{
+    const j=await(await api('/api/bgm')).json();
+    bgmList.length=0;bgmList.push(...j.items);
+  }catch(e){toast('背景音乐列表加载失败: '+e.message,true)}
+  const badge=$('#nav-bgm-count');if(badge)badge.textContent=bgmList.length;
+  const cnt=$('#bgm-count');if(cnt)cnt.textContent=bgmList.length+' 首曲目';
+  if(state.view==='bgm')renderBgmCards();
+  renderAdv();renderPodCast();   // 同步两处下拉选项
+}
+
+function bgmPickerHTML(ctx){
+  const st=ctx==='wb'?state:pod;
+  const pre=ctx==='wb'?'wb':'pod';
+  const opts=bgmList.map(b=>`<option value="${esc(b.file)}" ${b.file===st.bgmFile?'selected':''}>${esc(b.name)}</option>`).join('')
+    ||'<option value="">（曲库为空，去「背景音乐」上传）</option>';
+  const pct=Math.round(st.bgmVol*100);
+  return `<div class="adv-row"><div class="adv-name">背景音乐<small>循环混入 · 说话自动压低</small></div><div class="adv-ctl">
+    <button class="toggle ${st.bgmOn?'on':''}" data-act="${pre}-bgm-toggle" role="switch" aria-checked="${st.bgmOn}" aria-label="背景音乐"></button>
+    <select class="input" id="${pre}-bgm-select" ${st.bgmOn?'':'disabled'} style="width:auto;min-width:0;max-width:150px;padding:6px 8px">${opts}</select>
+    <input type="range" id="${pre}-bgm-vol" min="5" max="50" step="1" value="${pct}" ${st.bgmOn?'':'disabled'} aria-label="背景乐音量" style="width:86px">
+    <span class="range-val">${pct}%</span>
+    <button class="chip ${st.bgmDuck?'active':''}" data-act="${pre}-bgm-duck" ${st.bgmOn?'':'disabled'} title="说话时自动压低背景乐，停顿时浮现">自动压低</button>
+    <button class="chip ghost" data-act="view" data-key="bgm" title="管理背景音乐">管理</button>
+  </div></div>`;
+}
+
+function renderBgmCards(){
+  const el=$('#bgm-cards');if(!el)return;
+  if(!bgmList.length){
+    el.innerHTML='<div class="vlib-empty">还没有背景音乐。上传 wav / mp3 / flac / m4a 等音频文件（≤20MB，支持 mp4/webm 容器内含音轨），合成时循环混入。</div>';
+    return;
+  }
+  el.innerHTML=bgmList.map(b=>{
+    const playing=bgmAudio&&bgmAudio.dataset.file===b.file&&!bgmAudio.paused;
+    const ren=bgm.renaming===b.file;
+    const del=bgm.confirmDel===b.file;
+    return `<div class="vcard"><div class="vc-top">
+      <button class="bgm-play ${playing?'playing':''}" data-act="bgm-play" data-key="${esc(b.file)}" title="${playing?'停止试听':'试听'}" aria-label="${playing?'停止试听':'试听'}">${icon(playing?'pause':'play','ic sm')}</button>
+      <span><span class="vc-name" data-act="bgm-rename" data-key="${esc(b.file)}" title="点击重命名" style="cursor:pointer">${esc(b.name)}</span><span class="vc-meta">${b.duration?b.duration+'s · ':''}${(b.size/1024/1024).toFixed(1)} MB</span></span>
+      ${del?`<button class="mini-btn" style="width:auto;padding:0 8px;color:var(--danger);border-color:var(--danger)" data-act="bgm-del" data-key="${esc(b.file)}">确认删除</button>`
+           :`<button class="mini-btn" style="width:28px;height:28px" data-act="bgm-del" data-key="${esc(b.file)}" title="删除">${icon('close','ic sm')}</button>`}</div>
+      ${ren?`<div class="vc-edit" style="margin-top:10px"><label for="bgm-rename-input">曲目名称</label>
+        <input class="input" id="bgm-rename-input" maxlength="60" value="${esc(b.name)}">
+        <div class="vc-actions"><button class="btn btn-primary" data-act="bgm-rename-save" data-key="${esc(b.file)}">保存</button>
+        <button class="btn sec" data-act="bgm-rename-cancel">取消</button></div></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function stopBgmPreview(){
+  if(bgmAudio){bgmAudio.pause();bgmAudio=null}
+  if(state.view==='bgm')renderBgmCards();
+}
+
+async function uploadBgmFile(file){
+  if(bgm.uploading)return;
+  bgm.uploading=true;toast('正在上传 '+file.name+'…');
+  try{
+    const fd=new FormData();fd.append('file',file);
+    const j=await(await api('/api/bgm',{method:'POST',body:fd})).json();
+    state.bgmFile=j.file;saveBgmPrefs();     // 上传后自动选中 (创作台)
+    toast('已入库: '+j.name);
+    await loadBgm();
+  }catch(e){toast('上传失败: '+e.message,true,6000)}
+  finally{bgm.uploading=false;const inp=$('#bgm-file-input');if(inp)inp.value=''}
 }
 
 /* ================= 操作条 ================= */
@@ -1155,6 +1239,7 @@ function renderPodCast(){
    ${cards}
    <button class="btn sec" style="width:100%" data-act="pod-cast-add">${icon('plus','ic sm')} 添加嘉宾</button>
    <div class="adv-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><div class="adv-name" style="width:56px">语速</div><div class="adv-ctl"><input type="range" id="pod-speed" min="0.5" max="2" step="0.05" value="${pod.speed}"><span class="range-val">${pod.speed.toFixed(2)}×</span></div></div>
+   ${bgmPickerHTML('pod')}
    ${c.mine?`<div class="notice" style="margin-top:12px">${icon('info','ic sm')}<span>切到不支持声音克隆的模型时，未配置音色的角色会在这里标出并提示更换。</span></div>`
      :`<div class="notice warn" style="margin-top:12px">${icon('info','ic sm')}<span>当前模型 ${esc(model()?model().label:'')} 不支持声音克隆，请先在顶栏切换到支持的模型。</span></div>`}`;
 }
@@ -1474,6 +1559,9 @@ async function saveEpisode(silent){
     voice_host:host.voice_id||'',
     voice_guest:(pod.speakers.find(s=>s.role!=='host')||{}).voice_id||'',
     speed:pod.speed,
+    bgm_file:pod.bgmOn&&pod.bgmFile?pod.bgmFile:'',
+    bgm_volume:pod.bgmVol,
+    bgm_duck:pod.bgmDuck,
   };
   try{
     if(pod.episode&&pod.episode.id){
@@ -1512,6 +1600,10 @@ async function loadEpisode(id){
     return{role:spk.role,name:l.name||spk.name,text:l.text};
   });
   pod.speed=pod.episode.speed||1;
+  pod.bgmFile=pod.episode.bgm_file||'';        // 载入剧集时还原其背景乐配置
+  pod.bgmOn=!!pod.bgmFile;
+  pod.bgmVol=Math.min(.5,Math.max(.05,+pod.episode.bgm_volume||.18));
+  pod.bgmDuck=pod.episode.bgm_duck!==0;
   pod.editLine=-1;
   renderPod();
   toast(`已载入「${pod.episode.title}」`);
@@ -1779,6 +1871,7 @@ async function testLLM(){
 function deriveRequest(){
   const m=model();const c=caps();
   const payload={text:state.text,model:state.model,speed:state.speed,stream:state.stream};
+  if(state.bgmOn&&state.bgmFile){payload.bgm_file=state.bgmFile;payload.bgm_volume=state.bgmVol;payload.bgm_duck=state.bgmDuck}
   if(state.group==='design'){
     payload.mode='instruct';payload.instruct_text=state.designText.trim();
     return payload;
@@ -1988,6 +2081,8 @@ function switchView(k){
     renderPod();renderPodEpisodes();
   }else if(k==='voices'){
     loadVoices().then(()=>{renderVoiceLibrary();renderVoiceSide()});
+  }else if(k==='bgm'){
+    loadBgm();
   }else if(k==='workbench'){
     $('#out-title').textContent='本次结果';
     $('#out-recent').hidden=false;
@@ -2061,7 +2156,7 @@ async function loadVoices(){
 }
 
 /* ================= 事件: 点击委托 ================= */
-document.addEventListener('click',e=>{
+document.addEventListener('click',async e=>{
   if(e.target.id==='llm-modal'){$('#llm-modal').hidden=true;return}
   if(e.target.id==='pod-detail-modal'){pod.detailOpen=false;$('#pod-detail-modal').hidden=true;return}
   if(e.target.id==='sys-settings-modal'){closeSysSettings();return}
@@ -2162,6 +2257,39 @@ document.addEventListener('click',e=>{
     if(pod.speakers.filter(s=>s.role!=='host').length<=1){toast('至少保留一位嘉宾',true);break}
     pod.speakers.splice(+t.dataset.i,1);renderPodCast();renderPodScript();renderPodStepper();break}
    case 'pod-out-tab':pod.outTab=k;renderPodOutput();break;
+   /* ---- 背景音乐 ---- */
+   case 'bgm-refresh':loadBgm().then(()=>toast('背景音乐列表已刷新'));break;
+   case 'bgm-upload':{const inp=$('#bgm-file-input');if(inp)inp.click();break}
+   case 'wb-bgm-toggle':state.bgmOn=!state.bgmOn;saveBgmPrefs();renderAdv();break;
+   case 'wb-bgm-duck':state.bgmDuck=!state.bgmDuck;saveBgmPrefs();renderAdv();break;
+   case 'pod-bgm-toggle':pod.bgmOn=!pod.bgmOn;renderPodCast();break;
+   case 'pod-bgm-duck':pod.bgmDuck=!pod.bgmDuck;renderPodCast();break;
+   case 'bgm-play':{const f=k;
+     if(bgmAudio&&bgmAudio.dataset.file===f){stopBgmPreview();break}
+     stopBgmPreview();
+     bgmAudio=new Audio(`/api/bgm/${encodeURIComponent(f)}/audio`);
+     bgmAudio.dataset.file=f;
+     bgmAudio.onended=bgmAudio.onerror=()=>{bgmAudio=null;renderBgmCards()};
+     bgmAudio.play().catch(e=>toast('试听失败: '+e.message,true));
+     renderBgmCards();break}
+   case 'bgm-rename':bgm.renaming=k;bgm.confirmDel=null;renderBgmCards();
+     {const inp=$('#bgm-rename-input');if(inp){inp.focus();inp.select()}}break;
+   case 'bgm-rename-cancel':bgm.renaming=null;renderBgmCards();break;
+   case 'bgm-rename-save':{const inp=$('#bgm-rename-input');const v=(inp&&inp.value||'').trim();
+     if(!v){toast('名称不能为空',true);break}
+     try{const j=await api(`/api/bgm/${encodeURIComponent(k)}`,{method:'PUT',
+       headers:{'Content-Type':'application/json'},body:JSON.stringify({name:v})}).then(r=>r.json());
+       if(state.bgmFile===k){state.bgmFile=j.file;saveBgmPrefs()}
+       if(pod.bgmFile===k)pod.bgmFile=j.file;
+       bgm.renaming=null;toast('已重命名');await loadBgm();
+     }catch(e){toast('重命名失败: '+e.message,true,6000)}break}
+   case 'bgm-del':{if(bgm.confirmDel!==k){bgm.confirmDel=k;renderBgmCards();break}
+     try{await api(`/api/bgm/${encodeURIComponent(k)}`,{method:'DELETE'});
+       if(bgmAudio&&bgmAudio.dataset.file===k)stopBgmPreview();
+       if(state.bgmFile===k){state.bgmFile='';saveBgmPrefs()}
+       if(pod.bgmFile===k){pod.bgmFile='';pod.bgmOn=false}
+       bgm.confirmDel=null;toast('已删除, 引用它的剧集已关闭背景乐');await loadBgm();
+     }catch(e){toast('删除失败: '+e.message,true,6000)}break}
    case 'pod-save':saveEpisode().catch(()=>{});break;   // 失败已在函数内 toast
    case 'pod-synth':synthPodFinal();break;
    case 'pod-play':{if(!podSynthDone()||!pod.episode){toast('请先合成成品',true);break}
@@ -2256,6 +2384,12 @@ document.addEventListener('click',e=>{
 });
 
 /* ================= 事件: 输入 / 变更 / 拖拽 / 键盘 ================= */
+document.addEventListener('change',e=>{
+  const id=e.target.id;
+  if(id==='wb-bgm-select'){state.bgmFile=e.target.value;saveBgmPrefs()}
+  if(id==='pod-bgm-select')pod.bgmFile=e.target.value;
+  if(id==='bgm-file-input'&&e.target.files&&e.target.files[0])uploadBgmFile(e.target.files[0]);
+});
 document.addEventListener('input',e=>{
   const id=e.target.id;
   if(id==='text-input'){state.text=e.target.value;$('#char-count').textContent=state.text.length+' / 2000';renderAction()}
@@ -2273,6 +2407,10 @@ document.addEventListener('input',e=>{
   if(id==='pod-line-edit-text')pod.editText=e.target.value;
   if(id==='pod-speed'){pod.speed=parseFloat(e.target.value);
     const v=$('#pod-speed').parentElement.querySelector('.range-val');if(v)v.textContent=pod.speed.toFixed(2)+'×';renderPodStepper()}
+  if(id==='wb-bgm-vol'){state.bgmVol=parseFloat(e.target.value)/100;saveBgmPrefs();
+    const v=e.target.parentElement.querySelector('.range-val');if(v)v.textContent=e.target.value+'%'}
+  if(id==='pod-bgm-vol'){pod.bgmVol=parseFloat(e.target.value)/100;
+    const v=e.target.parentElement.querySelector('.range-val');if(v)v.textContent=e.target.value+'%'}
   if(id==='voice-new-name'){vlib.name=e.target.value;vlibUpdateSave()}
   if(id==='voice-new-text'){vlib.prompt=e.target.value;vlibUpdateSave()}
   if(id==='voice-edit-name')vlib.editName=e.target.value;
@@ -2362,6 +2500,7 @@ player=new Player(onPlayerTick);
 syncThemeIcon();
 fetchHealth();
 loadVoices().then(()=>{renderSounds();renderPodCast()});
+loadBgm();
 loadTasks();
 loadEpisodes();
 connectSSE();

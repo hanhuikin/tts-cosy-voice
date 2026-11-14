@@ -20,16 +20,29 @@ from urllib.parse import urlparse
 
 import requests
 
-from .audio import pcm_to_wav, wav_header
+from .audio import BgmMixer, pcm_to_wav, wav_header
 from .engine import TTSRequest, engine
 from .model_registry import MODEL_REGISTRY
-from .storage import DATA_DIR, storage, audio_logger
+from .storage import BGM_DIR, DATA_DIR, storage, audio_logger
 
 logger = logging.getLogger("cosyvoice-server.podcast")
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 LIVE_DIR = DATA_DIR / "live"
 SAMPLE_RATE = 24000
+
+
+def _episode_mixer(ep: dict) -> Optional[BgmMixer]:
+    """按剧集的 BGM 配置构建混流器; 未启用/文件缺失返回 None (静默跳过混音)。"""
+    name = (ep.get("bgm_file") or "").strip()
+    if not name:
+        return None
+    p = BGM_DIR / Path(name).name
+    if not p.exists():
+        logger.warning("episode %s 的背景音乐缺失: %s, 跳过混音", ep.get("id"), name)
+        return None
+    return BgmMixer(p, float(ep.get("bgm_volume") or 0.18), SAMPLE_RATE,
+                    bool(ep.get("bgm_duck", 1)))
 
 
 def _log_episode_audio(ep_id: str, source: str, status: str, lines_done: int, n_bytes: int) -> None:
@@ -264,6 +277,7 @@ async def stream_episode_gen(ep_id: str):
     ep = storage.get_episode(ep_id)
     lines = json.loads(ep["script_json"])
     speakers = episode_speakers(ep)
+    mixer = _episode_mixer(ep)   # 逐块混流 (跨块保持循环位置与闪避包络)
     yield wav_header(SAMPLE_RATE, 600 * SAMPLE_RATE)
     parts: list[bytes] = []
     line_ends: list[int] = []   # 每句结束点的累计采样数 (与落盘 WAV 对应)
@@ -289,6 +303,7 @@ async def stream_episode_gen(ep_id: str):
                         if _synth_stop_requested(ep_id):
                             job.cancelled = True   # 分块边界停止推理, 部分句子丢弃
                             raise SynthStopped("手动停止")
+                        payload = mixer.mix(payload) if mixer else payload
                         parts.append(payload)
                         cum_bytes += len(payload)
                         if first_ms is None:
@@ -367,7 +382,11 @@ async def synth_episode_final(ep_id: str) -> None:
             done += 1
             storage.update_episode(ep_id, progress=done)
         if status == "completed" or all_parts:
-            wav = pcm_to_wav(all_parts, SAMPLE_RATE) if all_parts else b""
+            raw = b"".join(all_parts)
+            mixer = _episode_mixer(ep)
+            if mixer and raw:
+                raw = mixer.mix_full(raw)   # 整段混流: 循环 + 自动闪避 + 首尾淡入淡出
+            wav = pcm_to_wav([raw], SAMPLE_RATE) if raw else b""
             out = DATA_DIR / "podcasts" / f"{ep_id}.wav"
             out.parent.mkdir(parents=True, exist_ok=True)
             if all_parts:
@@ -553,6 +572,7 @@ class PushManager:
                 if proc.returncode not in (0, None):
                     raise RuntimeError(f"ffmpeg 退出码 {proc.returncode}: {self._stderr_tail[-200:]}")
             else:
+                mixer = _episode_mixer(ep)   # 推流链路逐块混流 (成品直推不需要: 成品已混)
                 # 阶段 1: 预缓冲
                 reservoir: list[bytes] = []
                 rsamples = 0
@@ -560,6 +580,8 @@ class PushManager:
                 idx = 0
                 while idx < len(lines) and rsamples < need and not self._stop_flag:
                     pcm = await synth_line_pcm(resolve_line_request(lines[idx], speakers))
+                    if mixer:
+                        pcm = mixer.mix(pcm)
                     reservoir.append(pcm)
                     rsamples += len(pcm) // 2
                     idx += 1
@@ -577,6 +599,8 @@ class PushManager:
                         status, error = "stopped", "手动停止"
                         break
                     pcm = await synth_line_pcm(resolve_line_request(lines[idx], speakers))
+                    if mixer:
+                        pcm = mixer.mix(pcm)
                     all_parts.append(pcm)
                     await loop.run_in_executor(None, self._write_stdin, proc, pcm)
                     idx += 1

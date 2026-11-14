@@ -157,6 +157,9 @@ class EpisodeBody(BaseModel):
     voice_host: str = ""
     voice_guest: str = ""
     speed: float = 1.0
+    bgm_file: str = ""          # 背景音乐文件名 (空=不混音); 合成时循环混入并自动闪避
+    bgm_volume: float = Field(default=0.18, ge=0.0, le=1.0)
+    bgm_duck: bool = True       # 自动闪避: 说话时压低背景乐
 
 
 def _episode_speakers_json(body: EpisodeBody) -> tuple[str, str, str]:
@@ -177,7 +180,9 @@ def create_episode(body: EpisodeBody):
     spk_json, host, guest = _episode_speakers_json(body)
     ep = storage.add_episode(body.title, body.source_type, body.source_ref,
                              json.dumps(body.lines, ensure_ascii=False),
-                             spk_json, host, guest)
+                             spk_json, host, guest,
+                             bgm_file=body.bgm_file, bgm_volume=body.bgm_volume,
+                             bgm_duck=body.bgm_duck)
     ep["speakers"] = json.loads(ep.pop("speakers_json", "[]") or "[]")
     return ep
 
@@ -219,7 +224,8 @@ def update_episode(pid: str, body: EpisodeBody):
         raise HTTPException(404, "episode not found")
     spk_json, host, guest = _episode_speakers_json(body)
     storage.update_episode(pid, title=body.title, script_json=json.dumps(body.lines, ensure_ascii=False),
-                           speakers_json=spk_json, voice_host=host, voice_guest=guest, speed=body.speed)
+                           speakers_json=spk_json, voice_host=host, voice_guest=guest, speed=body.speed,
+                           bgm_file=body.bgm_file, bgm_volume=body.bgm_volume, bgm_duck=body.bgm_duck)
     ep = storage.get_episode(pid)
     ep["speakers"] = json.loads(ep.pop("speakers_json", "[]") or "[]")
     return ep

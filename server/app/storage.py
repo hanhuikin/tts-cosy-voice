@@ -14,6 +14,7 @@ audio_logger = logging.getLogger("cosyvoice.audio")   # 每次音频产出的控
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 VOICES_DIR = DATA_DIR / "voices"
 TASKS_DIR = DATA_DIR / "tasks"
+BGM_DIR = DATA_DIR / "bgm"
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS voices (
@@ -61,6 +62,9 @@ CREATE TABLE IF NOT EXISTS podcasts (
     file TEXT,
     duration REAL,
     error TEXT,
+    bgm_file TEXT NOT NULL DEFAULT '',
+    bgm_volume REAL NOT NULL DEFAULT 0.18,
+    bgm_duck INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL
 );
 """
@@ -79,6 +83,7 @@ class Storage:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         VOICES_DIR.mkdir(parents=True, exist_ok=True)
         TASKS_DIR.mkdir(parents=True, exist_ok=True)
+        BGM_DIR.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(str(DATA_DIR / "db.sqlite"), check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._lock = threading.Lock()
@@ -90,6 +95,12 @@ class Storage:
                 self._db.execute("ALTER TABLE podcasts ADD COLUMN speakers_json TEXT NOT NULL DEFAULT '[]'")
             if "lines_meta" not in cols:
                 self._db.execute("ALTER TABLE podcasts ADD COLUMN lines_meta TEXT NOT NULL DEFAULT '[]'")
+            if "bgm_file" not in cols:   # 背景音乐: 使能关闭=空串; 混流在合成时进行
+                self._db.execute("ALTER TABLE podcasts ADD COLUMN bgm_file TEXT NOT NULL DEFAULT ''")
+            if "bgm_volume" not in cols:
+                self._db.execute("ALTER TABLE podcasts ADD COLUMN bgm_volume REAL NOT NULL DEFAULT 0.18")
+            if "bgm_duck" not in cols:
+                self._db.execute("ALTER TABLE podcasts ADD COLUMN bgm_duck INTEGER NOT NULL DEFAULT 1")
             tcols = {r[1] for r in self._db.execute("PRAGMA table_info(tasks)")}
             if "source" not in tcols:   # 调用来源 (api:/api/tts / openai:/v1/audio/speech / mcp:<工具>)
                 self._db.execute("ALTER TABLE tasks ADD COLUMN source TEXT")
@@ -220,13 +231,14 @@ class Storage:
     # ---------- podcasts ----------
     def add_episode(self, title: str, source_type: str, source_ref: str,
                     script_json: str, speakers_json: str = "[]",
-                    voice_host: str = "", voice_guest: str = "") -> dict:
+                    voice_host: str = "", voice_guest: str = "",
+                    bgm_file: str = "", bgm_volume: float = 0.18, bgm_duck: bool = True) -> dict:
         pid = new_id()
         self._exec(
-            "INSERT INTO podcasts(id,title,source_type,source_ref,script_json,speakers_json,voice_host,voice_guest,created_at)"
-            " VALUES(?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO podcasts(id,title,source_type,source_ref,script_json,speakers_json,voice_host,voice_guest,bgm_file,bgm_volume,bgm_duck,created_at)"
+            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (pid, title, source_type, source_ref, script_json, speakers_json,
-             voice_host, voice_guest, now_iso()),
+             voice_host, voice_guest, bgm_file, bgm_volume, int(bgm_duck), now_iso()),
         )
         return self.get_episode(pid)  # type: ignore[return-value]
 
@@ -242,7 +254,8 @@ class Storage:
         if not fields:
             return
         allowed = {"title", "script_json", "voice_host", "voice_guest", "speakers_json", "speed",
-                   "status", "progress", "file", "duration", "error", "lines_meta"}
+                   "status", "progress", "file", "duration", "error", "lines_meta",
+                   "bgm_file", "bgm_volume", "bgm_duck"}
         sets, params = [], []
         for k, v in fields.items():
             if k in allowed:
@@ -251,6 +264,14 @@ class Storage:
         if sets:
             params.append(pid)
             self._exec(f"UPDATE podcasts SET {', '.join(sets)} WHERE id=?", tuple(params))
+
+    def rename_episode_bgm(self, old: str, new: str) -> None:
+        """BGM 改名后同步剧集引用。"""
+        self._exec("UPDATE podcasts SET bgm_file=? WHERE bgm_file=?", (new, old))
+
+    def clear_episode_bgm(self, name: str) -> None:
+        """BGM 删除后关闭引用它的剧集的 BGM。"""
+        self._exec("UPDATE podcasts SET bgm_file='', bgm_duck=1 WHERE bgm_file=?", (name,))
 
     def delete_episode(self, pid: str) -> bool:
         ep = self.get_episode(pid)

@@ -27,6 +27,9 @@ class TTSRequest(BaseModel):
     instruct_text: Optional[str] = None
     speed: float = Field(default=1.0, ge=0.5, le=2.0)
     stream: bool = False
+    bgm_file: Optional[str] = None   # 背景音乐文件名 (data/bgm 下, 仅文件名; 空=不混音)
+    bgm_volume: float = Field(default=0.18, ge=0.0, le=1.0)   # BGM 基础音量
+    bgm_duck: bool = True            # 自动闪避: 说话时自动压低 BGM
 
 
 class OpenAISpeechRequest(BaseModel):

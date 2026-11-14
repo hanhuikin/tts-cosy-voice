@@ -221,6 +221,28 @@ duration, sample_rate, infer_ms, first_chunk_ms, error, source, created_at}`。
 
 剧集状态机: `draft → synthesizing → completed / stopped / failed`。
 
+## 背景音乐
+
+BGM 库保存在 `server/data/bgm/`; 合成时循环混入（短曲自动交叉淡化无缝循环）、
+说话时自动闪避（可关）、整段输出首尾淡入淡出。混流覆盖 `/api/tts`（流式/非流式）、
+播客 final / stream / 直播推流。预置 3 首免版权曲目可由 `scripts/gen_preset_bgm.py` 重新生成。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/bgm` | 曲目列表: `{items:[{file, name, size, duration}]}` |
+| POST | `/api/bgm` | 上传 (multipart `file`): wav/mp3/flac/m4a/mp4/aac/ogg/opus/webm ≤20MB; 解码校验, 重名自动加序号 |
+| PUT | `/api/bgm/{name}` | 重命名 `{"name": "新名"}`; 同步更新引用它的剧集 |
+| DELETE | `/api/bgm/{name}` | 删除; 引用它的剧集自动关闭 BGM |
+| GET | `/api/bgm/{name}/audio` | 试听原文件 |
+
+合成请求字段（`/api/tts` 与剧集 `EpisodeBody` 通用）:
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `bgm_file` | null/空 | 曲目文件名（data/bgm 下）; 空=不混音 |
+| `bgm_volume` | 0.18 | BGM 基础音量 0~1 |
+| `bgm_duck` | true | 自动闪避: 说话时压低到基础音量的 35% |
+
 ## MCP 接入
 
 服务内置 **Model Context Protocol** 支持, 三种传输共用同一套 13 个工具

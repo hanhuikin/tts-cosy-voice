@@ -54,6 +54,9 @@ class TTSRequest:
     instruct_text: Optional[str] = None
     speed: float = 1.0
     stream: bool = False
+    bgm_file: Optional[str] = None    # 背景音乐文件名 (混流由路由层做, 引擎不感知)
+    bgm_volume: float = 0.18
+    bgm_duck: bool = True             # 自动闪避: 说话时压低背景乐
 
 
 @dataclass(eq=False)  # 按身份哈希: 播客停止链路要把 Job 放进 set

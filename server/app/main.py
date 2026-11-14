@@ -20,7 +20,7 @@ setup_sys_path()
 
 from .engine import MODEL_REGISTRY, QUEUE_MAX, engine
 from .model_registry import MODEL_KEYS, is_available
-from .routes import mcp, podcast, system, tasks, tts, voices
+from .routes import bgm, mcp, podcast, system, tasks, tts, voices
 from .storage import DATA_DIR, storage
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -33,6 +33,7 @@ TAGS_METADATA = [
     {"name": "TTS 合成", "description": "文本转语音: 统一入口 `/api/tts` 与 OpenAI 兼容 `/v1/audio/speech`; "
                                         "完整接口说明见仓库 `docs/API.md`。"},
     {"name": "音色管理", "description": "参考音频上传克隆 / 音色增删改查 / 参考音频试听。"},
+    {"name": "背景音乐", "description": "BGM 库管理: 上传 / 改名 / 删除 / 试听; 合成时循环混入并自动闪避。"},
     {"name": "任务历史", "description": "合成任务记录查询 (含调用来源 source) 与音频下载 (WAV/MP3)。"},
     {"name": "播客工坊", "description": "LLM 对话稿生成 / 剧集管理 / 逐句合成 (final+stream) / 直播推流。"},
     {"name": "MCP", "description": "Model Context Protocol 接入: SSE (`/mcp/sse`) 与 Streamable HTTP "
@@ -68,6 +69,7 @@ async def no_cache_static(request, call_next):
 
 app.include_router(tts.router, tags=["TTS 合成"])
 app.include_router(voices.router, tags=["音色管理"])
+app.include_router(bgm.router, tags=["背景音乐"])
 app.include_router(tasks.router, tags=["任务历史"])
 app.include_router(system.router, tags=["系统"])
 app.include_router(podcast.router, tags=["播客工坊"])

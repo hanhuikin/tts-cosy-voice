@@ -8,14 +8,24 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 
-from ..audio import pcm_duration_seconds, pcm_to_wav, wav_header
+from ..audio import BgmMixer, pcm_duration_seconds, pcm_to_wav, wav_header
 from ..engine import MODEL_REGISTRY, QueueFullError, TTSRequest as EngineSpec, engine
 from ..schemas import OpenAISpeechRequest, TTSRequest  # pydantic 校验模型
-from ..storage import TASKS_DIR, storage
+from ..storage import BGM_DIR, TASKS_DIR, storage
 
 router = APIRouter()
 
 ESTIMATED_MAX_SECONDS = 600  # 流式 WAV 头里的占位时长
+
+
+def _bgm_mixer(spec: EngineSpec, sample_rate: int) -> BgmMixer | None:
+    """按请求里的 bgm_file 构建混流器; 未启用/文件缺失返回 None。"""
+    if not spec.bgm_file:
+        return None
+    p = BGM_DIR / Path(spec.bgm_file).name
+    if not p.exists():
+        return None
+    return BgmMixer(p, spec.bgm_volume, sample_rate, spec.bgm_duck)
 
 # 进行中的推理 job (task_id -> Job): 供 /api/tasks/{id}/stop 置取消标志。
 # 请求收尾 (成功/失败/断开) 时移除; 推理线程在分块边界检查标志后真正停止。
@@ -70,14 +80,15 @@ async def tts(body: TTSRequest, request: Request):
     _active_jobs[task_id] = job
 
     sample_rate = engine.status()["sample_rate"] or 24000
+    mixer = _bgm_mixer(spec, sample_rate)
 
     if spec.stream:
-        return _stream_response(job, task_id, sample_rate)
-    return await _collect_response(job, task_id, spec)
+        return _stream_response(job, task_id, sample_rate, mixer)
+    return await _collect_response(job, task_id, spec, mixer)
 
 
-async def _collect_response(job, task_id: str, spec: EngineSpec) -> Response:
-    """非流式: 收齐所有分块, 打完整 WAV 返回 (采样率以本 job 实际输出为准)。"""
+async def _collect_response(job, task_id: str, spec: EngineSpec, mixer: BgmMixer | None) -> Response:
+    """非流式: 收齐所有分块, (可选混流后) 打完整 WAV 返回 (采样率以本 job 实际输出为准)。"""
     parts: list[bytes] = []
     t0 = time.time()
     status, error = "ok", None
@@ -102,8 +113,11 @@ async def _collect_response(job, task_id: str, spec: EngineSpec) -> Response:
         _release_job(task_id)
         raise HTTPException(500, error or "no audio produced")
 
-    wav = pcm_to_wav(parts, sample_rate)
-    duration = pcm_duration_seconds(sum(len(p) for p in parts), sample_rate)
+    raw = b"".join(parts)
+    if mixer:
+        raw = mixer.mix_full(raw)   # 整段混流: 循环 + 自动闪避 + 首尾淡入淡出
+    wav = pcm_to_wav([raw], sample_rate)
+    duration = pcm_duration_seconds(len(raw), sample_rate)
     storage.finish_task(task_id, TASKS_DIR / f"{task_id}.wav", duration, sample_rate, "ok", None,
                         infer_ms, int((job.first_chunk_at - t0) * 1000) if job.first_chunk_at else None)
     (TASKS_DIR / f"{task_id}.wav").write_bytes(wav)
@@ -121,8 +135,8 @@ async def _collect_response(job, task_id: str, spec: EngineSpec) -> Response:
     )
 
 
-def _stream_response(job, task_id: str, sample_rate: int) -> StreamingResponse:
-    """流式: 先发 WAV 头 (占位长度), 再顺序发 PCM 分块; 结束后落盘完整 WAV 到历史。"""
+def _stream_response(job, task_id: str, sample_rate: int, mixer: BgmMixer | None) -> StreamingResponse:
+    """流式: 先发 WAV 头 (占位长度), 再顺序发 (可选逐块混流的) PCM 分块; 结束后落盘完整 WAV 到历史。"""
     total_bytes = 0
     parts: list[bytes] = []
     t0 = time.time()
@@ -138,11 +152,12 @@ def _stream_response(job, task_id: str, sample_rate: int) -> StreamingResponse:
         try:
             async for kind, payload in engine.drain(job):
                 if kind == "chunk":
-                    parts.append(payload)
-                    total_bytes += len(payload)
+                    chunk = mixer.mix(payload) if mixer else payload   # 逐块混流 (跨块保持循环位置与闪避包络)
+                    parts.append(chunk)
+                    total_bytes += len(chunk)
                     if state["first_ms"] is None:
                         state["first_ms"] = int((time.time() - t0) * 1000)
-                    yield payload
+                    yield chunk
                 elif kind == "cancelled":
                     status, error, cancelled = "failed", "已停止", True
                     break
@@ -248,4 +263,4 @@ async def openai_speech(body: OpenAISpeechRequest):
         job = await engine.submit(spec)
     except QueueFullError:
         raise HTTPException(429, "server busy")
-    return await _collect_response(job, task_id, spec)
+    return await _collect_response(job, task_id, spec, None)   # OpenAI 兼容端点不做 BGM 混流
