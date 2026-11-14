@@ -1,5 +1,12 @@
 /* Voice Studio 设计系统 — 移植自 design/prototype.html (v1.8), 与原型逐条一致 */
-:root{--r-card:16px;--r-ctl:10px;--r-pill:999px;--sp:4px;--ease:cubic-bezier(.22,.8,.3,1)}
+:root{--r-card:16px;--r-ctl:10px;--r-pill:999px;--sp:4px;--ease:cubic-bezier(.22,.8,.3,1);
+  --font-ui:Inter,"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif}
+/* ---------- 字体皮肤 (data-font; 均为 Windows 自带字体, 无需下载) ---------- */
+:root[data-font="deng"]{--font-ui:"DengXian","DengXian Light","Microsoft YaHei",system-ui,sans-serif}
+:root[data-font="song"]{--font-ui:"SimSun","NSimSun","Songti SC","Noto Serif SC",serif}
+:root[data-font="kai"]{--font-ui:"KaiTi","STKaiti","Kaiti SC","Noto Serif SC",serif}
+:root[data-font="hei"]{--font-ui:"SimHei","Heiti SC","Source Han Sans CN","Microsoft YaHei",sans-serif}
+:root[data-font="mono"]{--font-ui:"Cascadia Mono","Consolas","Menlo",ui-monospace,"Microsoft YaHei",monospace}
 :root[data-theme="light"]{
   --bg:#F4F6FC;--surface:#FFFFFF;--surface-2:#F8F9FD;--surface-3:#EDF1F9;
   --line:#E4E9F3;--line-2:#D3DBEA;--text:#151B2E;--text-2:#58637B;--text-3:#8B96AD;
@@ -8,6 +15,7 @@
   --warn:#B07015;--warn-soft:#FFF3DC;--danger:#CF4247;--danger-soft:#FDECEC;
   --shadow:0 1px 2px rgba(21,27,46,.04),0 10px 30px rgba(21,27,46,.06);
   --shadow-sm:0 1px 3px rgba(21,27,46,.06);
+  --wave-idle:#c9d3e4;
 }
 :root[data-theme="dark"]{
   --bg:#0B1020;--surface:#121A2C;--surface-2:#161F33;--surface-3:#1D2840;
@@ -17,10 +25,92 @@
   --warn:#F0B75A;--warn-soft:#3A2D14;--danger:#F08287;--danger-soft:#3B1D24;
   --shadow:0 1px 2px rgba(0,0,0,.2),0 12px 32px rgba(0,0,0,.28);
   --shadow-sm:0 1px 3px rgba(0,0,0,.24);
+  --wave-idle:#3a465e;
 }
+/* ---------- 皮肤 (语义 token 全量覆盖; --wave-idle 为波形未播放条颜色) ---------- */
+:root[data-theme="ocean"]{   /* 深海: 墨青底 + 水鸭绿主色 + 珊瑚点缀 */
+  --bg:#071A1F;--surface:#0C242B;--surface-2:#102C34;--surface-3:#163943;
+  --line:#1C4450;--line-2:#2A5A68;--text:#E4F4F6;--text-2:#8FB4BC;--text-3:#5F8792;
+  --primary:#2FD4C2;--primary-2:#63E7D8;--primary-soft:#0E3F3D;--primary-ink:#04201E;
+  --accent:#FF9E6D;--accent-soft:#3D2517;--ok:#5BE0A7;--ok-soft:#0F3A2A;
+  --warn:#F5C065;--warn-soft:#3B2E12;--danger:#F5838F;--danger-soft:#3E1B23;
+  --shadow:0 1px 2px rgba(0,0,0,.22),0 12px 32px rgba(0,0,0,.3);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.26);
+  --wave-idle:#28505B;
+}
+:root[data-theme="forest"]{   /* 松林: 深绿底 + 苔绿主色 + 琥珀点缀 */
+  --bg:#0D1510;--surface:#132017;--surface-2:#17271C;--surface-3:#1E3224;
+  --line:#26402E;--line-2:#34563D;--text:#E8F2E9;--text-2:#9DB8A2;--text-3:#6C8A73;
+  --primary:#7BC96F;--primary-2:#98DB8C;--primary-soft:#1C3A22;--primary-ink:#0B1A0E;
+  --accent:#E39A3B;--accent-soft:#392A10;--ok:#5FD39A;--ok-soft:#123524;
+  --warn:#EFC76A;--warn-soft:#3B3114;--danger:#F08A7A;--danger-soft:#3E1F19;
+  --shadow:0 1px 2px rgba(0,0,0,.2),0 12px 32px rgba(0,0,0,.28);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.24);
+  --wave-idle:#31473A;
+}
+:root[data-theme="grape"]{   /* 幻夜紫: 深紫底 + 紫罗兰主色 + 樱粉点缀 */
+  --bg:#130F1F;--surface:#1B152B;--surface-2:#201936;--surface-3:#292044;
+  --line:#332853;--line-2:#453670;--text:#F0EAFB;--text-2:#AC9FC9;--text-3:#7E6FA0;
+  --primary:#B08CFF;--primary-2:#C7A8FF;--primary-soft:#2E2356;--primary-ink:#160F2B;
+  --accent:#FF9BC0;--accent-soft:#3C1F30;--ok:#6FD5B2;--ok-soft:#12332A;
+  --warn:#F0C36A;--warn-soft:#3A2E12;--danger:#F583A0;--danger-soft:#3B1B28;
+  --shadow:0 1px 2px rgba(0,0,0,.22),0 12px 32px rgba(0,0,0,.3);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.26);
+  --wave-idle:#3D3260;
+}
+:root[data-theme="graphite"]{   /* 石墨灰: 中性灰底 + 钢蓝灰主色 + 亮银点缀 */
+  --bg:#0F1113;--surface:#16181B;--surface-2:#1B1E21;--surface-3:#232730;
+  --line:#2A2F35;--line-2:#3A4148;--text:#EDEFF2;--text-2:#A3AAB4;--text-3:#6F7680;
+  --primary:#94A8BF;--primary-2:#AEC2D8;--primary-soft:#232B35;--primary-ink:#0D1218;
+  --accent:#C9CFD7;--accent-soft:#2A2F36;--ok:#7AC79E;--ok-soft:#1B2E26;
+  --warn:#D9BC7A;--warn-soft:#2E2918;--danger:#E08B8B;--danger-soft:#33201F;
+  --shadow:0 1px 2px rgba(0,0,0,.24),0 12px 32px rgba(0,0,0,.32);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.28);
+  --wave-idle:#3A4149;
+}
+:root[data-theme="onyx"]{   /* 曜石黑: 纯黑 OLED 底 + 亮白主色 + 琥珀点缀 */
+  --bg:#000000;--surface:#0A0A0C;--surface-2:#101013;--surface-3:#17171B;
+  --line:#222226;--line-2:#333338;--text:#F2F2F4;--text-2:#A8A8B0;--text-3:#6E6E76;
+  --primary:#F2F2F4;--primary-2:#FFFFFF;--primary-soft:#1C1C21;--primary-ink:#0A0A0C;
+  --accent:#E8A558;--accent-soft:#2B2114;--ok:#6FD69C;--ok-soft:#12241B;
+  --warn:#E8C06A;--warn-soft:#2A2312;--danger:#EF8A8A;--danger-soft:#2E1A1A;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.5);
+  --shadow-sm:0 1px 3px rgba(0,0,0,.45);
+  --wave-idle:#2A2A30;
+}
+:root[data-theme="sepia"]{   /* 暖沙: 羊皮纸底 + 陶土主色 + 橄榄点缀 */
+  --bg:#F7F1E8;--surface:#FFFDF9;--surface-2:#FAF5EC;--surface-3:#F1E9DB;
+  --line:#E7DCCC;--line-2:#D8C7AE;--text:#2E2418;--text-2:#6E5F4C;--text-3:#9C8E79;
+  --primary:#B4692D;--primary-2:#C97F42;--primary-soft:#F7E8DA;--primary-ink:#FFFFFF;
+  --accent:#5F7E52;--accent-soft:#E6EEDF;--ok:#4E7D45;--ok-soft:#E5F1E0;
+  --warn:#A87718;--warn-soft:#F9EFD4;--danger:#C04C42;--danger-soft:#FBE9E7;
+  --shadow:0 1px 2px rgba(46,36,24,.05),0 10px 30px rgba(46,36,24,.07);
+  --shadow-sm:0 1px 3px rgba(46,36,24,.08);
+  --wave-idle:#D8C9B2;
+}
+:root[data-theme="sakura"]{   /* 樱粉: 浅粉底 + 玫红主色 + 藤紫点缀 */
+  --bg:#FBF3F6;--surface:#FFFDFE;--surface-2:#FBF1F5;--surface-3:#F5E4EC;
+  --line:#F0DCE5;--line-2:#E2C4D2;--text:#33202B;--text-2:#7A5E6D;--text-3:#A98A9A;
+  --primary:#D4547E;--primary-2:#E0709A;--primary-soft:#FBE3EC;--primary-ink:#FFFFFF;
+  --accent:#8A6FD1;--accent-soft:#EEE8FA;--ok:#4E9B6F;--ok-soft:#E3F2E8;
+  --warn:#B37A1C;--warn-soft:#F9EFD8;--danger:#CE4A5E;--danger-soft:#FBE7EA;
+  --shadow:0 1px 2px rgba(51,32,43,.04),0 10px 30px rgba(51,32,43,.06);
+  --shadow-sm:0 1px 3px rgba(51,32,43,.07);
+  --wave-idle:#E3CBD6;
+}
+/* 主题下拉 (复用 .menu; 色板小圆点展示 bg/primary/accent 三色) */
+.theme-wrap{position:relative}
+.menu.themes{width:248px}
+.menu.themes .menu-item .swatch{display:flex;gap:4px;flex:none}
+.menu.themes .menu-item .swatch i{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.18);flex:none}
+.menu.themes .menu-item .f-prev{font-size:16px}
+.font-btn-label{font-size:13px;font-weight:700;letter-spacing:.5px;line-height:1}
+/* 下载格式浮层: 跟随被点击的下载按钮 (fixed 定位, 全局唯一实例) */
+.dl-menu{position:fixed;z-index:90;width:186px}
+.dl-menu .mi-note{white-space:nowrap}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{background:var(--bg);color:var(--text);font-family:Inter,"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
 button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer;border:none;background:none}
 :focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:6px}

@@ -6,8 +6,16 @@
 <meta name="color-scheme" content="dark light">
 <title>Voice Studio · 语音创作控制台</title>
 <script>
-/* 首帧前应用主题: localStorage 记忆 > 系统偏好 > 深色 (防闪烁) — 与原型一致 (vs-theme) */
-(function(){try{var t=localStorage.getItem('vs-theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t)}catch(e){}})();
+/* 首帧前应用主题与字体: localStorage 记忆 > 系统偏好 > 深色/默认 (防闪烁) — 与原型一致 (vs-theme/vs-font) */
+(function(){try{
+  var KS=['dark','light','ocean','forest','grape','graphite','onyx','sepia','sakura'];
+  var t=localStorage.getItem('vs-theme');
+  if(KS.indexOf(t)<0)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+  document.documentElement.setAttribute('data-theme',t);
+  var FK=['default','deng','song','kai','hei','mono'];
+  var f=localStorage.getItem('vs-font');
+  if(FK.indexOf(f)>=0)document.documentElement.setAttribute('data-font',f)
+}catch(e){}})();
 </script>
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙</text></svg>">
@@ -55,7 +63,14 @@
       </button>
       <div class="menu" id="model-menu" role="listbox" hidden></div>
     </div>
-    <button class="icon-btn" data-act="theme" title="切换明暗主题" aria-label="切换明暗主题"><svg class="ic" id="theme-icon"><use href="#i-moon"/></svg></button>
+    <div class="theme-wrap">
+      <button class="icon-btn" id="theme-btn" data-act="theme" title="主题皮肤" aria-label="选择主题皮肤" aria-haspopup="listbox" aria-expanded="false"><svg class="ic" id="theme-icon"><use href="#i-moon"/></svg></button>
+      <div class="menu themes" id="theme-menu" role="listbox" hidden></div>
+    </div>
+    <div class="theme-wrap">
+      <button class="icon-btn" id="font-btn" data-act="font" title="字体" aria-label="选择字体" aria-haspopup="listbox" aria-expanded="false"><span class="font-btn-label" aria-hidden="true">Aa</span></button>
+      <div class="menu themes" id="font-menu" role="listbox" hidden></div>
+    </div>
     <button class="icon-btn" data-act="help" title="快捷键说明" aria-label="快捷键说明"><svg class="ic"><use href="#i-info"/></svg></button>
   </header>
 
@@ -221,6 +236,7 @@
   </div>
 </div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
+<div class="menu dl-menu" id="dl-menu" role="menu" hidden></div>
 <script src="app.js"></script>
 </body>
 </html>

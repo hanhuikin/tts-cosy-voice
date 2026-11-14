@@ -269,9 +269,10 @@ function paintWave(canvas,peaks,progress){
       const grad=g.createLinearGradient(x,0,x,h);
       grad.addColorStop(0,'#4f8cff');grad.addColorStop(1,'#22d3ee');
       g.fillStyle=grad;
-    }else{
-      g.fillStyle=document.documentElement.dataset.theme==='light'?'#c9d3e4':'#3a465e';
-    }
+      }else{
+        /* 未播放条颜色随皮肤: 读 --wave-idle 令牌 (各主题在 style.css 定义) */
+        g.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--wave-idle').trim()||'#3a465e';
+      }
     g.beginPath();
     const r=Math.min(barW/2,2);
     g.roundRect(x,(h-bh)/2,barW,bh,r);
@@ -394,7 +395,7 @@ const TITLES={workbench:['创作台','把文字变成声音'],podcast:['播客�
 
 const state={view:'workbench',model:'cosyvoice3',modelTouched:false,group:'preset',pick:null,
   text:'',designText:'',refText:'',speed:1,lang:'',stream:false,instruct:'',
-  busy:false,previewBusy:false,genProg:0,result:null,menu:false,tasks:[],filter:'全部',bars:[],
+  busy:false,previewBusy:false,genProg:0,result:null,menu:false,themeMenu:false,fontMenu:false,dl:null,tasks:[],filter:'全部',bars:[],
   genTaskId:null,genAbort:null,genStopping:false};
 state.bars=Array.from({length:40},(_,i)=>18+Math.round(Math.abs(Math.sin(i*1.7)*Math.cos(i*.43))*32));
 const voices=[];
@@ -493,8 +494,76 @@ function podEpisodeTasks(){
 }
 
 /* ================= 主题 ================= */
-function syncThemeIcon(){const d=document.documentElement.getAttribute('data-theme')==='dark';
-  $('#theme-icon').innerHTML=`<use href="#i-${d?'sun':'moon'}"/>`}
+/* ================= 主题皮肤 =================
+   皮肤清单与 style.css 的 :root[data-theme=...] 一一对应; sw 为菜单色板 [surface,primary,accent] */
+const THEMES=[
+  {key:'dark',label:'深夜蓝',mode:'dark',sw:['#121A2C','#838DFF','#39D3C5']},
+  {key:'light',label:'晨雾白',mode:'light',sw:['#FFFFFF','#4F5BD5','#0E9E95']},
+  {key:'ocean',label:'深海',mode:'dark',sw:['#0C242B','#2FD4C2','#FF9E6D']},
+  {key:'forest',label:'松林',mode:'dark',sw:['#132017','#7BC96F','#E39A3B']},
+  {key:'grape',label:'幻夜紫',mode:'dark',sw:['#1B152B','#B08CFF','#FF9BC0']},
+  {key:'graphite',label:'石墨灰',mode:'dark',sw:['#16181B','#94A8BF','#C9CFD7']},
+  {key:'onyx',label:'曜石黑',mode:'dark',sw:['#0A0A0C','#F2F2F4','#E8A558']},
+  {key:'sepia',label:'暖沙',mode:'light',sw:['#FFFDF9','#B4692D','#5F7E52']},
+  {key:'sakura',label:'樱粉',mode:'light',sw:['#FFFDFE','#D4547E','#8A6FD1']},
+];
+function themeMode(){const t=THEMES.find(x=>x.key===document.documentElement.getAttribute('data-theme'));return t?t.mode:'dark'}
+function syncThemeIcon(){const d=themeMode()==='dark';
+  const meta=document.querySelector('meta[name="color-scheme"]');
+  if(meta)meta.content=d?'dark':'light';   // 表单控件/滚动条配色跟随当前皮肤明暗
+  $('#theme-icon').innerHTML=`<use href="#i-${d?'moon':'sun'}"/>`}
+/* 主题皮肤与字体是两个独立按钮/菜单, 各自渲染自己的分组 */
+function syncThemeMenu(){
+  const btn=$('#theme-btn');
+  if(btn)btn.setAttribute('aria-expanded',state.themeMenu);
+  const m=$('#theme-menu');if(!m)return;
+  m.hidden=!state.themeMenu;
+  if(m.hidden)return;
+  const cur=document.documentElement.getAttribute('data-theme');
+  m.innerHTML=`<div class="menu-head">主题皮肤 · ${THEMES.length} 套</div>`
+   +THEMES.map(t=>`
+   <button class="menu-item" data-act="theme-pick" data-key="${t.key}" role="option" aria-selected="${t.key===cur}">
+    <span class="swatch" aria-hidden="true"><i style="background:${t.sw[0]}"></i><i style="background:${t.sw[1]}"></i><i style="background:${t.sw[2]}"></i></span>
+    <span class="mi-main"><span class="mi-name">${t.label}</span><span class="mi-note">${t.mode==='dark'?'深色':'浅色'}</span></span>
+    ${t.key===cur?icon('check','ic sm mi-check'):''}</button>`).join('');
+}
+function syncFontMenu(){
+  const btn=$('#font-btn');
+  if(btn)btn.setAttribute('aria-expanded',state.fontMenu);
+  const m=$('#font-menu');if(!m)return;
+  m.hidden=!state.fontMenu;
+  if(m.hidden)return;
+  const cur=document.documentElement.getAttribute('data-font')||'default';
+  m.innerHTML=`<div class="menu-head">字体 · ${FONTS.length} 套</div>`
+   +FONTS.map(f=>`
+   <button class="menu-item" data-act="font-pick" data-key="${f.key}" role="option" aria-selected="${f.key===cur}">
+    <span class="mi-main"><span class="mi-name f-prev" ${f.css?`style="font-family:${f.css}"`:''}>${f.label}</span><span class="mi-note">${f.note}</span></span>
+    ${f.key===cur?icon('check','ic sm mi-check'):''}</button>`).join('');
+}
+/* 应用皮肤: 属性 + color-scheme(表单控件跟随) + localStorage + 波形重绘 */
+function applyTheme(k){
+  const t=THEMES.find(x=>x.key===k)||THEMES[0];
+  document.documentElement.setAttribute('data-theme',t.key);
+  const meta=document.querySelector('meta[name="color-scheme"]');
+  if(meta)meta.content=t.mode;
+  try{localStorage.setItem('vs-theme',t.key)}catch(_){}
+  syncThemeIcon();syncThemeMenu();drawVisibleWave();
+}
+/* 字体皮肤: 均为 Windows 自带字体; stack 与 style.css 的 :root[data-font=...] 一致 (菜单预览用) */
+const FONTS=[
+  {key:'default',label:'默认现代',note:'Inter · 微软雅黑',css:''},
+  {key:'deng',label:'等线轻盈',note:'DengXian',css:'"DengXian","DengXian Light","Microsoft YaHei",system-ui,sans-serif'},
+  {key:'song',label:'宋体阅读',note:'SimSun · 衬线',css:'"SimSun","NSimSun","Songti SC","Noto Serif SC",serif'},
+  {key:'kai',label:'楷体温润',note:'KaiTi · 衬线',css:'"KaiTi","STKaiti","Kaiti SC","Noto Serif SC",serif'},
+  {key:'hei',label:'黑体浓墨',note:'SimHei',css:'"SimHei","Heiti SC","Source Han Sans CN","Microsoft YaHei",sans-serif'},
+  {key:'mono',label:'等宽工整',note:'Cascadia Mono',css:'"Cascadia Mono","Consolas","Menlo",ui-monospace,"Microsoft YaHei",monospace'},
+];
+function applyFont(k){
+  if(!FONTS.some(x=>x.key===k))k='default';
+  document.documentElement.setAttribute('data-font',k);
+  try{localStorage.setItem('vs-font',k)}catch(_){}
+  syncFontMenu();
+}
 
 /* ================= 模型菜单 / 能力提示 ================= */
 function renderModelMenu(){
@@ -654,7 +723,7 @@ function renderOutput(){
    <canvas class="pb-wave-c" id="wave" style="height:44px"></canvas>
    <div class="times"><span id="t-cur">${fmt(playerState.position)}</span><span>${fmt(playerState.duration||r.dur)}</span></div>
    <div class="player-ctrl"><button class="play-main" data-act="play" aria-label="播放或暂停">${icon(playerState.playing?'pause':'play','ic sm')}</button>
-    <button class="mini-btn" data-act="download" title="下载 WAV">${icon('down','ic sm')}</button>
+    <button class="mini-btn" data-act="download" title="下载音频 (WAV/MP3)">${icon('down','ic sm')}</button>
     <button class="mini-btn" data-act="reuse" title="复用参数">${icon('copy','ic sm')}</button>
     <span style="flex:1"></span><span class="tag">${playerState.sampleRate?playerState.sampleRate+' Hz':(health.sample_rate||'—')+' Hz'}</span></div></div>`;
   syncPlayer();
@@ -1106,7 +1175,7 @@ function renderPodOutput(){
      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn sec" data-act="pod-synth" ${pod.lines.length&&!busy&&!pod.busyStream?'':'disabled'}>${busy?`合成中 ${pod.progress||0}/${pod.lines.length}`:'合成播客成品'}</button>
       <button class="btn sec" data-act="pod-synth-stop" ${busy&&!pod.stopping?'':'disabled'}>${pod.stopping?'停止中…':'■ 停止'}</button>
       <button class="btn sec" data-act="pod-play" ${done?'':'disabled'}>${icon('play','ic sm')}试听</button>
-      <button class="btn sec" data-act="pod-download" ${done?'':'disabled'}>${icon('down','ic sm')}下载 WAV</button></div>
+      <button class="btn sec" data-act="pod-download" ${done?'':'disabled'}>${icon('down','ic sm')}下载成品</button></div>
      ${!pod.lines.length?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>请先生成或载入对话稿，才能合成成品。</span></div>`:''}
     </div><div>
      <div class="result-card"><p class="result-title">${pod.episode?esc(pod.episode.title):'当前剧集尚未合成'}</p>
@@ -1126,7 +1195,7 @@ function renderPodOutput(){
      ${pod.busyStream?`<div class="notice" style="margin-top:10px">${icon('info','ic sm')}<span id="pod-stream-notice-text">${playerState.firstMs?`正在播放 · 首包 ${playerState.firstMs} ms`
         :caps().stream?`正在合成首句，${esc(model()?model().label:'当前模型')} 逐块下发，首包到达即开始播放`
         :`等待首包…（${esc(model()?model().label:'当前模型')} 为整段缓冲型，首句合成完才开始下发）`}</span></div>`
-       :done?`<div class="notice" style="margin-top:10px">${icon('info','ic sm')}<span>播放完成，成品已自动归档；可切到「成品合成」下载 WAV。</span></div>`:''}
+       :done?`<div class="notice" style="margin-top:10px">${icon('info','ic sm')}<span>播放完成，成品已自动归档；可切到「成品合成」下载 WAV 或 MP3。</span></div>`:''}
     </div><div>
      <div class="result-card"><p class="result-title">${pod.busyStream?'流式播放中':(done?'流式播放完成 · 已归档':'尚未开始流式播放')}</p>
       <div class="result-meta" id="pod-stream-meta">${pod.lines.length} 轮 · 24 kHz WAV${playerState.firstMs?` · 首包 ${playerState.firstMs} ms`:''}${pod.busyStream&&!playerState.firstMs?' · 等待首包…':''}</div>
@@ -1629,6 +1698,32 @@ async function refreshPodEpisode(pid){
   try{pod.episode=await(await api(`/api/podcast/episodes/${pid}`)).json();renderPod()}catch(e){}
 }
 
+/* ================= 下载格式 =================
+   下载按钮统一弹浮层选 WAV/MP3; ctx 记在 state.dl, 选定后拼 audio URL 触发浏览器下载 */
+function dlClose(){const m=$('#dl-menu');if(m&&!m.hidden)m.hidden=true}
+function openDlMenu(btn,ctx){
+  state.dl=ctx;
+  const m=$('#dl-menu');
+  m.innerHTML=`<div class="menu-head">选择下载格式</div>
+   <button class="menu-item" data-act="dl-do" data-key="wav" role="menuitem">
+    <span class="mi-main"><span class="mi-name">WAV 无损</span><span class="mi-note">原始质量 · 体积大</span></span></button>
+   <button class="menu-item" data-act="dl-do" data-key="mp3" role="menuitem">
+    <span class="mi-main"><span class="mi-name">MP3</span><span class="mi-note">128 kbps · 体积约为 WAV 的 6%</span></span></button>`;
+  const r=btn.getBoundingClientRect();
+  m.style.top=Math.min(r.bottom+6,innerHeight-120)+'px';
+  m.style.left=Math.max(8,Math.min(r.left-60,innerWidth-198))+'px';
+  m.hidden=false;
+}
+function dlDo(fmt){
+  const c=state.dl;dlClose();if(!c)return;
+  const base=c.kind==='episode'?`/api/podcast/episodes/${c.id}/audio`:`/api/tasks/${c.id}/audio`;
+  const a=document.createElement('a');
+  a.href=fmt==='mp3'?`${base}?format=mp3`:base;
+  a.download=(c.name||c.id)+(fmt==='mp3'?'.mp3':'.wav');
+  a.click();
+  if(fmt==='mp3')toast('MP3 转码中，稍候浏览器开始下载');
+}
+
 /* ================= 大模型配置 ================= */
 async function refreshLLM(){
   try{Object.assign(llmCfg,await(await api('/api/llm/config')).json())}catch(e){}
@@ -1916,8 +2011,8 @@ function setModel(k,fromUser){
   if(!c.stream)state.stream=false;
   if(!c.lang&&!c.crossLingual)state.lang='';
   if(!c.instruct)state.instruct='';
-  state.menu=false;
-  renderModelMenu();renderCapNotice();renderTabs();renderSounds();renderAdv();renderAction();
+  state.menu=false;state.themeMenu=false;state.fontMenu=false;
+  renderModelMenu();syncThemeMenu();syncFontMenu();renderCapNotice();renderTabs();renderSounds();renderAdv();renderAction();
   if(fromUser)toast(`已切换到 ${m?m.label:k}`);
 }
 
@@ -1959,14 +2054,18 @@ document.addEventListener('click',e=>{
   if(e.target.id==='pod-detail-modal'){pod.detailOpen=false;$('#pod-detail-modal').hidden=true;return}
   if(e.target.id==='sys-settings-modal'){closeSysSettings();return}
   const t=e.target.closest('[data-act]');
-  if(!t){if(state.menu){state.menu=false;renderModelMenu()}return}
+  if(!t){if(state.menu){state.menu=false;renderModelMenu()}
+    if(state.themeMenu){state.themeMenu=false;syncThemeMenu()}
+    if(state.fontMenu){state.fontMenu=false;syncFontMenu()}
+    dlClose();return}
   const a=t.dataset.act,k=t.dataset.key;
+  if(!['download','download-task','pod-download','pod-ep-download','dl-do'].includes(a))dlClose();   // 点其他控件时收起下载浮层
   switch(a){
    case 'view':switchView(k);break;
-   case 'theme':{const d=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
-    document.documentElement.setAttribute('data-theme',d);
-    try{localStorage.setItem('vs-theme',d)}catch(_){}
-    syncThemeIcon();drawVisibleWave();break}
+   case 'theme':state.themeMenu=!state.themeMenu;state.fontMenu=false;syncThemeMenu();syncFontMenu();break;
+   case 'font':state.fontMenu=!state.fontMenu;state.themeMenu=false;syncFontMenu();syncThemeMenu();break;
+   case 'theme-pick':state.themeMenu=false;applyTheme(k);break;
+   case 'font-pick':state.fontMenu=false;applyFont(k);break;
    case 'help':toast('快捷键：Ctrl/⌘ + Enter 生成 · 空格播放/暂停 · Esc 关闭菜单',true);break;
    case 'toggle-menu':state.menu=!state.menu;renderModelMenu();break;
    case 'model':switchModel(k,true);break;
@@ -2001,8 +2100,9 @@ document.addEventListener('click',e=>{
    case 'play':player.togglePlay();break;
    case 'download':{const r=state.result;
     if(!r||!r.taskId){toast('试听音频不支持下载',true);break}
-    const a1=document.createElement('a');a1.href=`/api/tasks/${r.taskId}/audio`;a1.download=`${r.taskId}.wav`;a1.click();break}
-   case 'download-task':{const a2=document.createElement('a');a2.href=`/api/tasks/${k}/audio`;a2.download=`${k}.wav`;a2.click();break}
+    openDlMenu(t,{kind:'task',id:r.taskId,name:(r.title||'语音').replace(/[\\/:*?"<>|]/g,'_').slice(0,40)});break}
+   case 'download-task':openDlMenu(t,{kind:'task',id:k,name:k});break;
+   case 'dl-do':dlDo(k);break;
    case 'reuse':{const r=state.result;
     const t2=state.tasks.find(x=>x.id===r.taskId);
     if(t2)reloadParams(t2);else switchView('workbench');
@@ -2060,9 +2160,9 @@ document.addEventListener('click',e=>{
     break}
    case 'pod-download':case 'pod-ep-download':{
     const eid=(a==='pod-download'?(pod.episode&&pod.episode.id):k);
+    if(!eid){toast('请先合成成品',true);break}
     const ep=pod.episodes.find(x=>x.id===eid)||pod.episode;
-    const a3=document.createElement('a');
-    a3.href=`/api/podcast/episodes/${eid}/audio`;a3.download=(ep?ep.title:eid)+'.wav';a3.click();break}
+    openDlMenu(t,{kind:'episode',id:eid,name:((ep&&ep.title)||eid).replace(/[\\/:*?"<>|]/g,'_').slice(0,60)});break}
    case 'pod-stream':synthPodStream();break;
    case 'pod-push-toggle':pod.pushOn=!pod.pushOn;renderPodOutput();break;
    case 'pod-proto':pod.protocol=k;renderPodOutput();break;
@@ -2232,6 +2332,9 @@ document.addEventListener('keydown',e=>{
     if(pod.detailOpen){pod.detailOpen=false;$('#pod-detail-modal').hidden=true}
     if(sys.settings)closeSysSettings();
     if(state.menu){state.menu=false;renderModelMenu()}
+    if(state.themeMenu){state.themeMenu=false;syncThemeMenu()}
+    if(state.fontMenu){state.fontMenu=false;syncFontMenu()}
+    dlClose();
   }
   if((e.key==='Enter'||e.key===' ')&&e.target.closest&&e.target.closest('[data-act="sys-path"]')){
     e.preventDefault();const pk=e.target.closest('[data-act="sys-path"]').dataset.key;

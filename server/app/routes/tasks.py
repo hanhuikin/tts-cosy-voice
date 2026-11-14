@@ -1,9 +1,12 @@
 """任务历史路由。"""
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
+from .. import podcast
 from ..storage import storage
 
 router = APIRouter(prefix="/api")
@@ -18,12 +21,18 @@ def list_tasks(limit: int = 100, offset: int = 0, mode: str | None = None, model
 
 
 @router.get("/tasks/{tid}/audio")
-def task_audio(tid: str):
+def task_audio(tid: str, format: str = "wav"):
     t = storage.get_task(tid)
     if not t:
         raise HTTPException(404, "task not found")
     if not t.get("file"):
         raise HTTPException(404, f"task has no audio (status={t['status']})")
+    if (format or "wav").lower() == "mp3":
+        try:
+            mp3 = podcast.transcode_mp3(Path(t["file"]))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+        return FileResponse(mp3, media_type="audio/mpeg", filename=f"{tid}.mp3")
     return FileResponse(t["file"], media_type="audio/wav", filename=f"{tid}.wav")
 
 

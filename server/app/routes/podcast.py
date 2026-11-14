@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -231,10 +232,19 @@ def delete_episode(pid: str):
 
 
 @router.get("/podcast/episodes/{pid}/audio")
-def episode_audio(pid: str):
+def episode_audio(pid: str, format: str = "wav"):
     ep = storage.get_episode(pid)
     if not ep or not ep.get("file"):
         raise HTTPException(404, "成品音频不存在")
+    if (format or "wav").lower() == "mp3":
+        from pathlib import Path
+        try:
+            mp3 = podcast.transcode_mp3(Path(ep["file"]))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+        title = (ep.get("title") or pid).strip() or pid
+        safe = re.sub(r'[\\/:*?"<>|]+', "_", title)   # 文件名非法字符 (标题可能含日期 2026/11/13)
+        return FileResponse(mp3, media_type="audio/mpeg", filename=f"{safe}.mp3")
     return FileResponse(ep["file"], media_type="audio/wav", filename=f"podcast_{pid}.wav")
 
 

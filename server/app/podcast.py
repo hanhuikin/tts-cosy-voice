@@ -385,6 +385,25 @@ def ffmpeg_available() -> bool:
     return find_ffmpeg() is not None
 
 
+def transcode_mp3(src: Path, bitrate: str = "128k") -> Path:
+    """WAV → MP3 (libmp3lame)。结果缓存为同目录同名 .mp3, 源更新后自动重转;
+    ffmpeg 缺失时抛 RuntimeError (路由转 503)。"""
+    out = src.with_suffix(".mp3")
+    if out.exists() and out.stat().st_mtime >= src.stat().st_mtime - 1:
+        return out
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg 未安装, 无法导出 MP3")
+    tmp = out.with_suffix(".mp3.part")
+    cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(src),
+           "-codec:a", "libmp3lame", "-b:a", bitrate, "-f", "mp3", str(tmp)]   # .part 扩展名未知, 显式指定封装
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if r.returncode != 0 or not tmp.exists() or tmp.stat().st_size == 0:
+        raise RuntimeError("MP3 转码失败: " + (r.stderr or "")[-300:])
+    tmp.replace(out)
+    return out
+
+
 def build_ffmpeg_cmd(protocol: str, url: str, ep_id: str, input_wav: Optional[str] = None) -> list[str]:
     """构建推流命令。-re 使 ffmpeg 按实时节拍读取: 产出不及时时输出流保持连续
     (延迟增长) 而非断续。input_wav 为空时从 stdin 读 PCM。"""
