@@ -151,10 +151,12 @@ powershell -ExecutionPolicy Bypass -File scripts\start.ps1 -Port 8001 -Model ind
 
 ## API 摘要
 
+> 完整接口文档 (参数表 / 示例 / 调用来源标识 / MCP 接入): **[docs/API.md](docs/API.md)**, 交互式调试见 `/docs`。
+
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | POST | `/api/tts` | 统一合成：`{text, model, mode, spk_id/voice_id, prompt_text, instruct_text, speed, stream}`；`stream=true` 返回分块 WAV 流 |
-| POST | `/v1/audio/speech` | OpenAI 兼容：`{input, voice, speed}`，`voice` 传内置说话人名或 `voice:<音色id>` |
+| POST | `/v1/audio/speech` | OpenAI 兼容：`{input, voice, speed}`，`voice` 传内置说话人名或音色 id (裸 id / `voice:<id>` 均可) |
 | GET/POST | `/api/voices` | 音色列表 / 上传（multipart: name, prompt_text, file） |
 | PUT | `/api/voices/{id}` | 编辑音色名称 / 参考文本 |
 | GET | `/api/voices/{id}/prompt` | 试听参考音频 |
@@ -170,6 +172,7 @@ powershell -ExecutionPolicy Bypass -File scripts\start.ps1 -Port 8001 -Model ind
 | GET/POST/PUT/DELETE | `/api/podcast/episodes…` | 剧集 CRUD / 合成 `{mode:"final"}` / 推流 `{protocol,url}` / 状态轮询 |
 | GET | `/live/{id}.m3u8` | HLS 拉流播放列表 |
 | GET | `/docs` | Swagger UI |
+| POST/GET/DELETE | `/mcp` · `/mcp/sse` · `/mcp/messages` | MCP 接口: Streamable HTTP 与 SSE 传输 (stdio 入口 `server/mcp_server.py`); 工具目录见 docs/API.md |
 
 ## 测试
 

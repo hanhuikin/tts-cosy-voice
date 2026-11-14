@@ -47,7 +47,7 @@ def _resolve_prompt(spec: EngineSpec) -> None:
         raise HTTPException(404, f"prompt wav not found: {spec.prompt_wav}")
 
 
-@router.post("/api/tts")
+@router.post("/api/tts", summary="文本转语音 (WAV; stream=true 时流式输出)")
 async def tts(body: TTSRequest, request: Request):
     # pydantic 校验通过后转引擎内部 dataclass (含 prompt_wav 内部字段)
     spec = EngineSpec(**body.model_dump())
@@ -58,7 +58,9 @@ async def tts(body: TTSRequest, request: Request):
 
     # 前端可在 X-Client-Task-Id 预生成任务 id: 生成中即可凭它调用停止接口
     client_tid = request.headers.get("x-client-task-id") or None
-    task_id = storage.create_task(spec, task_id=client_tid if client_tid else None)
+    # 调用来源标识: 客户端可用 X-Client-Source 覆盖 (如 web-ui / mcp:<工具名>), 用于任务历史与控制台审计
+    source = (request.headers.get("x-client-source") or "api:/api/tts").strip()[:120]
+    task_id = storage.create_task(spec, task_id=client_tid if client_tid else None, source=source)
     try:
         job = await engine.submit(spec)
     except QueueFullError:
@@ -181,7 +183,7 @@ def _stream_response(job, task_id: str, sample_rate: int) -> StreamingResponse:
 
 
 # ---------- 停止生成 ----------
-@router.post("/api/tasks/{task_id}/stop")
+@router.post("/api/tasks/{task_id}/stop", summary="停止进行中的合成任务")
 async def stop_task(task_id: str):
     """停止进行中的合成: 排队中的直接跳过; 推理中的在下一个分块边界停止。"""
     job = _active_jobs.get(task_id)
@@ -192,7 +194,7 @@ async def stop_task(task_id: str):
 
 
 # ---------- OpenAI 兼容端点 ----------
-@router.post("/v1/audio/speech")
+@router.post("/v1/audio/speech", summary="OpenAI 兼容: 文本转语音 (voice=说话人或 voice:<音色id>)")
 async def openai_speech(body: OpenAISpeechRequest):
     voice = body.voice
     cfg = MODEL_REGISTRY[body.model]
@@ -212,6 +214,12 @@ async def openai_speech(body: OpenAISpeechRequest):
         if clone_mode is None:
             raise HTTPException(400, f"模型 {body.model} 不支持参考音频克隆")
         spec_kwargs.update(mode=clone_mode, voice_id=voice.split(":", 1)[1])
+    elif storage.get_voice(voice):
+        # 裸 voice_id (音色库已存音色): 与 voice:<id> 等价, 走参考音频克隆
+        clone_mode = next((m for m in ("zero_shot", "cross_lingual") if m in cfg["modes"]), None)
+        if clone_mode is None:
+            raise HTTPException(400, f"模型 {body.model} 不支持参考音频克隆")
+        spec_kwargs.update(mode=clone_mode, voice_id=voice)
     elif "sft" in cfg["speaker_modes"]:
         spec_kwargs.update(mode="sft", spk_id=voice)
     elif "instruct" in cfg["speaker_modes"]:
@@ -235,7 +243,7 @@ async def openai_speech(body: OpenAISpeechRequest):
     if err:
         raise HTTPException(400, err)
 
-    task_id = storage.create_task(spec)
+    task_id = storage.create_task(spec, source="openai:/v1/audio/speech")
     try:
         job = await engine.submit(spec)
     except QueueFullError:

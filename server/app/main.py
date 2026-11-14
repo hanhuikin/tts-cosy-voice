@@ -20,7 +20,7 @@ setup_sys_path()
 
 from .engine import MODEL_REGISTRY, QUEUE_MAX, engine
 from .model_registry import MODEL_KEYS, is_available
-from .routes import podcast, system, tasks, tts, voices
+from .routes import mcp, podcast, system, tasks, tts, voices
 from .storage import DATA_DIR, storage
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -28,7 +28,27 @@ logger = logging.getLogger("cosyvoice-server")
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 
-app = FastAPI(title="CosyVoice Server", version="1.0.0", docs_url="/docs")
+TAGS_METADATA = [
+    {"name": "系统", "description": "健康状态 / 模型管理 / 环境自检 / SSE 实时事件流。"},
+    {"name": "TTS 合成", "description": "文本转语音: 统一入口 `/api/tts` 与 OpenAI 兼容 `/v1/audio/speech`; "
+                                        "完整接口说明见仓库 `docs/API.md`。"},
+    {"name": "音色管理", "description": "参考音频上传克隆 / 音色增删改查 / 参考音频试听。"},
+    {"name": "任务历史", "description": "合成任务记录查询 (含调用来源 source) 与音频下载 (WAV/MP3)。"},
+    {"name": "播客工坊", "description": "LLM 对话稿生成 / 剧集管理 / 逐句合成 (final+stream) / 直播推流。"},
+    {"name": "MCP", "description": "Model Context Protocol 接入: SSE (`/mcp/sse`) 与 Streamable HTTP "
+                                   "(`/mcp`) 传输; stdio 传输入口为 `server/mcp_server.py`。工具目录见 `docs/API.md`。"},
+]
+
+app = FastAPI(
+    title="CosyVoice TTS Server",
+    description="CosyVoice/多模型 TTS 服务: 文本转语音、音色克隆、播客工坊、直播推流。\n\n"
+                "- 接口约定、参数表与示例: 仓库 `docs/API.md`\n"
+                "- 交互式调试: 本页 `/docs`\n"
+                "- MCP 接入 (stdio/SSE/Streamable HTTP): `/mcp` 与 `server/mcp_server.py`",
+    version="1.1.0",
+    docs_url="/docs",
+    openapi_tags=TAGS_METADATA,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -46,11 +66,12 @@ async def no_cache_static(request, call_next):
         response.headers["Cache-Control"] = "no-cache"
     return response
 
-app.include_router(tts.router)
-app.include_router(voices.router)
-app.include_router(tasks.router)
-app.include_router(system.router)
-app.include_router(podcast.router)
+app.include_router(tts.router, tags=["TTS 合成"])
+app.include_router(voices.router, tags=["音色管理"])
+app.include_router(tasks.router, tags=["任务历史"])
+app.include_router(system.router, tags=["系统"])
+app.include_router(podcast.router, tags=["播客工坊"])
+app.include_router(mcp.router, tags=["MCP"])
 
 
 @app.get("/", include_in_schema=False)

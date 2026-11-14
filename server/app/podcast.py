@@ -16,13 +16,14 @@ import threading
 import time
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 
 from .audio import pcm_to_wav, wav_header
 from .engine import TTSRequest, engine
 from .model_registry import MODEL_REGISTRY
-from .storage import storage
+from .storage import DATA_DIR, storage, audio_logger
 
 logger = logging.getLogger("cosyvoice-server.podcast")
 
@@ -31,12 +32,30 @@ LIVE_DIR = DATA_DIR / "live"
 SAMPLE_RATE = 24000
 
 
+def _log_episode_audio(ep_id: str, source: str, status: str, lines_done: int, n_bytes: int) -> None:
+    """控制台审计: 播客合成不走 /api/tts (无任务记录), 在收尾处统一打「音频产出」日志。"""
+    ep = storage.get_episode(ep_id)
+    parts = [f"来源={source}", f"剧集={ep_id}", f"状态={status}", f"完成句数={lines_done}"]
+    if ep:
+        parts.append(f"标题={ep.get('title', '-')}")
+        if ep.get("duration"):
+            parts.append(f"时长={ep['duration']:.2f}s")
+        if ep.get("error"):
+            parts.append(f"错误={ep['error']}")
+        if ep.get("file"):
+            parts.append(f"文件={ep['file']}")
+    audio_logger.info("🔊 [音频产出] %s", " | ".join(parts))
+
+
 # ---------- 内容提取 ----------
 
 def extract_from_url(url: str, timeout: int = 30) -> str:
-    """抓取网页正文 (bs4 去除脚本/样式), 返回纯文本。"""
+    """抓取网页正文 (bs4 去除脚本/样式), 返回纯文本。loopback 地址强制直连 (避免系统代理劫持本机回环)。"""
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) CosyVoicePodcast/1.0"}
-    r = requests.get(url, headers=headers, timeout=timeout)
+    proxies = None
+    if (urlparse(url).hostname or "").lower() in ("127.0.0.1", "localhost", "::1"):
+        proxies = {"http": None, "https": None}
+    r = requests.get(url, headers=headers, timeout=timeout, proxies=proxies)
     r.raise_for_status()
     r.encoding = r.apparent_encoding or "utf-8"
     from bs4 import BeautifulSoup
@@ -315,6 +334,7 @@ async def stream_episode_gen(ep_id: str):
             update_kwargs["lines_meta"] = json.dumps({"ends": line_ends, "sr": SAMPLE_RATE})
         storage.update_episode(ep_id, **update_kwargs)
         logger.info("episode %s 本地流式结束: %s, %d 句, %d bytes", ep_id, status, done, sum(len(p) for p in parts))
+        _log_episode_audio(ep_id, "播客合成(stream)", status, done, len(parts))
 
 
 async def synth_episode_final(ep_id: str) -> None:
@@ -367,6 +387,7 @@ async def synth_episode_final(ep_id: str) -> None:
         storage.update_episode(ep_id, status="failed", error=f"{type(e).__name__}: {e}")
     finally:
         _synth_clear_stop(ep_id)
+        _log_episode_audio(ep_id, "播客合成(final)", status, done, len(all_parts))
 
 
 # ---------- 推流 ----------

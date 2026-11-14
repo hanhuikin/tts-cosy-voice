@@ -12,7 +12,7 @@ from ..storage import storage
 router = APIRouter(prefix="/api")
 
 
-@router.get("/tasks")
+@router.get("/tasks", summary="合成任务历史 (含调用来源 source)")
 def list_tasks(limit: int = 100, offset: int = 0, mode: str | None = None, model: str | None = None):
     tasks = storage.list_tasks(limit=min(limit, 500), offset=offset, mode=mode, model=model)
     for t in tasks:
@@ -20,7 +20,17 @@ def list_tasks(limit: int = 100, offset: int = 0, mode: str | None = None, model
     return {"tasks": tasks, "total": len(tasks)}
 
 
-@router.get("/tasks/{tid}/audio")
+@router.get("/tasks/{tid}")
+def get_task_detail(tid: str):
+    """单条任务详情 (含状态/耗时/来源), 音频经 /tasks/{tid}/audio 下载。"""
+    t = storage.get_task(tid)
+    if not t:
+        raise HTTPException(404, "task not found")
+    t.pop("file", None)  # 不暴露绝对路径
+    return t
+
+
+@router.get("/tasks/{tid}/audio", summary="下载任务音频 (WAV / ?format=mp3)")
 def task_audio(tid: str, format: str = "wav"):
     t = storage.get_task(tid)
     if not t:
@@ -36,7 +46,7 @@ def task_audio(tid: str, format: str = "wav"):
     return FileResponse(t["file"], media_type="audio/wav", filename=f"{tid}.wav")
 
 
-@router.delete("/tasks/{tid}")
+@router.delete("/tasks/{tid}", summary="删除任务记录")
 def delete_task(tid: str):
     if not storage.delete_task(tid):
         raise HTTPException(404, "task not found")

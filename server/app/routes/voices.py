@@ -24,7 +24,7 @@ class VoiceUpdate(BaseModel):
     prompt_text: Optional[str] = Field(default=None, min_length=1, max_length=500)
 
 
-@router.get("/voices")
+@router.get("/voices", summary="音色库列表")
 def list_voices():
     voices = storage.list_voices()
     for v in voices:
@@ -32,7 +32,7 @@ def list_voices():
     return voices
 
 
-@router.get("/speakers")
+@router.get("/speakers", summary="当前模型内置说话人列表")
 def list_speakers():
     return {"speakers": engine_speakers()}
 
@@ -44,7 +44,7 @@ def engine_speakers() -> list[str]:
     return st.get("speakers", []) if st["state"] == "ready" else []
 
 
-@router.post("/voices")
+@router.post("/voices", summary="上传参考音频克隆音色 (multipart)")
 async def create_voice(
     name: str = Form(...),
     prompt_text: str = Form(...),
@@ -86,7 +86,7 @@ async def create_voice(
         tmp_path.unlink(missing_ok=True)
 
 
-@router.put("/voices/{vid}")
+@router.put("/voices/{vid}", summary="编辑音色名称 / 参考文本")
 def update_voice(vid: str, body: VoiceUpdate):
     """编辑音色名称 / 参考文本 (至少提供一项)。"""
     if body.name is None and body.prompt_text is None:
@@ -101,7 +101,7 @@ def update_voice(vid: str, body: VoiceUpdate):
     return voice
 
 
-@router.get("/voices/{vid}/prompt")
+@router.get("/voices/{vid}/prompt", summary="试听音色参考音频")
 def voice_prompt(vid: str):
     voice = storage.get_voice(vid)
     if not voice:
@@ -109,7 +109,7 @@ def voice_prompt(vid: str):
     return FileResponse(voice["file"], media_type="audio/wav", filename=f"{vid}.wav")
 
 
-@router.delete("/voices/{vid}")
+@router.delete("/voices/{vid}", summary="删除音色")
 def delete_voice(vid: str):
     if not storage.delete_voice(vid):
         raise HTTPException(404, "voice not found")

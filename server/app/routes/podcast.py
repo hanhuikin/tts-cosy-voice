@@ -5,6 +5,8 @@ import asyncio
 import json
 import re
 
+import requests
+
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -18,7 +20,7 @@ PROTOCOLS = {"rtmp", "srt", "rtsp", "hls"}
 
 
 # ---------- 大模型配置 ----------
-@router.get("/llm/config")
+@router.get("/llm/config", summary="读取 LLM 配置 (密钥脱敏)")
 def llm_get_config():
     return llm.masked(llm.load_config())
 
@@ -32,12 +34,12 @@ class LLMConfigBody(BaseModel):
     style_prompt: str | None = None
 
 
-@router.put("/llm/config")
+@router.put("/llm/config", summary="保存 LLM 配置")
 def llm_save_config(body: LLMConfigBody):
     return llm.save_config(body.model_dump())
 
 
-@router.post("/llm/test")
+@router.post("/llm/test", summary="测试 LLM 连通性")
 def llm_test():
     try:
         return {"ok": True, **llm.test_connect()}
@@ -46,7 +48,7 @@ def llm_test():
 
 
 # ---------- 内容提取 ----------
-@router.post("/podcast/source/extract")
+@router.post("/podcast/source/extract", summary="内容提取: 上传文件 (multipart) 或抓取 URL")
 async def podcast_extract(request: Request, file: UploadFile | None = File(None)):
     """文件上传 (multipart) 或 JSON {url} 二选一, 返回提取的纯文本。"""
     if file is not None:
@@ -54,7 +56,7 @@ async def podcast_extract(request: Request, file: UploadFile | None = File(None)
         if len(raw) > 20 * 1024 * 1024:
             raise HTTPException(400, "文件过大 (max 20MB)")
         try:
-            text = podcast.extract_from_file(file.filename or " unnamed.txt", raw)
+            text = await asyncio.to_thread(podcast.extract_from_file, file.filename or " unnamed.txt", raw)
         except ValueError as e:
             raise HTTPException(400, str(e))
         except Exception as e:
@@ -65,7 +67,8 @@ async def podcast_extract(request: Request, file: UploadFile | None = File(None)
     if not url.startswith(("http://", "https://")):
         raise HTTPException(400, "请提供有效的 http(s) URL")
     try:
-        text = podcast.extract_from_url(url)
+        # 线程池执行: 阻塞式抓取不能占用事件循环 (否则服务抓自身页面会自锁)
+        text = await asyncio.to_thread(podcast.extract_from_url, url)
     except requests.RequestException as e:
         raise HTTPException(400, f"抓取失败: {type(e).__name__}: {e}")
     except ValueError as e:
@@ -79,7 +82,7 @@ class ScriptBody(BaseModel):
     speakers: list[dict] = []   # 主持阵容: {role, name, desc}, 注入 prompt 供大模型关联
 
 
-@router.post("/podcast/script")
+@router.post("/podcast/script", summary="LLM 流式生成对话稿 (纯文本增量)")
 async def podcast_script(body: ScriptBody):
     speakers = [s for s in body.speakers if isinstance(s, dict)]
     cfg = llm.load_config()
@@ -102,7 +105,7 @@ async def podcast_script(body: ScriptBody):
     return StreamingResponse(gen(), media_type="text/plain; charset=utf-8")
 
 
-@router.post("/podcast/parse-script")
+@router.post("/podcast/parse-script", summary="解析 LLM 原始输出为结构化对话稿行")
 async def podcast_parse(request: Request):
     """解析前端累积的原始 LLM 输出 -> 结构化对话稿行。
     传入阵容时做说话人归一化: 姓名对不上名单的行纠正为名单内说话人。"""
@@ -167,7 +170,7 @@ def _episode_speakers_json(body: EpisodeBody) -> tuple[str, str, str]:
     return json.dumps(spks, ensure_ascii=False), host, guest
 
 
-@router.post("/podcast/episodes")
+@router.post("/podcast/episodes", summary="创建剧集 (对话稿落库)")
 def create_episode(body: EpisodeBody):
     if not body.lines:
         raise HTTPException(400, "对话稿为空")
@@ -179,7 +182,7 @@ def create_episode(body: EpisodeBody):
     return ep
 
 
-@router.get("/podcast/episodes")
+@router.get("/podcast/episodes", summary="剧集列表 (含实时推流状态)")
 def list_episodes(limit: int = 50):
     """剧集列表, 同时作为播客任务队列的数据源:
     附带 lines_count 与正在推流剧集的实时推流状态 (elapsed/进度)。"""
@@ -196,7 +199,7 @@ def list_episodes(limit: int = 50):
     return {"episodes": eps}
 
 
-@router.get("/podcast/episodes/{pid}")
+@router.get("/podcast/episodes/{pid}", summary="剧集详情 (对话稿/阵容/推流状态)")
 def get_episode(pid: str):
     ep = storage.get_episode(pid)
     if not ep:
@@ -210,7 +213,7 @@ def get_episode(pid: str):
     return ep
 
 
-@router.put("/podcast/episodes/{pid}")
+@router.put("/podcast/episodes/{pid}", summary="更新剧集")
 def update_episode(pid: str, body: EpisodeBody):
     if not storage.get_episode(pid):
         raise HTTPException(404, "episode not found")
@@ -222,7 +225,7 @@ def update_episode(pid: str, body: EpisodeBody):
     return ep
 
 
-@router.delete("/podcast/episodes/{pid}")
+@router.delete("/podcast/episodes/{pid}", summary="删除剧集")
 def delete_episode(pid: str):
     if podcast.push_manager.info.get("episode_id") == pid and podcast.push_manager.active:
         raise HTTPException(409, "该剧集正在推流, 请先停止")
@@ -231,7 +234,7 @@ def delete_episode(pid: str):
     return {"ok": True}
 
 
-@router.get("/podcast/episodes/{pid}/audio")
+@router.get("/podcast/episodes/{pid}/audio", summary="下载剧集成品音频 (WAV / ?format=mp3)")
 def episode_audio(pid: str, format: str = "wav"):
     ep = storage.get_episode(pid)
     if not ep or not ep.get("file"):
@@ -248,7 +251,7 @@ def episode_audio(pid: str, format: str = "wav"):
     return FileResponse(ep["file"], media_type="audio/wav", filename=f"podcast_{pid}.wav")
 
 
-@router.get("/podcast/episodes/{pid}/status")
+@router.get("/podcast/episodes/{pid}/status", summary="剧集合成进度")
 def episode_status(pid: str):
     ep = storage.get_episode(pid)
     if not ep:
@@ -263,7 +266,7 @@ class SynthesizeBody(BaseModel):
     mode: str = "final"
 
 
-@router.post("/podcast/episodes/{pid}/synthesize")
+@router.post("/podcast/episodes/{pid}/synthesize", summary="合成剧集 (mode=final 落盘 / stream 本地流式)")
 async def synthesize_episode(pid: str, body: SynthesizeBody):
     ep = storage.get_episode(pid)
     if not ep:
@@ -306,7 +309,7 @@ class PushBody(BaseModel):
     title: str | None = None
 
 
-@router.post("/podcast/episodes/{pid}/push")
+@router.post("/podcast/episodes/{pid}/push", summary="开始推流 (rtmp/srt/rtsp/hls)")
 async def push_episode(pid: str, body: PushBody):
     if body.protocol not in PROTOCOLS:
         raise HTTPException(422, f"protocol 必须是 {sorted(PROTOCOLS)} 之一")
@@ -329,14 +332,14 @@ async def push_episode(pid: str, body: PushBody):
     return status
 
 
-@router.delete("/podcast/episodes/{pid}/push")
+@router.delete("/podcast/episodes/{pid}/push", summary="停止推流")
 def stop_push(pid: str):
     if podcast.push_manager.info.get("episode_id") != pid:
         raise HTTPException(404, "该剧集当前没有推流")
     return podcast.push_manager.stop()
 
 
-@router.post("/podcast/episodes/{pid}/stop")
+@router.post("/podcast/episodes/{pid}/stop", summary="停止合成 (当前句分块边界结束)")
 def stop_episode(pid: str):
     """停止合成 (成品/流式通用): 当前句在分块边界停止推理, 后续句子不再合成。"""
     ep = storage.get_episode(pid)
@@ -346,11 +349,11 @@ def stop_episode(pid: str):
     return {"ok": True, "episode_id": pid, "stopping": True}
 
 
-@router.get("/podcast/push/status")
+@router.get("/podcast/push/status", summary="推流状态")
 def push_status():
     return podcast.push_manager.status()
 
 
-@router.get("/podcast/ffmpeg")
+@router.get("/podcast/ffmpeg", summary="ffmpeg 可用性检查")
 def ffmpeg_check():
     return {"available": podcast.ffmpeg_available()}

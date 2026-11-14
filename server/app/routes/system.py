@@ -17,7 +17,7 @@ from ..storage import storage
 router = APIRouter(prefix="/api")
 
 
-@router.get("/health")
+@router.get("/health", summary="服务健康状态 (引擎/模型/GPU/队列)")
 def health():
     st = engine.status()
     st["voices_count"] = len(storage.list_voices())
@@ -25,12 +25,12 @@ def health():
     return st
 
 
-@router.get("/models")
+@router.get("/models", summary="模型注册表与加载状态")
 def models():
     return {"models": engine.models_info()}
 
 
-@router.get("/admin/config")
+@router.get("/admin/config", summary="运行环境与权重目录配置 (只读)")
 def admin_config():
     """「系统状态与设置」读取当前生效的权重目录 / 运行环境 (只读)。
 
@@ -51,7 +51,7 @@ def admin_config():
     return data
 
 
-@router.get("/models/{key}/doctor")
+@router.get("/models/{key}/doctor", summary="模型就绪诊断 (权重/解释器/依赖)")
 def model_doctor(key: str):
     """诊断某个本地模型的权重 / 解释器 / 依赖是否就绪 (不加载模型、不占显存)。"""
     if key not in MODEL_REGISTRY:
@@ -95,7 +95,7 @@ def model_doctor(key: str):
     return result
 
 
-@router.post("/admin/model")
+@router.post("/admin/model", summary="切换 / 加载模型")
 async def switch_model(body: ModelSwitchRequest, request: Request):
     if engine.state == "loading":
         raise HTTPException(409, "another model is loading, please wait")
@@ -110,7 +110,7 @@ async def switch_model(body: ModelSwitchRequest, request: Request):
     return {"ok": True, "state": "loading", "model": body.model}
 
 
-@router.get("/events")
+@router.get("/events", summary="SSE 实时事件流 (引擎状态/队列变化)")
 async def events(request: Request):
     """SSE 事件流: engine 状态 / queue 变化。"""
     q = engine.events.subscribe()
