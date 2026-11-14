@@ -1172,15 +1172,15 @@ function renderPodOutput(){
     body=`<div class="push-grid"><div>
      <p style="font-size:13px;margin:0 0 4px"><strong>整段合成，音质最稳</strong></p>
      <p style="font-size:12px;color:var(--text-3);margin:0">逐句合成后拼成一条音轨，完成后自动归档为剧集，可试听与下载。</p>
-     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn sec" data-act="pod-synth" ${pod.lines.length&&!busy&&!pod.busyStream?'':'disabled'}>${busy?`合成中 ${pod.progress||0}/${pod.lines.length}`:'合成播客成品'}</button>
+     ${!pod.lines.length?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>请先生成或载入对话稿，才能合成成品。</span></div>`:''}
+     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:flex-end"><button class="btn sec" data-act="pod-synth" ${pod.lines.length&&!busy&&!pod.busyStream?'':'disabled'}>${busy?`合成中 ${pod.progress||0}/${pod.lines.length}`:'合成播客成品'}</button>
       <button class="btn sec" data-act="pod-synth-stop" ${busy&&!pod.stopping?'':'disabled'}>${pod.stopping?'停止中…':'■ 停止'}</button>
       <button class="btn sec" data-act="pod-play" ${done?'':'disabled'}>${icon('play','ic sm')}试听</button>
       <button class="btn sec" data-act="pod-download" ${done?'':'disabled'}>${icon('down','ic sm')}下载成品</button></div>
-     ${!pod.lines.length?`<div class="notice warn" style="margin-top:10px">${icon('info','ic sm')}<span>请先生成或载入对话稿，才能合成成品。</span></div>`:''}
-    </div><div>
+    </div><div style="align-self:end">
      <div class="result-card"><p class="result-title">${pod.episode?esc(pod.episode.title):'当前剧集尚未合成'}</p>
       <div class="result-meta">${pod.lines.length} 轮 · ${done&&pod.episode&&pod.episode.duration?pod.episode.duration.toFixed(1)+' 秒 · ':''}24 kHz WAV</div>
-      <canvas class="pb-wave-c" id="pod-wave" style="height:44px"></canvas>
+      <canvas class="pb-wave-c" id="pod-wave" style="height:34px"></canvas>
       ${busy?`<div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><div class="times"><span>正在合成第 ${pod.progress||0} / ${pod.lines.length} 句</span><span>请稍候</span></div>`
         :`<div class="times"><span id="pod-t-cur">${podPlayingEp()?fmt(playerState.position):'0:00'}</span><span>${done&&pod.episode&&pod.episode.duration?fmt(pod.episode.duration):'—'}</span></div>`}
      </div></div></div>`;
@@ -1196,10 +1196,10 @@ function renderPodOutput(){
         :caps().stream?`正在合成首句，${esc(model()?model().label:'当前模型')} 逐块下发，首包到达即开始播放`
         :`等待首包…（${esc(model()?model().label:'当前模型')} 为整段缓冲型，首句合成完才开始下发）`}</span></div>`
        :done?`<div class="notice" style="margin-top:10px">${icon('info','ic sm')}<span>播放完成，成品已自动归档；可切到「成品合成」下载 WAV 或 MP3。</span></div>`:''}
-    </div><div>
+    </div><div style="align-self:end">
      <div class="result-card"><p class="result-title">${pod.busyStream?'流式播放中':(done?'流式播放完成 · 已归档':'尚未开始流式播放')}</p>
       <div class="result-meta" id="pod-stream-meta">${pod.lines.length} 轮 · 24 kHz WAV${playerState.firstMs?` · 首包 ${playerState.firstMs} ms`:''}${pod.busyStream&&!playerState.firstMs?' · 等待首包…':''}</div>
-      <canvas class="pb-wave-c" id="pod-stream-wave" style="height:44px"></canvas>
+      <canvas class="pb-wave-c" id="pod-stream-wave" style="height:34px"></canvas>
       <div class="times"><span id="pod-stream-t-cur">${fmt(playerState.position)}</span><span id="pod-stream-t-dur">${pod.busyStream&&!playerState.duration?'合成中…':(playerState.duration?fmt(playerState.duration):'—')}</span></div>
      </div></div></div>`;
   }else{
@@ -1460,6 +1460,10 @@ function autoTitle(){
   return `播客 ${new Date().toLocaleDateString('zh-CN')} · ${(src||'').replace(/^https?:\/\//,'').slice(0,24)||'未命名'}`;
 }
 async function saveEpisode(silent){
+  if(!pod.lines.length){
+    if(!silent)toast('对话稿为空，请先生成或载入对话稿再保存',true);
+    throw new Error('对话稿为空');
+  }
   ensureSpeakerNames();
   const host=pod.speakers.find(s=>s.role==='host')||pod.speakers[0];
   const keepTitle=pod.episode&&pod.episode.title?pod.episode.title:autoTitle();
@@ -1471,14 +1475,19 @@ async function saveEpisode(silent){
     voice_guest:(pod.speakers.find(s=>s.role!=='host')||{}).voice_id||'',
     speed:pod.speed,
   };
-  if(pod.episode&&pod.episode.id){
-    await api(`/api/podcast/episodes/${pod.episode.id}`,{
-      method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  }else{
-    pod.episode=await(await api('/api/podcast/episodes',{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  try{
+    if(pod.episode&&pod.episode.id){
+      await api(`/api/podcast/episodes/${pod.episode.id}`,{
+        method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    }else{
+      pod.episode=await(await api('/api/podcast/episodes',{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+    }
+    await loadEpisodes();
+  }catch(e){
+    if(!silent)toast('保存失败: '+e.message,true,6000);
+    throw e;
   }
-  await loadEpisodes();
   if(!silent)toast('剧集已保存，可在右侧「播客列表」载入');
 }
 async function loadEpisodes(){
@@ -1509,7 +1518,8 @@ async function loadEpisode(id){
 }
 /* ---- 播客: 合成 (成品 / 流式) ---- */
 async function synthPodFinal(){
-  if(!pod.lines.length||pod.busyFinal||pod.busyStream)return;
+  if(!pod.lines.length){toast('请先生成或载入对话稿，才能合成成品',true);renderPod();return}
+  if(pod.busyFinal||pod.busyStream){toast('已有合成任务进行中',true);return}
   pod.busyFinal=true;pod.busySince=Date.now();pod.progress=0;pod.stopping=false;
   try{
     await saveEpisode(true);
@@ -1569,7 +1579,8 @@ function podLineMarks(ep){
   return{marks:[0,...meta.ends.slice(0,-1)].map((s,i)=>({s,idx:i})),sr:meta.sr||24000};
 }
 async function synthPodStream(){
-  if(!pod.lines.length||pod.busyFinal||pod.busyStream)return;
+  if(!pod.lines.length){toast('请先生成或载入对话稿，才能流式播放',true);renderPod();return}
+  if(pod.busyFinal||pod.busyStream){toast('已有合成任务进行中',true);return}
   pod.busyStream=true;pod.busySince=Date.now();pod.outTab='stream';pod.stopping=false;renderPod();
   try{
     await saveEpisode(true);
@@ -1609,7 +1620,8 @@ async function stopPodSynth(){
 }
 /* ---- 播客: 推流 ---- */
 async function startPush(){
-  if(!pod.lines.length||pod.pushing)return;
+  if(!pod.lines.length){toast('请先生成或载入对话稿，才能推流',true);return}
+  if(pod.pushing){toast('已有推流进行中',true);return}
   pod.pushing=true;renderPodOutput();
   try{
     await saveEpisode(true);
@@ -2150,7 +2162,7 @@ document.addEventListener('click',e=>{
     if(pod.speakers.filter(s=>s.role!=='host').length<=1){toast('至少保留一位嘉宾',true);break}
     pod.speakers.splice(+t.dataset.i,1);renderPodCast();renderPodScript();renderPodStepper();break}
    case 'pod-out-tab':pod.outTab=k;renderPodOutput();break;
-   case 'pod-save':saveEpisode();break;
+   case 'pod-save':saveEpisode().catch(()=>{});break;   // 失败已在函数内 toast
    case 'pod-synth':synthPodFinal();break;
    case 'pod-play':{if(!podSynthDone()||!pod.episode){toast('请先合成成品',true);break}
     player.playFile(`/api/podcast/episodes/${pod.episode.id}/audio`,'播客 · '+(pod.episode.title||''),null);

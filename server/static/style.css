@@ -423,7 +423,7 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 .out-tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--line)}
 .out-tabs button{padding:9px 14px;font-size:13px;color:var(--text-2);border-bottom:2px solid transparent;margin-bottom:-1px;min-height:40px}
 .out-tabs button.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:650}
-.push-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.push-grid{display:grid;grid-template-columns:minmax(min(400px,45%),.66fr) 1.8fr;gap:16px}
 .proto-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
 .push-status{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;background:var(--surface-2);font-size:12px;margin-top:10px;flex-wrap:wrap}
 .live-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 3px var(--danger-soft);animation:pulse2 1.2s infinite;flex:none}
@@ -575,7 +575,8 @@ input[type=range]{flex:1;min-width:140px;accent-color:var(--primary)}
 .out-zone .pcol-head{margin-bottom:2px}
 .out-zone .out-tabs{margin-bottom:10px}
 .out-zone .out-tabs button{padding:6px 14px;min-height:34px}
-.out-zone .result-card{padding:12px}
+.out-zone .result-card{padding:10px 14px}
+.out-zone .result-meta{margin-bottom:8px}
 .out-zone .wave{height:36px}
 .out-zone .times{margin-bottom:6px}
 /* ===== v1.6 右侧面板配色重构：语义色降噪，回归单色系 ===== */
